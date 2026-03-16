@@ -9,6 +9,7 @@ import (
 	"github.com/agencycli/agencycli/internal/ctxbuild"
 	"github.com/agencycli/agencycli/internal/entity"
 	"github.com/agencycli/agencycli/internal/formatter"
+	"github.com/agencycli/agencycli/internal/sandbox"
 	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -40,6 +41,14 @@ func buildHireCmd(use string) *cobra.Command {
 		agentName   string
 		extraPrompt string
 		force       bool
+
+		// Sandbox flags
+		sandboxProvider    string
+		sandboxImage       string
+		sandboxNetwork     string
+		sandboxMemoryMB    int
+		sandboxCPUs        float64
+		sandboxNoAutoCreds bool
 	)
 
 	cmd := &cobra.Command{
@@ -62,13 +71,20 @@ The output format depends on --model:
 		Example: `  agencycli hire --project "my-api" --team "engineering/backend" \
                --model "claudecode" --name "dev"
 
+  # Hire with Docker sandbox isolation
+  agencycli hire --project "my-api" --team "engineering/backend" \
+               --model "claudecode" --name "dev" \
+               --sandbox docker
+
+  # Custom image and memory limit
+  agencycli hire --project "my-api" --team "qa" --model "claudecode" --name "reviewer" \
+               --sandbox docker \
+               --sandbox-image "ghcr.io/myorg/my-claude-sandbox:v1" \
+               --sandbox-memory 8192
+
   # assign is identical to hire
   agencycli assign --project "my-api" --team "engineering/backend" \
-                --model "cursor" --name "cursor-dev"
-
-  # Then start working:
-  cd projects/my-api/agents/dev
-  claude`,
+                --model "cursor" --name "cursor-dev"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if project == "" || team == "" || model == "" || agentName == "" {
 				return fmt.Errorf("--project, --team, --model and --name are all required")
@@ -128,6 +144,35 @@ The output format depends on --model:
 				return fmt.Errorf("%s: format context: %w", use, err)
 			}
 
+			// Build sandbox config if requested.
+			var sandboxCfg *entity.SandboxConfig
+			if sandboxProvider != "" {
+				provider := entity.SandboxProvider(sandboxProvider)
+				switch provider {
+				case entity.SandboxDocker:
+					// Verify docker is reachable now so we fail fast at hire time.
+					if err := sandbox.CheckDocker(); err != nil {
+						return err
+					}
+					dockerCfg := &entity.DockerSandboxConfig{
+						Image:             sandboxImage,
+						NetworkMode:       sandboxNetwork,
+						MemoryMB:          sandboxMemoryMB,
+						CPUs:              sandboxCPUs,
+						NoAutoCredentials: sandboxNoAutoCreds,
+					}
+					sandboxCfg = &entity.SandboxConfig{
+						Provider: entity.SandboxDocker,
+						Docker:   dockerCfg,
+					}
+					if sandboxImage == "" {
+						sandboxImage = sandbox.ImageForModel(agentModel)
+					}
+				default:
+					return fmt.Errorf("unknown sandbox provider %q (supported: docker)", sandboxProvider)
+				}
+			}
+
 			meta := &entity.AgentMeta{
 				Name:        agentName,
 				Project:     project,
@@ -135,12 +180,13 @@ The output format depends on --model:
 				Model:       agentModel,
 				HiredAt:     time.Now().UTC(),
 				ContextHash: ctxbuild.LayerHashes(mc),
+				Sandbox:     sandboxCfg,
 			}
 			if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
 				return fmt.Errorf("%s: save agent meta: %w", use, err)
 			}
 
-			printHireSuccess(agentDir, agentModel, mc, project, agentName)
+			printHireSuccess(agentDir, agentModel, mc, project, agentName, sandboxCfg)
 			return nil
 		},
 	}
@@ -152,6 +198,13 @@ The output format depends on --model:
 	cmd.Flags().StringVar(&extraPrompt, "extra-prompt", "", "Path to an additional Markdown file to append to the context")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing agent directory")
 
+	cmd.Flags().StringVar(&sandboxProvider, "sandbox", "", "Sandbox provider: docker (default: none, runs on host)")
+	cmd.Flags().StringVar(&sandboxImage, "sandbox-image", "", "Docker image override (default: ghcr.io/agencycli/sandbox-<model>:latest)")
+	cmd.Flags().StringVar(&sandboxNetwork, "sandbox-network", "bridge", "Docker network mode: bridge|none|host")
+	cmd.Flags().IntVar(&sandboxMemoryMB, "sandbox-memory", 0, "Container memory limit in MiB (0 = no limit)")
+	cmd.Flags().Float64Var(&sandboxCPUs, "sandbox-cpus", 0, "Container CPU quota (0 = no limit)")
+	cmd.Flags().BoolVar(&sandboxNoAutoCreds, "sandbox-no-auto-creds", false, "Disable automatic credential mount defaults")
+
 	_ = cmd.MarkFlagRequired("project")
 	_ = cmd.MarkFlagRequired("team")
 	_ = cmd.MarkFlagRequired("model")
@@ -160,9 +213,19 @@ The output format depends on --model:
 	return cmd
 }
 
-func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.MergedContext, project, agentName string) {
+func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.MergedContext, project, agentName string, sbx *entity.SandboxConfig) {
 	fmt.Printf("✓ Agent workspace created: %s\n\n", agentDir)
 	fmt.Printf("  Model:      %s\n", model)
+
+	if sbx != nil && sbx.Provider != entity.SandboxNone {
+		img := ""
+		if sbx.Docker != nil && sbx.Docker.Image != "" {
+			img = "  image=" + sbx.Docker.Image
+		}
+		fmt.Printf("  Sandbox:    %s%s\n", sbx.Provider, img)
+	} else {
+		fmt.Printf("  Sandbox:    none (runs on host)\n")
+	}
 
 	fmt.Printf("  Context layers merged:\n")
 	for i, l := range mc.Layers {
@@ -179,6 +242,13 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 
 	fmt.Printf("\n  To start working:\n")
 	fmt.Printf("    cd %s\n", agentDir)
+
+	if sbx != nil && sbx.Provider == entity.SandboxDocker {
+		fmt.Printf("    agencycli run --project %s --agent %s\n", project, agentName)
+		fmt.Printf("    # (agencycli run executes inside a Docker container)\n")
+		return
+	}
+
 	switch model {
 	case entity.ModelClaudeCode:
 		fmt.Printf("    claude\n")

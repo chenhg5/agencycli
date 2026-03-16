@@ -33,6 +33,8 @@ func InvokerFor(model entity.AgentModel, runCommand string) ModelInvoker {
 		return &geminiInvoker{}
 	case entity.ModelOpenCode:
 		return &openCodeInvoker{}
+	case entity.ModelCursor:
+		return &cursorInvoker{}
 	default:
 		return &genericInvoker{}
 	}
@@ -45,7 +47,17 @@ type claudeInvoker struct{}
 func (c *claudeInvoker) Args(promptFile, sessionID string) []string {
 	// claude --no-interactive --output-format stream-json -p "$(cat file)"
 	// We read from file via shell so the prompt isn't exposed in ps output.
-	args := []string{"claude", "--no-interactive", "--output-format", "stream-json"}
+	//
+	// --dangerously-skip-permissions is required when running as root (e.g.
+	// inside a Docker sandbox). Claude Code refuses to run as root without it.
+	// This is safe here because the Docker sandbox already provides the
+	// isolation boundary; we explicitly accept the risk.
+	args := []string{
+		"claude",
+		"--no-interactive",
+		"--output-format", "stream-json",
+		"--dangerously-skip-permissions",
+	}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
@@ -106,6 +118,42 @@ func (o *openCodeInvoker) Args(promptFile, _ string) []string {
 }
 
 func (o *openCodeInvoker) ParseSessionID(_ string) string { return "" }
+
+// ── Cursor ────────────────────────────────────────────────────────────────────
+// Cursor CLI is the `agent` binary installed via `curl https://cursor.com/install | bash`.
+// Auth: CURSOR_API_KEY env var or credentials cached in ~/.cursor/ after `agent login`.
+
+type cursorInvoker struct{}
+
+func (c *cursorInvoker) Args(promptFile, sessionID string) []string {
+	// agent -p --force --output-format stream-json --print-file <file>
+	// --force allows file modifications without per-step confirmation.
+	args := []string{"agent", "-p", "--force", "--output-format", "stream-json"}
+	if sessionID != "" {
+		args = append(args, "--session", sessionID)
+	}
+	args = append(args, "--print-file", promptFile)
+	return args
+}
+
+func (c *cursorInvoker) ParseSessionID(output string) string {
+	// Cursor stream-json may emit a session id in the "system"/"init" line.
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, `"session_id"`) {
+			const key = `"session_id":"`
+			idx := strings.Index(line, key)
+			if idx < 0 {
+				continue
+			}
+			rest := line[idx+len(key):]
+			if end := strings.Index(rest, `"`); end > 0 {
+				return rest[:end]
+			}
+		}
+	}
+	return ""
+}
 
 // ── Generic ───────────────────────────────────────────────────────────────────
 

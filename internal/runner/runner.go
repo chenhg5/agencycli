@@ -1,6 +1,10 @@
 // Package runner executes agent CLI processes for a given task,
 // handles sentinel detection (confirmation requests), captures session IDs,
 // and writes run logs.
+//
+// When the agent's SandboxConfig specifies provider=docker, execution is
+// delegated to the sandbox package which wraps the agent command in
+// `docker run`. Otherwise the agent CLI is invoked directly on the host.
 package runner
 
 import (
@@ -15,6 +19,7 @@ import (
 	"time"
 
 	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/agencycli/agencycli/internal/sandbox"
 	"github.com/agencycli/agencycli/internal/store"
 	"github.com/agencycli/agencycli/internal/taskstore"
 )
@@ -99,8 +104,71 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	}
 	defer os.Remove(promptFile)
 
-	invoker := InvokerFor(entity.NormaliseModel(meta.Model), meta.RunCommand)
-	args := invoker.Args(promptFile, sessionID)
+	model := entity.NormaliseModel(meta.Model)
+	invoker := InvokerFor(model, meta.RunCommand)
+
+	// Build the inner agent CLI arguments.
+	innerArgs := invoker.Args(promptFile, sessionID)
+
+	// Determine the actual executable and final argument list.
+	// When a Docker sandbox is configured the inner args become the command
+	// run inside the container; otherwise they run directly on the host.
+	var (
+		executable string
+		args       []string
+		execDir    string // working directory for the host process
+	)
+
+	if meta.Sandbox != nil && meta.Sandbox.Provider == entity.SandboxDocker {
+		// Validate docker is available once before the first run.
+		if err := sandbox.CheckDocker(); err != nil {
+			return nil, err
+		}
+
+		// Clone the docker config so we can inject extra mounts without
+		// mutating the original AgentMeta.
+		dockerCfg := cloneDockerCfg(meta.Sandbox.Docker)
+
+		// Auto-mount the project's code repository at the same absolute path
+		// inside the container. This lets the agent read/write/commit code at
+		// the exact path it expects (e.g. /root/code/cc-connect), matching
+		// what is written in CLAUDE.md / the project prompt.
+		if repoMount := r.resolveRepoMount(project); repoMount != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, repoMount)
+		}
+
+		// Auto-mount the workspace root at the same path so agents can use
+		// `agencycli task add --agent other-agent` to assign tasks to peers.
+		// This enables PM agents to coordinate dev/qa agents without human
+		// intervention.
+		if wsMount := r.root + ":" + r.root; r.root != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, wsMount)
+		}
+
+		// Auto-mount the agencycli binary itself (read-only) so agents can
+		// invoke `agencycli` inside the container.
+		if binMount := resolveAgencycliBinaryMount(); binMount != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, binMount)
+		}
+
+		// The prompt file path inside the container (workspace-relative).
+		// innerArgs reference the host promptFile path — remap it to /workspace.
+		containerPromptFile := sandbox.WorkspaceMount + "/" + filepath.Base(promptFile)
+		remappedInner := remapPromptFile(innerArgs, promptFile, containerPromptFile)
+
+		var err error
+		executable, args, err = sandbox.RunArgs(agentDir, model, dockerCfg, remappedInner)
+		if err != nil {
+			return nil, fmt.Errorf("sandbox: build docker args: %w", err)
+		}
+		// docker run executes from wherever; cwd doesn't matter for container.
+		execDir = ""
+	} else {
+		// Direct host execution.
+		executable = innerArgs[0]
+		args = innerArgs[1:]
+		execDir = agentDir
+	}
 
 	// Prepare log file.
 	logDir, err := r.ts.RunLogDir(project, agentName)
@@ -115,13 +183,20 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	}
 	defer logFile.Close()
 
-	fmt.Fprintf(logFile, "=== agencycli run: %s/%s task=%s ===\n", project, agentName, task.ID)
-	fmt.Fprintf(logFile, "Command: %s\n", strings.Join(args, " "))
+	sandboxLabel := "host"
+	if meta.Sandbox != nil && meta.Sandbox.Provider != entity.SandboxNone {
+		sandboxLabel = string(meta.Sandbox.Provider)
+	}
+	fmt.Fprintf(logFile, "=== agencycli run: %s/%s task=%s sandbox=%s ===\n",
+		project, agentName, task.ID, sandboxLabel)
+	fmt.Fprintf(logFile, "Command: %s %s\n", executable, strings.Join(args, " "))
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Run the agent.
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = agentDir
+	cmd := exec.Command(executable, args...)
+	if execDir != "" {
+		cmd.Dir = execDir
+	}
 
 	var outBuf bytes.Buffer
 	multiOut := io.MultiWriter(&outBuf, logFile)
@@ -199,4 +274,74 @@ func parseLineSentinel(output, prefix string) string {
 		}
 	}
 	return ""
+}
+
+// resolveAgencycliBinaryMount returns a read-only Docker volume mount for the
+// agencycli binary running on the host, so that agent containers can invoke
+// `agencycli task add`, `agencycli inbox`, etc. to coordinate with peers.
+// Returns "" if the binary path cannot be determined.
+func resolveAgencycliBinaryMount() string {
+	binPath, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	// Resolve symlinks so we get the real binary path.
+	binPath, err = filepath.EvalSymlinks(binPath)
+	if err != nil {
+		return ""
+	}
+	if _, err := os.Stat(binPath); err != nil {
+		return ""
+	}
+	return binPath + ":" + sandbox.AgencycliMount + ":ro"
+}
+
+// resolveRepoMount looks up the project's repo path and returns a Docker
+// volume mount string in the form "abs_host_path:abs_host_path" so that the
+// repository is visible inside the container at exactly the same absolute path
+// the agent's context references (e.g. /root/code/cc-connect).
+// Returns "" if the project has no repo configured or the path doesn't exist.
+func (r *Runner) resolveRepoMount(project string) string {
+	proj, err := r.agentStore.Project(project)
+	if err != nil || proj.Repo == "" {
+		return ""
+	}
+	repoPath := proj.Repo
+	if !filepath.IsAbs(repoPath) {
+		repoPath = filepath.Join(r.root, repoPath)
+	}
+	repoPath, err = filepath.Abs(repoPath)
+	if err != nil {
+		return ""
+	}
+	if _, err := os.Stat(repoPath); err != nil {
+		return "" // directory not present on this host, skip silently
+	}
+	// Mount at the same path: the agent sees /root/code/cc-connect
+	// inside the container, matching what is written in CLAUDE.md.
+	return repoPath + ":" + repoPath
+}
+
+// cloneDockerCfg returns a shallow copy of cfg (or a fresh struct if nil)
+// so callers can mutate ExtraVolumes/ExtraEnv without affecting the original.
+func cloneDockerCfg(cfg *entity.DockerSandboxConfig) *entity.DockerSandboxConfig {
+	if cfg == nil {
+		return &entity.DockerSandboxConfig{}
+	}
+	cp := *cfg
+	cp.ExtraVolumes = append([]string(nil), cfg.ExtraVolumes...)
+	cp.ExtraEnv = append([]string(nil), cfg.ExtraEnv...)
+	cp.CredentialMounts = append([]string(nil), cfg.CredentialMounts...)
+	return &cp
+}
+
+// remapPromptFile replaces occurrences of hostPath with containerPath in args.
+// This is needed when the prompt file is written to the host working directory
+// but the container sees it at the /workspace mount point.
+func remapPromptFile(args []string, hostPath, containerPath string) []string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		out[i] = strings.ReplaceAll(a, hostPath, containerPath)
+	}
+	return out
 }

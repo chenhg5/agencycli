@@ -139,6 +139,73 @@ type AgentMeta struct {
 	// Use {prompt_file} and {session_id} as placeholders.
 	// Example: "my-agent --input {prompt_file}"
 	RunCommand string `yaml:"run_command,omitempty"`
+
+	// Sandbox configures isolated container execution for this agent.
+	// When nil the agent runs directly on the host (default behaviour).
+	Sandbox *SandboxConfig `yaml:"sandbox,omitempty"`
+}
+
+// ─────────────────────────────────────────────
+// Sandbox
+// ─────────────────────────────────────────────
+
+// SandboxProvider identifies the sandbox backend.
+type SandboxProvider string
+
+const (
+	// SandboxNone runs the agent directly on the host (default).
+	SandboxNone SandboxProvider = ""
+	// SandboxDocker runs the agent inside a plain Docker container.
+	// Works on any OS with Docker installed; no Docker Desktop required.
+	SandboxDocker SandboxProvider = "docker"
+)
+
+// SandboxConfig describes how to isolate an agent execution.
+// Resolved at hire/run time with agency → team → agent override priority.
+type SandboxConfig struct {
+	Provider SandboxProvider `yaml:"provider"`
+
+	// Docker holds Docker-specific options. Used when Provider == "docker".
+	Docker *DockerSandboxConfig `yaml:"docker,omitempty"`
+}
+
+// DockerSandboxConfig holds options for Docker-based sandbox execution.
+type DockerSandboxConfig struct {
+	// Image is the container image to use.
+	// Defaults are chosen by model when empty:
+	//   claudecode → ghcr.io/agencycli/sandbox-claudecode:latest
+	//   codex      → ghcr.io/agencycli/sandbox-codex:latest
+	//   gemini     → ghcr.io/agencycli/sandbox-gemini:latest
+	//   (others)   → ghcr.io/agencycli/sandbox-generic:latest
+	Image string `yaml:"image,omitempty"`
+
+	// NetworkMode controls Docker networking.
+	// "bridge" (default) — internet access, agent can reach GitHub/APIs.
+	// "none"             — fully offline, safest option.
+	// "host"             — shares host network (debug only, not recommended).
+	NetworkMode string `yaml:"network_mode,omitempty"`
+
+	// CredentialMounts mounts host credential paths into the container
+	// as read-only volumes. Format: "~/.claude:/root/.claude" or
+	// "~/.claude:/root/.claude:ro". The tilde is expanded at runtime.
+	// Defaults are set automatically per-model when empty.
+	CredentialMounts []string `yaml:"credential_mounts,omitempty"`
+
+	// ExtraVolumes mounts additional host paths. Same format as CredentialMounts.
+	ExtraVolumes []string `yaml:"extra_volumes,omitempty"`
+
+	// ExtraEnv passes additional environment variables as "KEY=VALUE" pairs.
+	ExtraEnv []string `yaml:"extra_env,omitempty"`
+
+	// MemoryMB limits container memory (0 = no limit).
+	MemoryMB int `yaml:"memory_mb,omitempty"`
+
+	// CPUs limits CPU quota, e.g. 2.0 (0 = no limit).
+	CPUs float64 `yaml:"cpus,omitempty"`
+
+	// NoAutoCredentials disables the automatic per-model credential mount
+	// defaults. Set to true when you manage credential mounts manually.
+	NoAutoCredentials bool `yaml:"no_auto_credentials,omitempty"`
 }
 
 // ─────────────────────────────────────────────
