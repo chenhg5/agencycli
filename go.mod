@@ -1,4 +1,4 @@
-module github.com/agentorg/agentorg
+module github.com/agencycli/agencycli
 
 go 1.22
 

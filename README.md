@@ -1,17 +1,17 @@
-# agentorg
+# agencycli
 
-**agentorg** is a CLI tool for managing AI agent context through a company-style organisational structure. It lets you define departments, projects, and skills once — then hire agents into projects with a fully assembled context that they can load immediately.
+**agencycli** is a CLI tool for managing AI agent context through a company-style organisational structure. It lets you define departments, projects, and skills once — then hire agents into projects with a fully assembled context that they can load immediately.
 
 No more copy-pasting prompts between sessions. No more context drift between agents working on the same project.
 
 ## How it works
 
-agentorg models your AI workflow as a company:
+agencycli models your AI workflow as a company:
 
 - **Company** — global rules and values shared by every agent
 - **Departments** — capability groups (engineering, growth, product…) with their own standards and skills. Departments can be nested (`engineering/backend`)
 - **Projects** — concrete products or initiatives with their own goals and tech stack
-- **Hire** — assign an agent to a project. agentorg merges the full context chain (company → department → project) and writes it into an agent working directory ready to use
+- **Hire** — assign an agent to a project. agencycli merges the full context chain (company → department → project) and writes it into an agent working directory ready to use
 
 ```
 company-prompt.md
@@ -36,14 +36,14 @@ The agent working directory contains everything the agent needs. Just `cd` in an
 ## Installation
 
 ```bash
-go install github.com/agentorg/agentorg/cmd/agentorg@latest
+go install github.com/agencycli/agencycli/cmd/agencycli@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/agentorg/agentorg
-cd agentorg
+git clone https://github.com/agencycli/agencycli
+cd agencycli
 make install
 ```
 
@@ -51,26 +51,26 @@ make install
 
 ```bash
 # 1. Create a company workspace
-agentorg create company --name "MyCompany" --desc "Building great software"
+agencycli create company --name "MyCompany" --desc "Building great software"
 cd MyCompany
 
 # 2. Create departments
-agentorg create dept --name "engineering" --desc "Software engineering"
-agentorg create dept --name "engineering/backend" --desc "Go/gRPC services" --skills "git,bash"
-agentorg create dept --name "growth" --desc "Growth and marketing"
-agentorg create dept --name "growth/seo" --desc "SEO and content"
+agencycli create dept --name "engineering" --desc "Software engineering"
+agencycli create dept --name "engineering/backend" --desc "Go/gRPC services" --skills "git,bash"
+agencycli create dept --name "growth" --desc "Growth and marketing"
+agencycli create dept --name "growth/seo" --desc "SEO and content"
 
 # 3. Edit department prompts (add your standards and conventions)
 vim departments/engineering/prompt.md
 vim departments/engineering/backend/prompt.md
 
 # 4. Create a project
-agentorg create project --name "my-api" --desc "REST API service" --repo "../my-api"
+agencycli create project --name "my-api" --desc "REST API service" --repo "../my-api"
 vim projects/my-api/prompt.md
 
 # 5. Hire agents
-agentorg hire --project "my-api" --dept "engineering/backend" --model "claude-code" --name "dev"
-agentorg hire --project "my-api" --dept "growth/seo"          --model "codex"       --name "seo"
+agencycli hire --project "my-api" --dept "engineering/backend" --model "claude-code" --name "dev"
+agencycli hire --project "my-api" --dept "growth/seo"          --model "codex"       --name "seo"
 
 # 6. Start working
 cd projects/my-api/agents/dev
@@ -106,7 +106,7 @@ MyCompany/
       agents/
         dev/                   # claude-code agent working directory
           CLAUDE.md            ← @imports all context layers
-          .aios-context/       ← individual layer files (managed by agentorg)
+          .aios-context/       ← individual layer files (managed by agencycli)
           .claude/
             skills/
               git/SKILL.md
@@ -128,44 +128,44 @@ MyCompany/
 
 ## Commands
 
-### `agentorg create company`
+### `agencycli create company`
 
 Initialise a new workspace directory.
 
 ```
-agentorg create company --name <name> [--desc <description>]
+agencycli create company --name <name> [--desc <description>]
 ```
 
 Creates the workspace directory, installs built-in skills (git, bash, github), and generates template prompt files.
 
-### `agentorg create dept`
+### `agencycli create dept`
 
 Create a department. Supports nested paths.
 
 ```
-agentorg create dept --name <path> [--desc <description>] [--skills <skill1,skill2>]
+agencycli create dept --name <path> [--desc <description>] [--skills <skill1,skill2>]
 ```
 
 Examples:
 ```bash
-agentorg create dept --name "engineering"
-agentorg create dept --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"
+agencycli create dept --name "engineering"
+agencycli create dept --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"
 ```
 
-### `agentorg create project`
+### `agencycli create project`
 
 Create a project.
 
 ```
-agentorg create project --name <name> [--desc <description>] [--repo <path>]
+agencycli create project --name <name> [--desc <description>] [--repo <path>]
 ```
 
-### `agentorg hire`
+### `agencycli hire`
 
 Assemble context and create an agent working directory.
 
 ```
-agentorg hire \
+agencycli hire \
   --project <project-name> \
   --dept    <dept-path> \
   --model   <claude-code|codex|generic-cli> \
@@ -181,38 +181,38 @@ The context is assembled in this order:
 4. `projects/<project>/prompt.md`
 5. `--extra-prompt` file (if provided)
 
-### `agentorg sync`
+### `agencycli sync`
 
 Regenerate agent working directories whose context has changed.
 
 ```
-agentorg sync [--project <name>] [--name <agent>] [--force]
+agencycli sync [--project <name>] [--name <agent>] [--force]
 ```
 
-agentorg stores a SHA-256 hash of each prompt layer in `.aios-agent.yaml`. Running `sync` compares current file contents against stored hashes and only rewrites files that have changed.
+agencycli stores a SHA-256 hash of each prompt layer in `.aios-agent.yaml`. Running `sync` compares current file contents against stored hashes and only rewrites files that have changed.
 
 ```bash
-agentorg sync                           # sync all agents in all projects
-agentorg sync --project my-api         # sync all agents in one project
-agentorg sync --project my-api --name dev  # sync one specific agent
+agencycli sync                           # sync all agents in all projects
+agencycli sync --project my-api         # sync all agents in one project
+agencycli sync --project my-api --name dev  # sync one specific agent
 ```
 
-### `agentorg list`
+### `agencycli list`
 
 ```bash
-agentorg list depts     # list all departments
-agentorg list projects  # list all projects
-agentorg list agents    # list all hired agents
-agentorg list skills    # list available skills
+agencycli list depts     # list all departments
+agencycli list projects  # list all projects
+agencycli list agents    # list all hired agents
+agencycli list skills    # list available skills
 ```
 
-### `agentorg show`
+### `agencycli show`
 
 ```bash
-agentorg show dept    engineering/backend
-agentorg show project my-api
-agentorg show agent   my-api dev           # summary
-agentorg show agent   my-api dev --raw     # print full merged context
+agencycli show dept    engineering/backend
+agencycli show project my-api
+agencycli show agent   my-api dev           # summary
+agencycli show agent   my-api dev --raw     # print full merged context
 ```
 
 ## Context inheritance
@@ -232,11 +232,11 @@ Skills are collected from the entire department chain and deduplicated. A skill 
 
 Every `prompt.md` is plain Markdown — write whatever instructions you want the agent to follow. There is no special syntax required.
 
-After editing a prompt, run `agentorg sync` to push the changes into all affected agent directories.
+After editing a prompt, run `agencycli sync` to push the changes into all affected agent directories.
 
 ```bash
 vim departments/engineering/backend/prompt.md
-agentorg sync
+agencycli sync
 ```
 
 ## Built-in skills
@@ -261,7 +261,7 @@ skills/
 Then reference the skill in a department:
 
 ```bash
-agentorg create dept --name "engineering/backend" --skills "git,bash,docker"
+agencycli create dept --name "engineering/backend" --skills "git,bash,docker"
 ```
 
 ## Workflow tips
@@ -271,9 +271,9 @@ agentorg create dept --name "engineering/backend" --skills "git,bash,docker"
 Hire multiple agents from different departments for the same project:
 
 ```bash
-agentorg hire --project my-api --dept engineering/backend --model claude-code --name dev
-agentorg hire --project my-api --dept engineering/test    --model claude-code --name tester
-agentorg hire --project my-api --dept growth/seo          --model codex       --name seo
+agencycli hire --project my-api --dept engineering/backend --model claude-code --name dev
+agencycli hire --project my-api --dept engineering/test    --model claude-code --name tester
+agencycli hire --project my-api --dept growth/seo          --model codex       --name seo
 ```
 
 Each agent gets only the context relevant to its department.
@@ -284,9 +284,9 @@ Each project is independent. Hire the same department agent into multiple projec
 
 **Keeping context lean**
 
-Claude Code recommends keeping each `CLAUDE.md` file under 200 lines. agentorg uses `@import` to split context across multiple files, so each layer stays small and Claude's adherence remains high.
+Claude Code recommends keeping each `CLAUDE.md` file under 200 lines. agencycli uses `@import` to split context across multiple files, so each layer stays small and Claude's adherence remains high.
 
-For Codex the combined `AGENTS.md` must stay under 32 KiB (the default limit). Use `agentorg show agent <project> <name>` to check total line counts.
+For Codex the combined `AGENTS.md` must stay under 32 KiB (the default limit). Use `agencycli show agent <project> <name>` to check total line counts.
 
 ## Roadmap
 

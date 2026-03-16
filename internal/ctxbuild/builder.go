@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentorg/agentorg/internal/store"
+	"github.com/agencycli/agencycli/internal/store"
 )
 
 // Builder constructs a MergedContext for a given (project, department) pair
@@ -51,7 +51,12 @@ func (b *Builder) Build(projectName, deptPath string) (*MergedContext, error) {
 	for _, dp := range chain {
 		dept, err := b.store.Department(dp)
 		if err != nil {
-			return nil, fmt.Errorf("ctxbuild: department %q: %w", dp, err)
+			return nil, fmt.Errorf(
+				"ctxbuild: department %q not found — "+
+					"every level in the chain must exist; "+
+					"run: agencycli create dept --name %q",
+				dp, dp,
+			)
 		}
 
 		prompt, err := b.store.DeptPrompt(dp)

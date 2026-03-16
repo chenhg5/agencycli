@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agentorg/agentorg/internal/entity"
-	"github.com/agentorg/agentorg/internal/scaffold"
-	"github.com/agentorg/agentorg/internal/store"
-	"github.com/agentorg/agentorg/internal/workspace"
+	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/agencycli/agencycli/internal/scaffold"
+	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -36,8 +36,8 @@ func newCreateCompanyCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "company",
-		Short: "Initialise a new agentorg workspace",
-		Example: `  agentorg create company --name "Acme Corp" --desc "Building the future"
+		Short: "Initialise a new agencycli workspace",
+		Example: `  agencycli create company --name "Acme Corp" --desc "Building the future"
   cd "Acme Corp"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
@@ -61,7 +61,7 @@ func newCreateCompanyCmd() *cobra.Command {
 			fmt.Printf("✓ Company workspace created: %s\n", root)
 			fmt.Printf("\nNext steps:\n")
 			fmt.Printf("  cd %q\n", name)
-			fmt.Printf("  agentorg create dept --name \"engineering\"\n")
+			fmt.Printf("  agencycli create dept --name \"engineering\"\n")
 			return nil
 		},
 	}
@@ -84,14 +84,14 @@ func newCreateDeptCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dept",
 		Short: "Create a department (supports nested paths)",
-		Example: `  agentorg create dept --name "engineering"
-  agentorg create dept --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"`,
+		Example: `  agencycli create dept --name "engineering"
+  agencycli create dept --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -102,6 +102,23 @@ func newCreateDeptCmd() *cobra.Command {
 			parent := ""
 			if idx := strings.LastIndex(name, "/"); idx != -1 {
 				parent = name[:idx]
+			}
+
+			// Every level in the chain must already exist before we can
+			// create a child department.  This ensures each level has its
+			// own dept.yaml and prompt.md so the context chain is complete.
+			if parent != "" {
+				chain := ctxbuild.ResolveChain(parent)
+				for _, ancestor := range chain {
+					if _, err := s.Department(ancestor); err != nil {
+						return fmt.Errorf(
+							"parent department %q does not exist\n"+
+								"Create it first with:\n"+
+								"  agencycli create dept --name %q",
+							ancestor, ancestor,
+						)
+					}
+				}
 			}
 
 			d := &entity.Department{
@@ -140,13 +157,13 @@ func newCreateProjectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",
 		Short: "Create a project",
-		Example: `  agentorg create project --name "my-api" --desc "REST API" --repo "../my-api"`,
+		Example: `  agencycli create project --name "my-api" --desc "REST API" --repo "../my-api"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -160,7 +177,7 @@ func newCreateProjectCmd() *cobra.Command {
 
 			fmt.Printf("✓ Project created: projects/%s\n", name)
 			fmt.Printf("  Edit the prompt: vim projects/%s/prompt.md\n", name)
-			fmt.Printf("  Hire an agent:   agentorg hire --project %q --dept \"...\" --model \"claude-code\" --name \"dev\"\n", name)
+			fmt.Printf("  Hire an agent:   agencycli hire --project %q --dept \"...\" --model \"claudecode\" --name \"dev\"\n", name)
 			return nil
 		},
 	}

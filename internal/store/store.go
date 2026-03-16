@@ -1,12 +1,12 @@
 // Package store defines the storage interface and filesystem implementation
-// for agentorg workspace data.
+// for agencycli workspace data.
 //
 // The Store interface abstracts all reads and writes so that higher-level
 // packages (ctxbuild, formatter, scaffold) never touch the filesystem directly.
 // This also makes unit testing straightforward with a stub implementation.
 package store
 
-import "github.com/agentorg/agentorg/internal/entity"
+import "github.com/agencycli/agencycli/internal/entity"
 
 // DeptEntry is a department together with its slash-separated path.
 type DeptEntry struct {

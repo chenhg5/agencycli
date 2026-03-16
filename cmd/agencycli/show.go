@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentorg/agentorg/internal/ctxbuild"
-	"github.com/agentorg/agentorg/internal/store"
-	"github.com/agentorg/agentorg/internal/workspace"
+	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -29,11 +28,11 @@ func newShowDeptCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "dept <path>",
 		Short:   "Show department details and its prompt",
-		Example: `  agentorg show dept engineering/backend`,
+		Example: `  agencycli show dept engineering/backend`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			deptPath := args[0]
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -74,11 +73,11 @@ func newShowProjectCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "project <name>",
 		Short:   "Show project details and its prompt",
-		Example: `  agentorg show project my-api`,
+		Example: `  agencycli show project my-api`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -123,11 +122,11 @@ func newShowAgentCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "agent <project> <name>",
 		Short:   "Show merged context for a hired agent",
-		Example: `  agentorg show agent my-api dev`,
+		Example: `  agencycli show agent my-api dev`,
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, agentName := args[0], args[1]
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}

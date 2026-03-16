@@ -5,10 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/agentorg/agentorg/internal/ctxbuild"
-	"github.com/agentorg/agentorg/internal/formatter"
-	"github.com/agentorg/agentorg/internal/store"
-	"github.com/agentorg/agentorg/internal/workspace"
+	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/agencycli/agencycli/internal/formatter"
+	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -27,11 +26,11 @@ func newSyncCmd() *cobra.Command {
 
 With no flags it syncs all agents in all projects.
 Use --project to limit to one project, --project + --name for a single agent.`,
-		Example: `  agentorg sync                          # sync everything
-  agentorg sync --project my-api         # sync all agents in my-api
-  agentorg sync --project my-api --name dev  # sync one specific agent`,
+		Example: `  agencycli sync                          # sync everything
+  agencycli sync --project my-api         # sync all agents in my-api
+  agencycli sync --project my-api --name dev  # sync one specific agent`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}

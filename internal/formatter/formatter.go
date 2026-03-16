@@ -8,8 +8,8 @@ package formatter
 import (
 	"fmt"
 
-	"github.com/agentorg/agentorg/internal/ctxbuild"
-	"github.com/agentorg/agentorg/internal/entity"
+	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/agencycli/agencycli/internal/entity"
 )
 
 // Formatter writes context files into an agent working directory.
@@ -20,12 +20,23 @@ type Formatter interface {
 }
 
 // New returns the Formatter appropriate for the given agent model.
+// The model is normalised (alias-resolved) before lookup.
 func New(model entity.AgentModel) (Formatter, error) {
+	model = entity.NormaliseModel(model)
 	switch model {
 	case entity.ModelClaudeCode:
 		return &claudeCodeFormatter{}, nil
-	case entity.ModelCodex:
+	case entity.ModelCodex, entity.ModelQoder:
+		// Qoder uses the same AGENTS.md format as Codex.
 		return &codexFormatter{}, nil
+	case entity.ModelCursor:
+		return &cursorFormatter{}, nil
+	case entity.ModelGemini:
+		return &geminiFormatter{}, nil
+	case entity.ModelOpenCode:
+		return &singleFileFormatter{filename: "OPENCODE.md"}, nil
+	case entity.ModelIFlow:
+		return &singleFileFormatter{filename: "IFLOW.md"}, nil
 	case entity.ModelGenericCLI:
 		return &genericFormatter{}, nil
 	default:

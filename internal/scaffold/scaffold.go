@@ -1,5 +1,5 @@
 // Package scaffold creates the initial directory layout and template files
-// for agentorg workspace objects (company, department, project).
+// for agencycli workspace objects (company, department, project).
 //
 // Scaffold operations are idempotent: they never overwrite an existing file,
 // so running create twice is always safe.
@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/agentorg/agentorg/internal/entity"
-	"github.com/agentorg/agentorg/internal/store"
+	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/agencycli/agencycli/internal/store"
 	"gopkg.in/yaml.v3"
 )
 

@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentorg/agentorg/internal/store"
-	"github.com/agentorg/agentorg/internal/workspace"
+	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +28,7 @@ func newListDeptsCmd() *cobra.Command {
 		Aliases: []string{"dept"},
 		Short:   "List all departments",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -39,7 +38,7 @@ func newListDeptsCmd() *cobra.Command {
 				return err
 			}
 			if len(entries) == 0 {
-				fmt.Println("No departments found. Run: agentorg create dept --name <name>")
+				fmt.Println("No departments found. Run: agencycli create dept --name <name>")
 				return nil
 			}
 			fmt.Println("Departments:")
@@ -65,7 +64,7 @@ func newListProjectsCmd() *cobra.Command {
 		Aliases: []string{"project"},
 		Short:   "List all projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -75,7 +74,7 @@ func newListProjectsCmd() *cobra.Command {
 				return err
 			}
 			if len(projects) == 0 {
-				fmt.Println("No projects found. Run: agentorg create project --name <name>")
+				fmt.Println("No projects found. Run: agencycli create project --name <name>")
 				return nil
 			}
 			fmt.Println("Projects:")
@@ -99,7 +98,7 @@ func newListAgentsCmd() *cobra.Command {
 		Aliases: []string{"agent"},
 		Short:   "List hired agents",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
@@ -132,7 +131,7 @@ func newListAgentsCmd() *cobra.Command {
 				}
 			}
 			if found == 0 {
-				fmt.Println("No agents found. Run: agentorg hire --help")
+				fmt.Println("No agents found. Run: agencycli hire --help")
 			}
 			return nil
 		},
@@ -148,7 +147,7 @@ func newListSkillsCmd() *cobra.Command {
 		Aliases: []string{"skill"},
 		Short:   "List available skills",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}

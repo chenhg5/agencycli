@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentorg/agentorg/internal/ctxbuild"
-	"github.com/agentorg/agentorg/internal/entity"
-	"github.com/agentorg/agentorg/internal/formatter"
-	"github.com/agentorg/agentorg/internal/store"
-	"github.com/agentorg/agentorg/internal/workspace"
+	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/agencycli/agencycli/internal/formatter"
+	"github.com/agencycli/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -36,11 +35,11 @@ The context layers are merged in this order:
   3. Project
 
 The output format depends on --model:
-  claude-code  →  CLAUDE.md + .aios-context/ + .claude/skills/
+  claudecode   →  CLAUDE.md + .aios-context/ + .claude/skills/
   codex        →  AGENTS.md (single merged file)
   generic-cli  →  context.md (plain text)`,
-		Example: `  agentorg hire --project "my-api" --dept "engineering/backend" \
-               --model "claude-code" --name "dev"
+		Example: `  agencycli hire --project "my-api" --dept "engineering/backend" \
+               --model "claudecode" --name "dev"
 
   # Then start working:
   cd projects/my-api/agents/dev
@@ -50,13 +49,13 @@ The output format depends on --model:
 				return fmt.Errorf("--project, --dept, --model and --name are all required")
 			}
 
-			agentModel := entity.AgentModel(model)
+			agentModel := entity.NormaliseModel(entity.AgentModel(model))
 			if !entity.IsValidModel(agentModel) {
 				return fmt.Errorf("unknown model %q (supported: %s)",
 					model, joinModels(entity.KnownModels))
 			}
 
-			root, err := workspace.FindRootFromCWD()
+			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}

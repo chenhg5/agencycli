@@ -1,7 +1,7 @@
 // Package workspace provides helpers for locating and validating an
-// agentorg workspace on the local filesystem.
+// agencycli workspace on the local filesystem.
 //
-// An agentorg workspace is any directory that contains a .aios/company.yaml
+// An agencycli workspace is any directory that contains a .aios/company.yaml
 // file. Commands discover the workspace root by walking up the directory
 // tree from the current working directory, the same way git finds .git.
 package workspace
@@ -36,7 +36,7 @@ func FindRoot(start string) (string, error) {
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			return "", fmt.Errorf(
-				"not inside an agentorg workspace " +
+				"not inside an agencycli workspace " +
 					"(no .aios/company.yaml found in %q or any parent directory)",
 				abs,
 			)

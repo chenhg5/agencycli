@@ -1,6 +1,6 @@
 // Package ctxbuild builds a MergedContext by walking the department chain
 // and collecting prompt layers and skills. It is the core business logic
-// of agentorg and has no dependency on any agent-specific format.
+// of agencycli and has no dependency on any agent-specific format.
 package ctxbuild
 
 // MergedContext is the agent-agnostic representation of a fully assembled

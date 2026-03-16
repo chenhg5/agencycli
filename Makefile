@@ -1,6 +1,6 @@
-BINARY := agentorg
+BINARY := agencycli
 BUILD_DIR := dist
-MAIN := ./cmd/agentorg
+MAIN := ./cmd/agencycli
 
 .PHONY: build install clean test lint
 
