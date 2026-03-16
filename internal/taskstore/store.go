@@ -7,7 +7,7 @@
 // any other database without changing callers.
 package taskstore
 
-import "github.com/agencycli/agencycli/internal/entity"
+import "github.com/chenhg5/agencycli/internal/entity"
 
 // Store is the single access point for all workflow persistence.
 // Implementations must be safe for concurrent use from multiple goroutines

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agencycli/agencycli/internal/ctxbuild"
+	"github.com/chenhg5/agencycli/internal/ctxbuild"
 )
 
 // geminiFormatter generates context files for Google Gemini CLI.

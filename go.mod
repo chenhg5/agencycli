@@ -1,4 +1,4 @@
-module github.com/agencycli/agencycli
+module github.com/chenhg5/agencycli
 
 go 1.22
 

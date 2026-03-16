@@ -50,13 +50,13 @@ agency-prompt.md
 ## Installation
 
 ```bash
-go install github.com/agencycli/agencycli/cmd/agencycli@latest
+go install github.com/chenhg5/agencycli/cmd/agencycli@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/agencycli/agencycli
+git clone https://github.com/chenhg5/agencycli
 cd agencycli
 make install
 ```

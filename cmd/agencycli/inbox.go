@@ -6,10 +6,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/agencycli/agencycli/internal/entity"
-	"github.com/agencycli/agencycli/internal/runner"
-	"github.com/agencycli/agencycli/internal/store"
-	"github.com/agencycli/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/runner"
+	"github.com/chenhg5/agencycli/internal/store"
+	"github.com/chenhg5/agencycli/internal/taskstore"
 	"github.com/spf13/cobra"
 )
 

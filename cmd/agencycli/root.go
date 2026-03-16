@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agencycli/agencycli/internal/workspace"
+	"github.com/chenhg5/agencycli/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -61,6 +61,7 @@ func init() {
 		newShowCmd(),
 		newTaskCmd(),
 		newRunCmd(),
+		newExecCmd(),
 		newInboxCmd(),
 		newSessionCmd(),
 		newDaemonCmd(),

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/entity"
 	"gopkg.in/yaml.v3"
 )
 

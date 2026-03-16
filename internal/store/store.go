@@ -6,7 +6,7 @@
 // This also makes unit testing straightforward with a stub implementation.
 package store
 
-import "github.com/agencycli/agencycli/internal/entity"
+import "github.com/chenhg5/agencycli/internal/entity"
 
 // TeamEntry is a team together with its slash-separated path.
 type TeamEntry struct {

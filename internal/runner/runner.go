@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agencycli/agencycli/internal/entity"
-	"github.com/agencycli/agencycli/internal/sandbox"
-	"github.com/agencycli/agencycli/internal/store"
-	"github.com/agencycli/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/sandbox"
+	"github.com/chenhg5/agencycli/internal/store"
+	"github.com/chenhg5/agencycli/internal/taskstore"
 )
 
 const (
@@ -73,6 +73,125 @@ type RunResult struct {
 	LogPath    string
 	Summary    string // set when Status == TaskStatusAwaitingConfirmation
 	ErrorMsg   string // set when Status == TaskStatusDoneFailed
+}
+
+// ExecPrompt runs a raw prompt against an agent directly, bypassing the task
+// queue entirely. It is intended for quick interactive testing:
+//
+//	agencycli exec --project p --agent a --prompt "hello"
+//
+// Unlike RunTask, it does NOT append the system meta footer, does NOT create
+// or update any task record, and streams output directly to stdout in real
+// time (as well as writing a log file).
+//
+// sessionID may be "" to start a fresh conversation, or a previous session ID
+// to resume. The returned RunResult contains the detected session ID (if any)
+// and the log path.
+func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunResult, error) {
+	meta, err := r.agentStore.AgentMeta(project, agentName)
+	if err != nil {
+		return nil, fmt.Errorf("load agent meta: %w", err)
+	}
+
+	agentDir := filepath.Join(r.root, "projects", project, "agents", agentName)
+
+	// Write prompt to a temp file.
+	promptFile, err := writeTempPrompt(agentDir, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("write prompt file: %w", err)
+	}
+	defer os.Remove(promptFile)
+
+	model := entity.NormaliseModel(meta.Model)
+	invoker := InvokerFor(model, meta.RunCommand)
+	innerArgs := invoker.Args(promptFile, sessionID)
+
+	var (
+		executable string
+		args       []string
+		execDir    string
+	)
+
+	if meta.Sandbox != nil && meta.Sandbox.Provider == entity.SandboxDocker {
+		if err := sandbox.CheckDocker(); err != nil {
+			return nil, err
+		}
+		dockerCfg := cloneDockerCfg(meta.Sandbox.Docker)
+		if repoMount := r.resolveRepoMount(project); repoMount != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, repoMount)
+		}
+		if wsMount := r.root + ":" + r.root; r.root != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, wsMount)
+		}
+		if binMount := resolveAgencycliBinaryMount(); binMount != "" {
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, binMount)
+		}
+		containerPromptFile := sandbox.WorkspaceMount + "/" + filepath.Base(promptFile)
+		remappedInner := remapPromptFile(innerArgs, promptFile, containerPromptFile)
+		var err error
+		executable, args, err = sandbox.RunArgs(agentDir, model, dockerCfg, remappedInner)
+		if err != nil {
+			return nil, fmt.Errorf("sandbox: build docker args: %w", err)
+		}
+	} else {
+		executable = innerArgs[0]
+		args = innerArgs[1:]
+		execDir = agentDir
+	}
+
+	// Prepare log file.
+	logDir, err := r.ts.RunLogDir(project, agentName)
+	if err != nil {
+		return nil, fmt.Errorf("create log dir: %w", err)
+	}
+	logName := fmt.Sprintf("%s-exec.log", time.Now().UTC().Format("20060102-150405"))
+	logPath := filepath.Join(logDir, logName)
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("create log file: %w", err)
+	}
+	defer logFile.Close()
+
+	sandboxLabel := "host"
+	if meta.Sandbox != nil && meta.Sandbox.Provider != entity.SandboxNone {
+		sandboxLabel = string(meta.Sandbox.Provider)
+	}
+	fmt.Fprintf(logFile, "=== agencycli exec: %s/%s sandbox=%s ===\n", project, agentName, sandboxLabel)
+	fmt.Fprintf(logFile, "Command: %s %s\n", executable, strings.Join(args, " "))
+	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
+
+	// Stream output to stdout AND the log file simultaneously.
+	cmd := exec.Command(executable, args...)
+	if execDir != "" {
+		cmd.Dir = execDir
+	}
+
+	var outBuf bytes.Buffer
+	multiOut := io.MultiWriter(&outBuf, logFile, os.Stdout)
+	cmd.Stdout = multiOut
+	cmd.Stderr = multiOut
+
+	runErr := cmd.Run()
+
+	fmt.Fprintf(logFile, "\n=== exit code: %v  finished: %s ===\n",
+		cmd.ProcessState.ExitCode(), time.Now().UTC().Format(time.RFC3339))
+
+	output := outBuf.String()
+	result := &RunResult{LogPath: logPath}
+
+	if sid := invoker.ParseSessionID(output); sid != "" {
+		result.SessionID = sid
+	} else if sid := parseLineSentinel(output, SessionSentinel); sid != "" {
+		result.SessionID = sid
+	}
+
+	if runErr != nil {
+		result.Status = entity.TaskStatusDoneFailed
+		result.ErrorMsg = runErr.Error()
+	} else {
+		result.Status = entity.TaskStatusDoneSuccess
+	}
+	return result, nil
 }
 
 // RunTask executes a single task in the context of the given agent.

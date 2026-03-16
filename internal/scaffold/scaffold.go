@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/agencycli/agencycli/internal/entity"
-	"github.com/agencycli/agencycli/internal/store"
+	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/store"
 	"gopkg.in/yaml.v3"
 )
 

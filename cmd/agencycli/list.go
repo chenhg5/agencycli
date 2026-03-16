@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agencycli/agencycli/internal/store"
+	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
 

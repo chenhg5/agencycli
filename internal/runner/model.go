@@ -3,7 +3,7 @@ package runner
 import (
 	"strings"
 
-	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/entity"
 )
 
 // ModelInvoker knows how to invoke a specific agent model CLI.

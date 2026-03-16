@@ -8,8 +8,8 @@ package formatter
 import (
 	"fmt"
 
-	"github.com/agencycli/agencycli/internal/ctxbuild"
-	"github.com/agencycli/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/ctxbuild"
+	"github.com/chenhg5/agencycli/internal/entity"
 )
 
 // Formatter writes context files into an agent working directory.
