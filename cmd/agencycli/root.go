@@ -59,6 +59,11 @@ func init() {
 		newSyncCmd(),
 		newListCmd(),
 		newShowCmd(),
+		newTaskCmd(),
+		newRunCmd(),
+		newInboxCmd(),
+		newSessionCmd(),
+		newDaemonCmd(),
 	)
 }
 

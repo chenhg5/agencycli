@@ -30,7 +30,7 @@ func New(s store.Store) *Scaffolder {
 // ── Agency ────────────────────────────────────────────────────────────────────
 
 // InitAgency writes .agencycli/agency.yaml, agency-prompt.md, and the standard
-// top-level subdirectories inside root. It also installs the built-in skills.
+// top-level subdirectories inside root.
 // root must already exist on disk.
 func InitAgency(root string, a *entity.Agency) error {
 	s := store.NewFS(root)
@@ -50,10 +50,6 @@ func InitAgency(root string, a *entity.Agency) error {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
 			return fmt.Errorf("scaffold: create %s dir: %w", dir, err)
 		}
-	}
-
-	if err := installBuiltinSkills(root); err != nil {
-		return fmt.Errorf("scaffold: install skills: %w", err)
 	}
 
 	return nil
@@ -134,24 +130,3 @@ func writeYAMLOnce(path string, v any) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-// installBuiltinSkills writes the built-in skill definitions into
-// <root>/skills/. Existing files are never overwritten.
-func installBuiltinSkills(root string) error {
-	for _, sk := range builtinSkills {
-		dir := filepath.Join(root, "skills", sk.Name)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-		def := &entity.Skill{Name: sk.Name, Description: sk.Description}
-		if err := writeYAMLOnce(filepath.Join(dir, "skill.yaml"), def); err != nil {
-			return err
-		}
-		promptPath := filepath.Join(dir, "prompt.md")
-		if _, err := os.Stat(promptPath); os.IsNotExist(err) {
-			if err := os.WriteFile(promptPath, []byte(sk.Prompt), 0o644); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}

@@ -3,7 +3,11 @@
 // They are serialised to/from YAML by the store layer.
 package entity
 
-import "time"
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
 // AgentModel identifies which AI agent runtime an employee uses.
 // Names match the identifiers used by cc-connect for interoperability.
@@ -130,4 +134,163 @@ type AgentMeta struct {
 	// ContextHash maps each layer source key to the SHA-256 hex digest
 	// of its prompt content at hire time.
 	ContextHash map[string]string `yaml:"context_hash,omitempty"`
+
+	// RunCommand overrides the default agent CLI invocation command.
+	// Use {prompt_file} and {session_id} as placeholders.
+	// Example: "my-agent --input {prompt_file}"
+	RunCommand string `yaml:"run_command,omitempty"`
+}
+
+// ─────────────────────────────────────────────
+// Task system
+// ─────────────────────────────────────────────
+
+// TaskStatus represents the lifecycle state of a task.
+type TaskStatus string
+
+const (
+	TaskStatusPending              TaskStatus = "pending"
+	TaskStatusInProgress           TaskStatus = "in_progress"
+	TaskStatusAwaitingConfirmation TaskStatus = "awaiting_confirmation"
+	TaskStatusBlocked              TaskStatus = "blocked"
+	TaskStatusDoneSuccess          TaskStatus = "done_success"
+	TaskStatusDoneFailed           TaskStatus = "done_failed"
+	TaskStatusCancelled            TaskStatus = "cancelled"
+)
+
+// IsTerminal reports whether s is a terminal (archived) state.
+func (s TaskStatus) IsTerminal() bool {
+	return s == TaskStatusDoneSuccess || s == TaskStatusDoneFailed || s == TaskStatusCancelled
+}
+
+// TaskType categorises the kind of work a task represents.
+type TaskType string
+
+const (
+	TaskTypeFeature  TaskType = "feature"
+	TaskTypeBug      TaskType = "bug"
+	TaskTypeReview   TaskType = "review"
+	TaskTypeTriage   TaskType = "triage"
+	TaskTypeTest     TaskType = "test"
+	TaskTypeResearch TaskType = "research"
+	TaskTypeChore    TaskType = "chore"
+)
+
+// OnSuccessTrigger describes a task to auto-create when this task completes.
+type OnSuccessTrigger struct {
+	// Assignee is "<project>/<agent-name>" or "human".
+	Assignee string `yaml:"assignee"`
+	Title    string `yaml:"title"`
+	Type     string `yaml:"type,omitempty"`
+	Priority int    `yaml:"priority,omitempty"`
+	Prompt   string `yaml:"prompt"`
+}
+
+// ConfirmationRequest holds information surfaced to the human inbox.
+type ConfirmationRequest struct {
+	Summary    string `yaml:"summary"`
+	ActionHint string `yaml:"action_hint,omitempty"`
+}
+
+// Task is the atomic unit of work assigned to an agent or human.
+// Stored in <agent-dir>/tasks.yaml (active) and tasks_archive.yaml (terminal).
+type Task struct {
+	ID       string     `yaml:"id"`
+	Title    string     `yaml:"title"`
+	Type     TaskType   `yaml:"type,omitempty"`
+	Priority int        `yaml:"priority"` // 0=critical 1=high 2=normal 3=low
+	Assignee string     `yaml:"assignee"` // "<project>/<agent>" or "human"
+	CreatedBy string    `yaml:"created_by,omitempty"`
+	Status   TaskStatus `yaml:"status"`
+
+	Prompt  string            `yaml:"prompt"`
+	Context map[string]string `yaml:"context,omitempty"`
+
+	CreatedAt  time.Time  `yaml:"created_at"`
+	UpdatedAt  time.Time  `yaml:"updated_at"`
+	StartedAt  *time.Time `yaml:"started_at,omitempty"`
+	FinishedAt *time.Time `yaml:"finished_at,omitempty"`
+
+	DependsOn []string `yaml:"depends_on,omitempty"`
+
+	OnSuccess         []OnSuccessTrigger   `yaml:"on_success,omitempty"`
+	ConfirmationReq   *ConfirmationRequest `yaml:"confirmation_request,omitempty"`
+	ConfirmationReply string               `yaml:"confirmation_reply,omitempty"`
+
+	RetryCount int    `yaml:"retry_count,omitempty"`
+	MaxRetries int    `yaml:"max_retries,omitempty"`
+	LastError  string `yaml:"last_error,omitempty"`
+
+	// RunLogPath is set by the runner after execution.
+	RunLogPath string `yaml:"run_log_path,omitempty"`
+}
+
+// NewTaskID generates a sortable unique task ID.
+func NewTaskID() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return fmt.Sprintf("t-%s-%s", time.Now().UTC().Format("20060102"), string(b))
+}
+
+// InboxItem is an entry in the human inbox.
+// Stored at <workspace>/.agencycli/inbox.yaml.
+type InboxItem struct {
+	TaskID    string    `yaml:"task_id"`
+	Project   string    `yaml:"project"`
+	Agent     string    `yaml:"agent"`
+	Title     string    `yaml:"title"`
+	Summary   string    `yaml:"summary"`
+	ActionHint string   `yaml:"action_hint,omitempty"`
+	RoutedAt  time.Time `yaml:"routed_at"`
+	LogPath   string    `yaml:"log_path,omitempty"`
+}
+
+// ─────────────────────────────────────────────
+// Heartbeat & session
+// ─────────────────────────────────────────────
+
+// SessionScope controls how session IDs are shared across task runs.
+type SessionScope string
+
+const (
+	SessionScopeCycle SessionScope = "cycle" // all tasks in one wakeup share a session
+	SessionScopeTask  SessionScope = "task"  // each task gets a fresh session resume
+)
+
+// HeartbeatConfig holds the per-agent heartbeat configuration and runtime state.
+// Stored at <agent-dir>/heartbeat.yaml.
+type HeartbeatConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Interval string `yaml:"interval"` // Go duration string, e.g. "30m", "1h"
+
+	// SessionScope determines session sharing strategy within a wakeup cycle.
+	SessionScope SessionScope `yaml:"session_scope,omitempty"`
+
+	// Runtime state (mutated by daemon / runner).
+	PID               int        `yaml:"pid,omitempty"`
+	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
+	LastWakeupStatus  string     `yaml:"last_wakeup_status,omitempty"` // running | done | failed
+	SessionID         string     `yaml:"session_id,omitempty"`
+	SessionStartedAt  *time.Time `yaml:"session_started_at,omitempty"`
+}
+
+// ─────────────────────────────────────────────
+// Cron
+// ─────────────────────────────────────────────
+
+// Cron defines a calendar-scheduled recurring task for an agent.
+// Stored at <agent-dir>/crons.yaml.
+// When a cron fires it enqueues a new Task (does not directly invoke the agent).
+type Cron struct {
+	ID       string `yaml:"id"`
+	Title    string `yaml:"title"`
+	Schedule string `yaml:"schedule"` // crontab expression, e.g. "0 9 * * 1-5"
+	Enabled  bool   `yaml:"enabled"`
+	Prompt   string `yaml:"prompt"`
+
+	LastRun       *time.Time `yaml:"last_run,omitempty"`
+	LastRunStatus string     `yaml:"last_run_status,omitempty"`
 }
