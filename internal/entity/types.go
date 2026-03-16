@@ -79,24 +79,24 @@ func IsValidModel(m AgentModel) bool {
 	return false
 }
 
-// Company is the top-level organisational unit.
-// Stored at <root>/.aios/company.yaml.
-type Company struct {
+// Agency is the top-level organisational unit (the "company").
+// Stored at <root>/.aios/agency.yaml.
+type Agency struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
 }
 
-// Department represents a functional group inside the company.
-// Departments can be nested; the Parent field holds the slash-separated
-// path of the parent department (empty = direct child of company).
-// Stored at <root>/departments/<path>/dept.yaml.
-type Department struct {
+// Team represents a functional group inside the agency.
+// Teams can be nested; the Parent field holds the slash-separated
+// path of the parent team (empty = direct child of agency).
+// Stored at <root>/teams/<path>/team.yaml.
+type Team struct {
 	Name        string   `yaml:"name"`
 	Parent      string   `yaml:"parent,omitempty"`
 	Description string   `yaml:"description,omitempty"`
 	Goals       []string `yaml:"goals,omitempty"`
-	// Skills lists skill names this department uses.
-	// Skills are inherited by all sub-departments.
+	// Skills lists skill names this team uses.
+	// Skills are inherited by all sub-teams.
 	Skills []string `yaml:"skills,omitempty"`
 }
 
@@ -121,11 +121,11 @@ type Skill struct {
 // Stored at <root>/projects/<project>/agents/<name>/.aios-agent.yaml.
 // It is used by `agencycli sync` to detect which context layers have changed.
 type AgentMeta struct {
-	Name       string     `yaml:"name"`
-	Project    string     `yaml:"project"`
-	Department string     `yaml:"department"`
-	Model      AgentModel `yaml:"model"`
-	HiredAt    time.Time  `yaml:"hired_at"`
+	Name    string     `yaml:"name"`
+	Project string     `yaml:"project"`
+	Team    string     `yaml:"team"`
+	Model   AgentModel `yaml:"model"`
+	HiredAt time.Time  `yaml:"hired_at"`
 
 	// ContextHash maps each layer source key to the SHA-256 hex digest
 	// of its prompt content at hire time.

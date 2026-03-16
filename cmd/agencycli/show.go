@@ -15,49 +15,49 @@ func newShowCmd() *cobra.Command {
 		Short: "Show details of a workspace object",
 	}
 	cmd.AddCommand(
-		newShowDeptCmd(),
+		newShowTeamCmd(),
 		newShowProjectCmd(),
 		newShowAgentCmd(),
 	)
 	return cmd
 }
 
-// ── show dept ─────────────────────────────────────────────────────────────────
+// ── show team ─────────────────────────────────────────────────────────────────
 
-func newShowDeptCmd() *cobra.Command {
+func newShowTeamCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "dept <path>",
-		Short:   "Show department details and its prompt",
-		Example: `  agencycli show dept engineering/backend`,
+		Use:     "team <path>",
+		Short:   "Show team details and its prompt",
+		Example: `  agencycli show team engineering/backend`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			deptPath := args[0]
+			teamPath := args[0]
 			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
 			s := store.NewFS(root)
-			d, err := s.Department(deptPath)
+			t, err := s.Team(teamPath)
 			if err != nil {
 				return err
 			}
-			prompt, _ := s.DeptPrompt(deptPath)
+			prompt, _ := s.TeamPrompt(teamPath)
 
-			fmt.Printf("Department: %s\n", deptPath)
-			if d.Description != "" {
-				fmt.Printf("  Description: %s\n", d.Description)
+			fmt.Printf("Team: %s\n", teamPath)
+			if t.Description != "" {
+				fmt.Printf("  Description: %s\n", t.Description)
 			}
-			if d.Parent != "" {
-				fmt.Printf("  Parent:      %s\n", d.Parent)
+			if t.Parent != "" {
+				fmt.Printf("  Parent:      %s\n", t.Parent)
 			}
-			if len(d.Goals) > 0 {
+			if len(t.Goals) > 0 {
 				fmt.Printf("  Goals:\n")
-				for _, g := range d.Goals {
+				for _, g := range t.Goals {
 					fmt.Printf("    - %s\n", g)
 				}
 			}
-			if len(d.Skills) > 0 {
-				fmt.Printf("  Skills:      %s\n", strings.Join(d.Skills, ", "))
+			if len(t.Skills) > 0 {
+				fmt.Printf("  Skills:      %s\n", strings.Join(t.Skills, ", "))
 			}
 			if prompt != "" {
 				fmt.Printf("\n--- prompt.md ---\n%s\n", prompt)
@@ -96,13 +96,12 @@ func newShowProjectCmd() *cobra.Command {
 				fmt.Printf("  Repo:        %s\n", p.Repo)
 			}
 
-			// List hired agents
 			agents, _ := s.ListAgents(name)
 			if len(agents) > 0 {
 				fmt.Printf("  Agents:\n")
 				for _, a := range agents {
-					fmt.Printf("    - %-16s  model:%-12s  dept:%s\n",
-						a.Name, a.Meta.Model, a.Meta.Department)
+					fmt.Printf("    - %-16s  model:%-12s  team:%s\n",
+						a.Name, a.Meta.Model, a.Meta.Team)
 				}
 			}
 
@@ -137,16 +136,15 @@ func newShowAgentCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Agent:      %s/%s\n", project, agentName)
-			fmt.Printf("Model:      %s\n", meta.Model)
-			fmt.Printf("Department: %s\n", meta.Department)
-			fmt.Printf("Hired at:   %s\n", meta.HiredAt.Format("2006-01-02 15:04:05 UTC"))
-			fmt.Printf("Agent dir:  %s\n", s.AgentDir(project, agentName))
+			fmt.Printf("Agent:     %s/%s\n", project, agentName)
+			fmt.Printf("Model:     %s\n", meta.Model)
+			fmt.Printf("Team:      %s\n", meta.Team)
+			fmt.Printf("Hired at:  %s\n", meta.HiredAt.Format("2006-01-02 15:04:05 UTC"))
+			fmt.Printf("Agent dir: %s\n", s.AgentDir(project, agentName))
 
 			if raw {
-				// Rebuild and print the full merged context
 				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Department)
+				mc, err := builder.Build(project, meta.Team)
 				if err != nil {
 					return err
 				}
@@ -161,9 +159,8 @@ func newShowAgentCmd() *cobra.Command {
 					}
 				}
 			} else {
-				// Just show layer summary
 				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Department)
+				mc, err := builder.Build(project, meta.Team)
 				if err != nil {
 					return err
 				}

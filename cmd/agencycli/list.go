@@ -14,7 +14,7 @@ func newListCmd() *cobra.Command {
 		Short: "List workspace objects",
 	}
 	cmd.AddCommand(
-		newListDeptsCmd(),
+		newListTeamsCmd(),
 		newListProjectsCmd(),
 		newListAgentsCmd(),
 		newListSkillsCmd(),
@@ -22,34 +22,34 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-func newListDeptsCmd() *cobra.Command {
+func newListTeamsCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "depts",
-		Aliases: []string{"dept"},
-		Short:   "List all departments",
+		Use:     "teams",
+		Aliases: []string{"team"},
+		Short:   "List all teams",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
 			s := store.NewFS(root)
-			entries, err := s.ListDepartments()
+			entries, err := s.ListTeams()
 			if err != nil {
 				return err
 			}
 			if len(entries) == 0 {
-				fmt.Println("No departments found. Run: agencycli create dept --name <name>")
+				fmt.Println("No teams found. Run: agencycli create team --name <name>")
 				return nil
 			}
-			fmt.Println("Departments:")
+			fmt.Println("Teams:")
 			for _, e := range entries {
 				desc := ""
-				if e.Department.Description != "" {
-					desc = "  — " + e.Department.Description
+				if e.Team.Description != "" {
+					desc = "  — " + e.Team.Description
 				}
 				skills := ""
-				if len(e.Department.Skills) > 0 {
-					skills = fmt.Sprintf(" [skills: %s]", strings.Join(e.Department.Skills, ", "))
+				if len(e.Team.Skills) > 0 {
+					skills = fmt.Sprintf(" [skills: %s]", strings.Join(e.Team.Skills, ", "))
 				}
 				fmt.Printf("  %-36s%s%s\n", e.Path, desc, skills)
 			}
@@ -104,7 +104,6 @@ func newListAgentsCmd() *cobra.Command {
 			}
 			s := store.NewFS(root)
 
-			// If no project given, list for all projects
 			projectNames := []string{}
 			if project != "" {
 				projectNames = []string{project}
@@ -125,8 +124,8 @@ func newListAgentsCmd() *cobra.Command {
 					continue
 				}
 				for _, a := range agents {
-					fmt.Printf("  %-16s  %-24s  model:%-12s  dept:%s\n",
-						pName, a.Name, a.Meta.Model, a.Meta.Department)
+					fmt.Printf("  %-16s  %-24s  model:%-12s  team:%s\n",
+						pName, a.Name, a.Meta.Model, a.Meta.Team)
 					found++
 				}
 			}

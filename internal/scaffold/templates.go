@@ -1,13 +1,13 @@
 package scaffold
 
-// companyPromptTmpl is the default template for company-prompt.md.
-const companyPromptTmpl = `# Company: {{.Name}}
+// agencyPromptTmpl is the default template for agency-prompt.md.
+const agencyPromptTmpl = `# Agency: {{.Name}}
 
 {{if .Description}}{{.Description}}
 
 {{end}}## Values & Principles
 
-- (Describe your company's values and principles here)
+- (Describe your agency's values and principles here)
 
 ## Global Rules
 
@@ -15,18 +15,18 @@ const companyPromptTmpl = `# Company: {{.Name}}
 - (Add your global rules here)
 `
 
-// deptPromptTmpl is the default template for a department's prompt.md.
-const deptPromptTmpl = `# Department: {{.Name}}
+// teamPromptTmpl is the default template for a team's prompt.md.
+const teamPromptTmpl = `# Team: {{.Name}}
 
 {{if .Description}}{{.Description}}
 
 {{end}}## Responsibilities
 
-- (Describe what this department is responsible for)
+- (Describe what this team is responsible for)
 
 ## Standards & Conventions
 
-- (Add department-wide standards and conventions here)
+- (Add team-wide standards and conventions here)
 `
 
 // projectPromptTmpl is the default template for a project's prompt.md.
@@ -62,7 +62,7 @@ const skillPromptTmpl = `# Skill: {{.Name}}
 (Describe how and when to use this skill)
 `
 
-// builtinSkills defines the skills installed when a company workspace is
+// builtinSkills defines the skills installed when an agency workspace is
 // initialised. Prompt content uses only backtick-free Markdown so that the
 // Go raw string literals are not prematurely terminated.
 var builtinSkills = []struct {

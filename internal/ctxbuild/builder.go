@@ -8,7 +8,7 @@ import (
 	"github.com/agencycli/agencycli/internal/store"
 )
 
-// Builder constructs a MergedContext for a given (project, department) pair
+// Builder constructs a MergedContext for a given (project, team) pair
 // by reading prompt files from the store in the correct inheritance order.
 type Builder struct {
 	store store.Store
@@ -19,58 +19,58 @@ func NewBuilder(s store.Store) *Builder {
 	return &Builder{store: s}
 }
 
-// Build assembles the MergedContext for projectName with the department
-// context from deptPath. The returned context contains:
+// Build assembles the MergedContext for projectName with the team
+// context from teamPath. The returned context contains:
 //
-//  1. Company layer
-//  2. Each department in the chain from top-level to deptPath
+//  1. Agency layer
+//  2. Each team in the chain from top-level to teamPath
 //  3. Project layer
 //
 // Empty prompt files are silently skipped so callers don't need to guard
 // against empty layers. Skills are deduplicated and collected from all
-// departments in the chain (parent skills are included).
-func (b *Builder) Build(projectName, deptPath string) (*MergedContext, error) {
+// teams in the chain (parent skills are included).
+func (b *Builder) Build(projectName, teamPath string) (*MergedContext, error) {
 	mc := &MergedContext{}
 
-	// 1. Company layer
-	companyPrompt, err := b.store.CompanyPrompt()
+	// 1. Agency layer
+	agencyPrompt, err := b.store.AgencyPrompt()
 	if err != nil {
-		return nil, fmt.Errorf("ctxbuild: company prompt: %w", err)
+		return nil, fmt.Errorf("ctxbuild: agency prompt: %w", err)
 	}
-	if strings.TrimSpace(companyPrompt) != "" {
+	if strings.TrimSpace(agencyPrompt) != "" {
 		mc.Layers = append(mc.Layers, ContextLayer{
-			Source:  "company",
-			Content: companyPrompt,
+			Source:  "agency",
+			Content: agencyPrompt,
 		})
 	}
 
-	// 2. Department chain layers + skill collection
-	chain := ResolveChain(deptPath)
+	// 2. Team chain layers + skill collection
+	chain := ResolveChain(teamPath)
 	seenSkills := make(map[string]bool)
 
-	for _, dp := range chain {
-		dept, err := b.store.Department(dp)
+	for _, tp := range chain {
+		team, err := b.store.Team(tp)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"ctxbuild: department %q not found — "+
+				"ctxbuild: team %q not found — "+
 					"every level in the chain must exist; "+
-					"run: agencycli create dept --name %q",
-				dp, dp,
+					"run: agencycli create team --name %q",
+				tp, tp,
 			)
 		}
 
-		prompt, err := b.store.DeptPrompt(dp)
+		prompt, err := b.store.TeamPrompt(tp)
 		if err != nil {
-			return nil, fmt.Errorf("ctxbuild: dept prompt %q: %w", dp, err)
+			return nil, fmt.Errorf("ctxbuild: team prompt %q: %w", tp, err)
 		}
 		if strings.TrimSpace(prompt) != "" {
 			mc.Layers = append(mc.Layers, ContextLayer{
-				Source:  "department:" + dp,
+				Source:  "team:" + tp,
 				Content: prompt,
 			})
 		}
 
-		for _, skillName := range dept.Skills {
+		for _, skillName := range team.Skills {
 			if seenSkills[skillName] {
 				continue
 			}

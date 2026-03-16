@@ -8,11 +8,11 @@ package store
 
 import "github.com/agencycli/agencycli/internal/entity"
 
-// DeptEntry is a department together with its slash-separated path.
-type DeptEntry struct {
-	// Path is the slash-separated dept path, e.g. "engineering/backend".
-	Path       string
-	Department *entity.Department
+// TeamEntry is a team together with its slash-separated path.
+type TeamEntry struct {
+	// Path is the slash-separated team path, e.g. "engineering/backend".
+	Path string
+	Team *entity.Team
 }
 
 // AgentEntry is an agent's metadata together with its location.
@@ -28,22 +28,22 @@ type Store interface {
 	// Root returns the absolute path of the workspace root.
 	Root() string
 
-	// ── Company ──────────────────────────────────────────────────────────
+	// ── Agency ────────────────────────────────────────────────────────────
 
-	Company() (*entity.Company, error)
-	SaveCompany(c *entity.Company) error
-	CompanyPrompt() (string, error)
-	SaveCompanyPrompt(content string) error
+	Agency() (*entity.Agency, error)
+	SaveAgency(a *entity.Agency) error
+	AgencyPrompt() (string, error)
+	SaveAgencyPrompt(content string) error
 
-	// ── Departments ───────────────────────────────────────────────────────
-	// path is a slash-separated dept path, e.g. "engineering/backend".
+	// ── Teams ─────────────────────────────────────────────────────────────
+	// path is a slash-separated team path, e.g. "engineering/backend".
 
-	Department(path string) (*entity.Department, error)
-	SaveDepartment(path string, d *entity.Department) error
-	DeptPrompt(path string) (string, error)
-	SaveDeptPrompt(path string, content string) error
-	// ListDepartments returns all departments in no guaranteed order.
-	ListDepartments() ([]*DeptEntry, error)
+	Team(path string) (*entity.Team, error)
+	SaveTeam(path string, t *entity.Team) error
+	TeamPrompt(path string) (string, error)
+	SaveTeamPrompt(path string, content string) error
+	// ListTeams returns all teams in no guaranteed order.
+	ListTeams() ([]*TeamEntry, error)
 
 	// ── Projects ──────────────────────────────────────────────────────────
 

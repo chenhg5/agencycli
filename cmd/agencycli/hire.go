@@ -14,9 +14,28 @@ import (
 )
 
 func newHireCmd() *cobra.Command {
+	cmd := buildHireCmd("hire")
+	// assign is a natural-language alias for hire
+	assignCmd := buildHireCmd("assign")
+	assignCmd.Short = "Assign an agent to a project (alias for hire)"
+	assignCmd.Hidden = false
+
+	// Register assign as a sibling at the root level via root.go init,
+	// but return the primary hire command here. assign is added in root.go.
+	_ = assignCmd
+	return cmd
+}
+
+func newAssignCmd() *cobra.Command {
+	cmd := buildHireCmd("assign")
+	cmd.Short = "Assign an agent to a project (alias for hire)"
+	return cmd
+}
+
+func buildHireCmd(use string) *cobra.Command {
 	var (
 		project     string
-		dept        string
+		team        string
 		model       string
 		agentName   string
 		extraPrompt string
@@ -24,29 +43,35 @@ func newHireCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "hire",
+		Use:   use,
 		Short: "Hire an agent for a project (merges context and creates the agent working directory)",
-		Long: `hire assembles the full context for a (project, department) pair and writes
+		Long: `hire (or assign) assembles the full context for a (project, team) pair and writes
 it into an agent working directory under projects/<project>/agents/<name>/.
 
 The context layers are merged in this order:
-  1. Company
-  2. Department chain (from top-level to the specified department)
+  1. Agency
+  2. Team chain (from top-level to the specified team)
   3. Project
 
 The output format depends on --model:
   claudecode   →  CLAUDE.md + .aios-context/ + .claude/skills/
   codex        →  AGENTS.md (single merged file)
+  cursor       →  .cursorrules + .cursor/rules/agencycli.mdc
+  gemini       →  GEMINI.md + .aios-context/ + .gemini/skills/
   generic-cli  →  context.md (plain text)`,
-		Example: `  agencycli hire --project "my-api" --dept "engineering/backend" \
+		Example: `  agencycli hire --project "my-api" --team "engineering/backend" \
                --model "claudecode" --name "dev"
+
+  # assign is identical to hire
+  agencycli assign --project "my-api" --team "engineering/backend" \
+                --model "cursor" --name "cursor-dev"
 
   # Then start working:
   cd projects/my-api/agents/dev
   claude`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if project == "" || dept == "" || model == "" || agentName == "" {
-				return fmt.Errorf("--project, --dept, --model and --name are all required")
+			if project == "" || team == "" || model == "" || agentName == "" {
+				return fmt.Errorf("--project, --team, --model and --name are all required")
 			}
 
 			agentModel := entity.NormaliseModel(entity.AgentModel(model))
@@ -61,12 +86,10 @@ The output format depends on --model:
 			}
 			s := store.NewFS(root)
 
-			// Verify project exists
 			if _, err := s.Project(project); err != nil {
 				return err
 			}
 
-			// Check the agent directory doesn't already exist unless --force
 			agentDir := s.AgentDir(project, agentName)
 			if _, err := os.Stat(agentDir); err == nil && !force {
 				return fmt.Errorf(
@@ -76,18 +99,16 @@ The output format depends on --model:
 				)
 			}
 
-			// Build merged context
 			builder := ctxbuild.NewBuilder(s)
-			mc, err := builder.Build(project, dept)
+			mc, err := builder.Build(project, team)
 			if err != nil {
-				return fmt.Errorf("hire: build context: %w", err)
+				return fmt.Errorf("%s: build context: %w", use, err)
 			}
 
-			// Append extra prompt if provided
 			if extraPrompt != "" {
 				data, err := os.ReadFile(extraPrompt)
 				if err != nil {
-					return fmt.Errorf("hire: read extra prompt: %w", err)
+					return fmt.Errorf("%s: read extra prompt: %w", use, err)
 				}
 				mc.Layers = append(mc.Layers, ctxbuild.ContextLayer{
 					Source:  "extra",
@@ -95,9 +116,8 @@ The output format depends on --model:
 				})
 			}
 
-			// Create and populate agent working directory
 			if err := os.MkdirAll(agentDir, 0o755); err != nil {
-				return fmt.Errorf("hire: create agent dir: %w", err)
+				return fmt.Errorf("%s: create agent dir: %w", use, err)
 			}
 
 			f, err := formatter.New(agentModel)
@@ -105,20 +125,19 @@ The output format depends on --model:
 				return err
 			}
 			if err := f.Format(mc, agentDir); err != nil {
-				return fmt.Errorf("hire: format context: %w", err)
+				return fmt.Errorf("%s: format context: %w", use, err)
 			}
 
-			// Persist agent metadata for future sync
 			meta := &entity.AgentMeta{
 				Name:        agentName,
 				Project:     project,
-				Department:  dept,
+				Team:        team,
 				Model:       agentModel,
 				HiredAt:     time.Now().UTC(),
 				ContextHash: ctxbuild.LayerHashes(mc),
 			}
 			if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
-				return fmt.Errorf("hire: save agent meta: %w", err)
+				return fmt.Errorf("%s: save agent meta: %w", use, err)
 			}
 
 			printHireSuccess(agentDir, agentModel, mc, project, agentName)
@@ -127,14 +146,14 @@ The output format depends on --model:
 	}
 
 	cmd.Flags().StringVar(&project, "project", "", "Project name")
-	cmd.Flags().StringVar(&dept, "dept", "", "Department path, e.g. \"engineering/backend\"")
+	cmd.Flags().StringVar(&team, "team", "", "Team path, e.g. \"engineering/backend\"")
 	cmd.Flags().StringVar(&model, "model", "", fmt.Sprintf("Agent model (%s)", joinModels(entity.KnownModels)))
 	cmd.Flags().StringVar(&agentName, "name", "", "Name for this agent (used as directory name)")
 	cmd.Flags().StringVar(&extraPrompt, "extra-prompt", "", "Path to an additional Markdown file to append to the context")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing agent directory")
 
 	_ = cmd.MarkFlagRequired("project")
-	_ = cmd.MarkFlagRequired("dept")
+	_ = cmd.MarkFlagRequired("team")
 	_ = cmd.MarkFlagRequired("model")
 	_ = cmd.MarkFlagRequired("name")
 
@@ -165,6 +184,10 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 		fmt.Printf("    claude\n")
 	case entity.ModelCodex:
 		fmt.Printf("    codex\n")
+	case entity.ModelCursor:
+		fmt.Printf("    agent\n")
+	case entity.ModelGemini:
+		fmt.Printf("    gemini\n")
 	default:
 		fmt.Printf("    <your-agent-command>\n")
 	}

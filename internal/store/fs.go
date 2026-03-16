@@ -66,115 +66,115 @@ func writeText(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-// ── Company ───────────────────────────────────────────────────────────────────
+// ── Agency ────────────────────────────────────────────────────────────────────
 
-func (s *fsStore) Company() (*entity.Company, error) {
-	path := s.abs(".aios", "company.yaml")
-	var c entity.Company
-	if err := readYAML(path, &c); err != nil {
-		return nil, fmt.Errorf("store: read company: %w", err)
+func (s *fsStore) Agency() (*entity.Agency, error) {
+	path := s.abs(".aios", "agency.yaml")
+	var a entity.Agency
+	if err := readYAML(path, &a); err != nil {
+		return nil, fmt.Errorf("store: read agency: %w", err)
 	}
-	return &c, nil
+	return &a, nil
 }
 
-func (s *fsStore) SaveCompany(c *entity.Company) error {
-	path := s.abs(".aios", "company.yaml")
-	if err := writeYAML(path, c); err != nil {
-		return fmt.Errorf("store: save company: %w", err)
+func (s *fsStore) SaveAgency(a *entity.Agency) error {
+	path := s.abs(".aios", "agency.yaml")
+	if err := writeYAML(path, a); err != nil {
+		return fmt.Errorf("store: save agency: %w", err)
 	}
 	return nil
 }
 
-func (s *fsStore) CompanyPrompt() (string, error) {
-	content, err := readText(s.abs("company-prompt.md"))
+func (s *fsStore) AgencyPrompt() (string, error) {
+	content, err := readText(s.abs("agency-prompt.md"))
 	if err != nil {
-		return "", fmt.Errorf("store: read company prompt: %w", err)
+		return "", fmt.Errorf("store: read agency prompt: %w", err)
 	}
 	return content, nil
 }
 
-func (s *fsStore) SaveCompanyPrompt(content string) error {
-	if err := writeText(s.abs("company-prompt.md"), content); err != nil {
-		return fmt.Errorf("store: save company prompt: %w", err)
+func (s *fsStore) SaveAgencyPrompt(content string) error {
+	if err := writeText(s.abs("agency-prompt.md"), content); err != nil {
+		return fmt.Errorf("store: save agency prompt: %w", err)
 	}
 	return nil
 }
 
-// ── Departments ───────────────────────────────────────────────────────────────
+// ── Teams ─────────────────────────────────────────────────────────────────────
 
-func (s *fsStore) deptDir(path string) string {
+func (s *fsStore) teamDir(path string) string {
 	// path is slash-separated, e.g. "engineering/backend"
-	return s.abs(append([]string{"departments"}, strings.Split(path, "/")...)...)
+	return s.abs(append([]string{"teams"}, strings.Split(path, "/")...)...)
 }
 
-func (s *fsStore) Department(path string) (*entity.Department, error) {
-	yamlPath := filepath.Join(s.deptDir(path), "dept.yaml")
-	var d entity.Department
-	if err := readYAML(yamlPath, &d); err != nil {
+func (s *fsStore) Team(path string) (*entity.Team, error) {
+	yamlPath := filepath.Join(s.teamDir(path), "team.yaml")
+	var t entity.Team
+	if err := readYAML(yamlPath, &t); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("store: department %q not found", path)
+			return nil, fmt.Errorf("store: team %q not found", path)
 		}
-		return nil, fmt.Errorf("store: read department %q: %w", path, err)
+		return nil, fmt.Errorf("store: read team %q: %w", path, err)
 	}
-	return &d, nil
+	return &t, nil
 }
 
-func (s *fsStore) SaveDepartment(path string, d *entity.Department) error {
-	yamlPath := filepath.Join(s.deptDir(path), "dept.yaml")
-	if err := writeYAML(yamlPath, d); err != nil {
-		return fmt.Errorf("store: save department %q: %w", path, err)
+func (s *fsStore) SaveTeam(path string, t *entity.Team) error {
+	yamlPath := filepath.Join(s.teamDir(path), "team.yaml")
+	if err := writeYAML(yamlPath, t); err != nil {
+		return fmt.Errorf("store: save team %q: %w", path, err)
 	}
 	return nil
 }
 
-func (s *fsStore) DeptPrompt(path string) (string, error) {
-	content, err := readText(filepath.Join(s.deptDir(path), "prompt.md"))
+func (s *fsStore) TeamPrompt(path string) (string, error) {
+	content, err := readText(filepath.Join(s.teamDir(path), "prompt.md"))
 	if err != nil {
-		return "", fmt.Errorf("store: read dept prompt %q: %w", path, err)
+		return "", fmt.Errorf("store: read team prompt %q: %w", path, err)
 	}
 	return content, nil
 }
 
-func (s *fsStore) SaveDeptPrompt(path string, content string) error {
-	if err := writeText(filepath.Join(s.deptDir(path), "prompt.md"), content); err != nil {
-		return fmt.Errorf("store: save dept prompt %q: %w", path, err)
+func (s *fsStore) SaveTeamPrompt(path string, content string) error {
+	if err := writeText(filepath.Join(s.teamDir(path), "prompt.md"), content); err != nil {
+		return fmt.Errorf("store: save team prompt %q: %w", path, err)
 	}
 	return nil
 }
 
-// ListDepartments walks departments/ recursively and returns every directory
-// that contains a dept.yaml.
-func (s *fsStore) ListDepartments() ([]*DeptEntry, error) {
-	base := s.abs("departments")
-	var entries []*DeptEntry
+// ListTeams walks teams/ recursively and returns every directory
+// that contains a team.yaml.
+func (s *fsStore) ListTeams() ([]*TeamEntry, error) {
+	base := s.abs("teams")
+	var entries []*TeamEntry
 
 	err := filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.Name() != "dept.yaml" {
+		if d.Name() != "team.yaml" {
 			return nil
 		}
 		dir := filepath.Dir(path)
-		// Convert absolute dir to relative dept path (slash-separated)
+		// Convert absolute dir to relative team path (slash-separated)
 		rel, err := filepath.Rel(base, dir)
 		if err != nil {
 			return err
 		}
-		deptPath := filepath.ToSlash(rel)
+		teamPath := filepath.ToSlash(rel)
 
-		var dept entity.Department
-		if err := readYAML(path, &dept); err != nil {
-			return fmt.Errorf("store: read dept %q: %w", deptPath, err)
+		var team entity.Team
+		if err := readYAML(path, &team); err != nil {
+			return fmt.Errorf("store: read team %q: %w", teamPath, err)
 		}
-		entries = append(entries, &DeptEntry{Path: deptPath, Department: &dept})
+		entries = append(entries, &TeamEntry{Path: teamPath, Team: &team})
 		return nil
 	})
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("store: list departments: %w", err)
+		return nil, fmt.Errorf("store: list teams: %w", err)
 	}
 	return entries, nil
 }

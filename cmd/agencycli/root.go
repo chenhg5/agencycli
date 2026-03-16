@@ -18,29 +18,32 @@ var rootCmd = &cobra.Command{
 	Short: "AI agent organisation and context management",
 	Long: `agencycli manages the organisational context for AI agents.
 
-It lets you create a company with departments and projects, then hire
+It lets you create an agency with teams and projects, then hire (or assign)
 AI agents into projects with the right accumulated context so they can
 start working immediately.
 
 Typical workflow:
 
-  agencycli create company --name "MyCompany"
-  cd MyCompany
+  agencycli create agency --name "MyAgency"
+  cd MyAgency
 
-  agencycli create dept --name "engineering"
-  agencycli create dept --name "engineering/backend" --desc "Go/gRPC services"
+  agencycli create team --name "engineering"
+  agencycli create team --name "engineering/backend" --desc "Go/gRPC services"
 
   agencycli create project --name "my-api" --repo "../my-api"
 
-  agencycli hire --project "my-api" --dept "engineering/backend" \
-                --model "claudecode" --name "dev"
+  agencycli hire   --project "my-api" --team "engineering/backend" \
+                   --model "claudecode" --name "dev"
+  # or equivalently:
+  agencycli assign --project "my-api" --team "engineering/backend" \
+                   --model "cursor" --name "cursor-dev"
 
   cd projects/my-api/agents/dev
   claude
 
 You can run any command from outside the workspace by passing --dir:
 
-  agencycli --dir /path/to/MyCompany list depts`,
+  agencycli --dir /path/to/MyAgency list teams`,
 }
 
 func init() {
@@ -52,6 +55,7 @@ func init() {
 	rootCmd.AddCommand(
 		newCreateCmd(),
 		newHireCmd(),
+		newAssignCmd(),
 		newSyncCmd(),
 		newListCmd(),
 		newShowCmd(),

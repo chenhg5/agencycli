@@ -1,5 +1,5 @@
 // Package scaffold creates the initial directory layout and template files
-// for agencycli workspace objects (company, department, project).
+// for agencycli workspace objects (agency, team, project).
 //
 // Scaffold operations are idempotent: they never overwrite an existing file,
 // so running create twice is always safe.
@@ -27,26 +27,26 @@ func New(s store.Store) *Scaffolder {
 	return &Scaffolder{store: s}
 }
 
-// ── Company ───────────────────────────────────────────────────────────────────
+// ── Agency ────────────────────────────────────────────────────────────────────
 
-// InitCompany writes .aios/company.yaml, company-prompt.md, and the standard
+// InitAgency writes .aios/agency.yaml, agency-prompt.md, and the standard
 // top-level subdirectories inside root. It also installs the built-in skills.
 // root must already exist on disk.
-func InitCompany(root string, c *entity.Company) error {
+func InitAgency(root string, a *entity.Agency) error {
 	s := store.NewFS(root)
 
-	if err := s.SaveCompany(c); err != nil {
-		return fmt.Errorf("scaffold: init company: %w", err)
+	if err := s.SaveAgency(a); err != nil {
+		return fmt.Errorf("scaffold: init agency: %w", err)
 	}
 
 	if err := writeTemplateOnce(
-		filepath.Join(root, "company-prompt.md"),
-		companyPromptTmpl, c,
+		filepath.Join(root, "agency-prompt.md"),
+		agencyPromptTmpl, a,
 	); err != nil {
-		return fmt.Errorf("scaffold: company prompt: %w", err)
+		return fmt.Errorf("scaffold: agency prompt: %w", err)
 	}
 
-	for _, dir := range []string{"departments", "projects", "skills"} {
+	for _, dir := range []string{"teams", "projects", "skills"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
 			return fmt.Errorf("scaffold: create %s dir: %w", dir, err)
 		}
@@ -59,20 +59,20 @@ func InitCompany(root string, c *entity.Company) error {
 	return nil
 }
 
-// ── Department ────────────────────────────────────────────────────────────────
+// ── Team ──────────────────────────────────────────────────────────────────────
 
-// CreateDept writes dept.yaml and an initial prompt.md for a department.
-// path is a slash-separated dept path, e.g. "engineering/backend".
-func (sc *Scaffolder) CreateDept(path string, d *entity.Department) error {
-	if err := sc.store.SaveDepartment(path, d); err != nil {
-		return fmt.Errorf("scaffold: save dept %q: %w", path, err)
+// CreateTeam writes team.yaml and an initial prompt.md for a team.
+// path is a slash-separated team path, e.g. "engineering/backend".
+func (sc *Scaffolder) CreateTeam(path string, t *entity.Team) error {
+	if err := sc.store.SaveTeam(path, t); err != nil {
+		return fmt.Errorf("scaffold: save team %q: %w", path, err)
 	}
 	promptPath := filepath.Join(
-		sc.store.Root(), "departments",
+		sc.store.Root(), "teams",
 		filepath.FromSlash(path), "prompt.md",
 	)
-	if err := writeTemplateOnce(promptPath, deptPromptTmpl, d); err != nil {
-		return fmt.Errorf("scaffold: dept prompt %q: %w", path, err)
+	if err := writeTemplateOnce(promptPath, teamPromptTmpl, t); err != nil {
+		return fmt.Errorf("scaffold: team prompt %q: %w", path, err)
 	}
 	return nil
 }

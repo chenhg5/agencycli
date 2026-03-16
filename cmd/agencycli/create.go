@@ -16,65 +16,64 @@ import (
 func newCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create workspace objects (company, dept, project)",
+		Short: "Create workspace objects (agency, team, project)",
 	}
 	cmd.AddCommand(
-		newCreateCompanyCmd(),
-		newCreateDeptCmd(),
+		newCreateAgencyCmd(),
+		newCreateTeamCmd(),
 		newCreateProjectCmd(),
 	)
 	return cmd
 }
 
-// ── create company ────────────────────────────────────────────────────────────
+// ── create agency ─────────────────────────────────────────────────────────────
 
-func newCreateCompanyCmd() *cobra.Command {
+func newCreateAgencyCmd() *cobra.Command {
 	var (
 		name string
 		desc string
 	)
 
 	cmd := &cobra.Command{
-		Use:   "company",
+		Use:   "agency",
 		Short: "Initialise a new agencycli workspace",
-		Example: `  agencycli create company --name "Acme Corp" --desc "Building the future"
-  cd "Acme Corp"`,
+		Example: `  agencycli create agency --name "Acme Agency" --desc "Building the future"
+  cd "Acme Agency"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			// Create the company root directory
 			root, err := filepath.Abs(name)
 			if err != nil {
 				return err
 			}
 			if err := os.MkdirAll(root, 0o755); err != nil {
-				return fmt.Errorf("create company dir: %w", err)
+				return fmt.Errorf("create agency dir: %w", err)
 			}
 
-			c := &entity.Company{Name: name, Description: desc}
-			if err := scaffold.InitCompany(root, c); err != nil {
+			a := &entity.Agency{Name: name, Description: desc}
+			if err := scaffold.InitAgency(root, a); err != nil {
 				return err
 			}
 
-			fmt.Printf("✓ Company workspace created: %s\n", root)
+			fmt.Printf("✓ Agency workspace created: %s\n", root)
 			fmt.Printf("\nNext steps:\n")
 			fmt.Printf("  cd %q\n", name)
-			fmt.Printf("  agencycli create dept --name \"engineering\"\n")
+			fmt.Printf("  agencycli create team --name \"engineering\"\n")
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&name, "name", "", "Company name (also used as directory name)")
+	cmd.Flags().StringVar(&name, "name", "", "Agency name (also used as directory name)")
 	cmd.Flags().StringVar(&desc, "desc", "", "Short description")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
 
-// ── create dept ───────────────────────────────────────────────────────────────
+// ── create team ───────────────────────────────────────────────────────────────
 
-func newCreateDeptCmd() *cobra.Command {
+func newCreateTeamCmd() *cobra.Command {
 	var (
 		name   string
 		desc   string
@@ -82,10 +81,10 @@ func newCreateDeptCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "dept",
-		Short: "Create a department (supports nested paths)",
-		Example: `  agencycli create dept --name "engineering"
-  agencycli create dept --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"`,
+		Use:   "team",
+		Short: "Create a team (supports nested paths)",
+		Example: `  agencycli create team --name "engineering"
+  agencycli create team --name "engineering/backend" --desc "Go/gRPC" --skills "git,bash"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -105,40 +104,40 @@ func newCreateDeptCmd() *cobra.Command {
 			}
 
 			// Every level in the chain must already exist before we can
-			// create a child department.  This ensures each level has its
-			// own dept.yaml and prompt.md so the context chain is complete.
+			// create a child team. This ensures each level has its own
+			// team.yaml and prompt.md so the context chain is complete.
 			if parent != "" {
 				chain := ctxbuild.ResolveChain(parent)
 				for _, ancestor := range chain {
-					if _, err := s.Department(ancestor); err != nil {
+					if _, err := s.Team(ancestor); err != nil {
 						return fmt.Errorf(
-							"parent department %q does not exist\n"+
+							"parent team %q does not exist\n"+
 								"Create it first with:\n"+
-								"  agencycli create dept --name %q",
+								"  agencycli create team --name %q",
 							ancestor, ancestor,
 						)
 					}
 				}
 			}
 
-			d := &entity.Department{
+			t := &entity.Team{
 				Name:        filepath.Base(name),
 				Parent:      parent,
 				Description: desc,
 				Skills:      skills,
 			}
-			if err := sc.CreateDept(name, d); err != nil {
+			if err := sc.CreateTeam(name, t); err != nil {
 				return err
 			}
 
-			fmt.Printf("✓ Department created: departments/%s\n", name)
-			fmt.Printf("  Edit the prompt: vim departments/%s/prompt.md\n",
+			fmt.Printf("✓ Team created: teams/%s\n", name)
+			fmt.Printf("  Edit the prompt: vim teams/%s/prompt.md\n",
 				filepath.FromSlash(name))
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&name, "name", "", "Department path, e.g. \"engineering\" or \"engineering/backend\"")
+	cmd.Flags().StringVar(&name, "name", "", "Team path, e.g. \"engineering\" or \"engineering/backend\"")
 	cmd.Flags().StringVar(&desc, "desc", "", "Short description")
 	cmd.Flags().StringSliceVar(&skills, "skills", nil, "Comma-separated skill names, e.g. git,bash")
 	_ = cmd.MarkFlagRequired("name")
@@ -177,7 +176,7 @@ func newCreateProjectCmd() *cobra.Command {
 
 			fmt.Printf("✓ Project created: projects/%s\n", name)
 			fmt.Printf("  Edit the prompt: vim projects/%s/prompt.md\n", name)
-			fmt.Printf("  Hire an agent:   agencycli hire --project %q --dept \"...\" --model \"claudecode\" --name \"dev\"\n", name)
+			fmt.Printf("  Hire an agent:   agencycli hire --project %q --team \"...\" --model \"claudecode\" --name \"dev\"\n", name)
 			return nil
 		},
 	}
