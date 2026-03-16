@@ -54,10 +54,10 @@ The context layers are merged in this order:
   3. Project
 
 The output format depends on --model:
-  claudecode   →  CLAUDE.md + .aios-context/ + .claude/skills/
+  claudecode   →  CLAUDE.md + .agencycli-context/ + .claude/skills/
   codex        →  AGENTS.md (single merged file)
   cursor       →  .cursorrules + .cursor/rules/agencycli.mdc
-  gemini       →  GEMINI.md + .aios-context/ + .gemini/skills/
+  gemini       →  GEMINI.md + .agencycli-context/ + .gemini/skills/
   generic-cli  →  context.md (plain text)`,
 		Example: `  agencycli hire --project "my-api" --team "engineering/backend" \
                --model "claudecode" --name "dev"

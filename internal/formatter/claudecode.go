@@ -14,7 +14,7 @@ import (
 // Output structure inside outDir:
 //
 //	CLAUDE.md                    ← main file; uses @import to reference layers
-//	.aios-context/
+//	.agencycli-context/
 //	  company.md
 //	  department-engineering.md
 //	  department-engineering-backend.md
@@ -32,14 +32,14 @@ import (
 type claudeCodeFormatter struct{}
 
 func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) error {
-	contextDir := filepath.Join(outDir, ".aios-context")
+	contextDir := filepath.Join(outDir, ".agencycli-context")
 	if err := os.MkdirAll(contextDir, 0o755); err != nil {
 		return fmt.Errorf("claudecode: create context dir: %w", err)
 	}
 
 	var importLines []string
 
-	// Write each layer into its own file under .aios-context/
+	// Write each layer into its own file under .agencycli-context/
 	for _, layer := range mc.Layers {
 		filename := sourceToFilename(layer.Source) + ".md"
 		path := filepath.Join(contextDir, filename)
@@ -47,7 +47,7 @@ func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) 
 			return fmt.Errorf("claudecode: write layer %q: %w", layer.Source, err)
 		}
 		// CLAUDE.md @import paths are relative to the file containing the import.
-		importLines = append(importLines, fmt.Sprintf("@.aios-context/%s", filename))
+		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
 	}
 
 	// Write CLAUDE.md with @import directives

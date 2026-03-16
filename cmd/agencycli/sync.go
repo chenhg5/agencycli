@@ -22,7 +22,7 @@ func newSyncCmd() *cobra.Command {
 		Use:   "sync",
 		Short: "Regenerate agent working directories whose context has changed",
 		Long: `sync compares the current prompt file contents against the hashes stored in
-.aios-agent.yaml and regenerates any agent whose context is stale.
+.agencycli-agent.yaml and regenerates any agent whose context is stale.
 
 With no flags it syncs all agents in all projects.
 Use --project to limit to one project, --project + --name for a single agent.`,

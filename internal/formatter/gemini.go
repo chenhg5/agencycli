@@ -18,7 +18,7 @@ import (
 // Output structure inside outDir:
 //
 //	GEMINI.md               ← merged context (uses @import like Claude Code)
-//	.aios-context/          ← individual layer files
+//	.agencycli-context/          ← individual layer files
 //	.gemini/
 //	  skills/
 //	    git/
@@ -26,7 +26,7 @@ import (
 type geminiFormatter struct{}
 
 func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) error {
-	contextDir := filepath.Join(outDir, ".aios-context")
+	contextDir := filepath.Join(outDir, ".agencycli-context")
 	if err := os.MkdirAll(contextDir, 0o755); err != nil {
 		return fmt.Errorf("gemini: create context dir: %w", err)
 	}
@@ -38,7 +38,7 @@ func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) erro
 		if err := os.WriteFile(path, []byte(layer.Content), 0o644); err != nil {
 			return fmt.Errorf("gemini: write layer %q: %w", layer.Source, err)
 		}
-		importLines = append(importLines, fmt.Sprintf("@.aios-context/%s", filename))
+		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
 	}
 
 	// GEMINI.md supports the same @import syntax as CLAUDE.md

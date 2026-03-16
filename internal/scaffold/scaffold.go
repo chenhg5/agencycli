@@ -29,7 +29,7 @@ func New(s store.Store) *Scaffolder {
 
 // ── Agency ────────────────────────────────────────────────────────────────────
 
-// InitAgency writes .aios/agency.yaml, agency-prompt.md, and the standard
+// InitAgency writes .agencycli/agency.yaml, agency-prompt.md, and the standard
 // top-level subdirectories inside root. It also installs the built-in skills.
 // root must already exist on disk.
 func InitAgency(root string, a *entity.Agency) error {

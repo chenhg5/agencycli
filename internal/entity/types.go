@@ -80,7 +80,7 @@ func IsValidModel(m AgentModel) bool {
 }
 
 // Agency is the top-level organisational unit (the "company").
-// Stored at <root>/.aios/agency.yaml.
+// Stored at <root>/.agencycli/agency.yaml.
 type Agency struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
@@ -118,7 +118,7 @@ type Skill struct {
 }
 
 // AgentMeta records the provenance of a hired agent working directory.
-// Stored at <root>/projects/<project>/agents/<name>/.aios-agent.yaml.
+// Stored at <root>/projects/<project>/agents/<name>/.agencycli-agent.yaml.
 // It is used by `agencycli sync` to detect which context layers have changed.
 type AgentMeta struct {
 	Name    string     `yaml:"name"`
