@@ -55,9 +55,10 @@ var defaultImages = map[entity.AgentModel]string{
 var defaultCredentialMounts = map[entity.AgentModel][]string{
 	entity.ModelClaudeCode: {
 		// ~/.claude.json holds user state / onboarding read at every startup.
-		// ~/.claude/ holds settings.json, sessions, skills, etc.
+		// ~/.claude/ must be writable so Claude can create session-env dirs,
+		// write session state, and update settings during a run.
 		"~/.claude.json:/root/.claude.json:ro",
-		"~/.claude:/root/.claude:ro",
+		"~/.claude:/root/.claude",
 		"~/.config/gh:/root/.config/gh:ro",
 		"~/.ssh:/root/.ssh:ro",
 	},

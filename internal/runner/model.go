@@ -13,6 +13,12 @@ type ModelInvoker interface {
 	// sessionID is the previous session ID (empty = start fresh).
 	Args(promptFile, sessionID string) []string
 
+	// UseStdinPrompt reports whether the runner should open promptFile and
+	// pipe its contents to the process via stdin instead of referencing the
+	// file path in the argument list.
+	// When true, the promptFile path is NOT included in Args().
+	UseStdinPrompt() bool
+
 	// ParseSessionID attempts to extract a new session ID from the agent's
 	// combined stdout output. Returns "" if not found or not supported.
 	ParseSessionID(output string) string
@@ -45,25 +51,25 @@ func InvokerFor(model entity.AgentModel, runCommand string) ModelInvoker {
 type claudeInvoker struct{}
 
 func (c *claudeInvoker) Args(promptFile, sessionID string) []string {
-	// claude --no-interactive --output-format stream-json -p "$(cat file)"
-	// We read from file via shell so the prompt isn't exposed in ps output.
+	// Use -p/--print for non-interactive mode; prompt arrives on stdin
+	// (UseStdinPrompt returns true so the runner pipes promptFile).
 	//
-	// --dangerously-skip-permissions is required when running as root (e.g.
-	// inside a Docker sandbox). Claude Code refuses to run as root without it.
-	// This is safe here because the Docker sandbox already provides the
-	// isolation boundary; we explicitly accept the risk.
+	// --dangerously-skip-permissions is required when running as root inside a
+	// Docker sandbox. IS_SANDBOX=1 must also be set (handled by sandbox layer).
 	args := []string{
 		"claude",
-		"--no-interactive",
+		"-p",
+		"--verbose",
 		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
 	}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
-	args = append(args, "--print-file", promptFile)
 	return args
 }
+
+func (c *claudeInvoker) UseStdinPrompt() bool { return true }
 
 func (c *claudeInvoker) ParseSessionID(output string) string {
 	// Claude emits stream-json lines. First system line contains session_id.
@@ -92,10 +98,13 @@ func (c *claudeInvoker) ParseSessionID(output string) string {
 type codexInvoker struct{}
 
 func (c *codexInvoker) Args(promptFile, sessionID string) []string {
-	// codex -q --full-auto -p "<prompt>"
-	// Codex does not support --print-file; we inject via stdin or -p flag.
-	return []string{"codex", "-q", "--full-auto", "--input-file", promptFile}
+	// `codex exec -` reads the prompt from stdin.
+	// --skip-git-repo-check allows running outside a git repo (agent workspace
+	// dirs are not git repos themselves; the project repo is mounted separately).
+	return []string{"codex", "exec", "--skip-git-repo-check", "-"}
 }
+
+func (c *codexInvoker) UseStdinPrompt() bool { return true }
 
 func (c *codexInvoker) ParseSessionID(_ string) string { return "" }
 
@@ -103,9 +112,19 @@ func (c *codexInvoker) ParseSessionID(_ string) string { return "" }
 
 type geminiInvoker struct{}
 
-func (g *geminiInvoker) Args(promptFile, _ string) []string {
-	return []string{"gemini", "--yolo", "--prompt-file", promptFile}
+func (g *geminiInvoker) Args(promptFile, sessionID string) []string {
+	// -p requires a string value to activate non-interactive/headless mode.
+	// Passing "" means headless mode is active; the real prompt arrives via
+	// stdin. Gemini appends the -p value to stdin input, so "" = stdin only.
+	// --output-format stream-json gives structured output for session parsing.
+	args := []string{"gemini", "-y", "--output-format", "stream-json", "-p", ""}
+	if sessionID != "" {
+		args = append(args, "--resume", sessionID)
+	}
+	return args
 }
+
+func (g *geminiInvoker) UseStdinPrompt() bool { return true }
 
 func (g *geminiInvoker) ParseSessionID(_ string) string { return "" }
 
@@ -114,30 +133,32 @@ func (g *geminiInvoker) ParseSessionID(_ string) string { return "" }
 type openCodeInvoker struct{}
 
 func (o *openCodeInvoker) Args(promptFile, _ string) []string {
-	return []string{"opencode", "run", "--file", promptFile}
+	// opencode run reads prompt from stdin when no positional arg is given.
+	return []string{"opencode", "run"}
 }
+
+func (o *openCodeInvoker) UseStdinPrompt() bool { return true }
 
 func (o *openCodeInvoker) ParseSessionID(_ string) string { return "" }
 
 // ── Cursor ────────────────────────────────────────────────────────────────────
 // Cursor CLI is the `agent` binary installed via `curl https://cursor.com/install | bash`.
-// Auth: CURSOR_API_KEY env var or credentials cached in ~/.cursor/ after `agent login`.
+// Auth: credentials cached in ~/.cursor/ after `agent login`.
 
 type cursorInvoker struct{}
 
 func (c *cursorInvoker) Args(promptFile, sessionID string) []string {
-	// agent -p --force --output-format stream-json --print-file <file>
-	// --force allows file modifications without per-step confirmation.
-	args := []string{"agent", "-p", "--force", "--output-format", "stream-json"}
+	// `agent --print --output-format stream-json` reads the prompt from stdin.
+	args := []string{"agent", "--print", "--output-format", "stream-json"}
 	if sessionID != "" {
 		args = append(args, "--session", sessionID)
 	}
-	args = append(args, "--print-file", promptFile)
 	return args
 }
 
+func (c *cursorInvoker) UseStdinPrompt() bool { return true }
+
 func (c *cursorInvoker) ParseSessionID(output string) string {
-	// Cursor stream-json may emit a session id in the "system"/"init" line.
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.Contains(line, `"session_id"`) {
@@ -157,13 +178,15 @@ func (c *cursorInvoker) ParseSessionID(output string) string {
 
 // ── Generic ───────────────────────────────────────────────────────────────────
 
-// genericInvoker falls back to a minimal echo invocation.
+// genericInvoker falls back to `cat` so the prompt text is printed to stdout.
 // Users should set run_command in .agencycli-agent.yaml for custom agents.
 type genericInvoker struct{}
 
 func (g *genericInvoker) Args(promptFile, _ string) []string {
-	return []string{"sh", "-c", "cat " + promptFile}
+	return []string{"cat", promptFile}
 }
+
+func (g *genericInvoker) UseStdinPrompt() bool { return false }
 
 func (g *genericInvoker) ParseSessionID(_ string) string { return "" }
 
@@ -180,5 +203,7 @@ func (c *customInvoker) Args(promptFile, sessionID string) []string {
 	cmd = strings.ReplaceAll(cmd, "{session_id}", sessionID)
 	return []string{"sh", "-c", cmd}
 }
+
+func (c *customInvoker) UseStdinPrompt() bool { return false }
 
 func (c *customInvoker) ParseSessionID(_ string) string { return "" }

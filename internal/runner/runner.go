@@ -166,6 +166,19 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 		cmd.Dir = execDir
 	}
 
+	// When the invoker reads the prompt from stdin, open the prompt file and
+	// pipe it through. For Docker this works because `-i` is always present in
+	// the run args (see sandbox.BuildArgs), so stdin is forwarded into the
+	// container transparently.
+	if invoker.UseStdinPrompt() {
+		pf, err := os.Open(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("open prompt file for stdin: %w", err)
+		}
+		defer pf.Close()
+		cmd.Stdin = pf
+	}
+
 	var outBuf bytes.Buffer
 	multiOut := io.MultiWriter(&outBuf, logFile, os.Stdout)
 	cmd.Stdout = multiOut
@@ -315,6 +328,15 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	cmd := exec.Command(executable, args...)
 	if execDir != "" {
 		cmd.Dir = execDir
+	}
+
+	if invoker.UseStdinPrompt() {
+		pf, err := os.Open(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("open prompt file for stdin: %w", err)
+		}
+		defer pf.Close()
+		cmd.Stdin = pf
 	}
 
 	var outBuf bytes.Buffer
