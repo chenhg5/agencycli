@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/scaffold"
 	"github.com/chenhg5/agencycli/internal/store"
+	tmpl "github.com/chenhg5/agencycli/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -31,15 +34,26 @@ func newCreateCmd() *cobra.Command {
 
 func newCreateAgencyCmd() *cobra.Command {
 	var (
-		name string
-		desc string
+		name         string
+		desc         string
+		templateSrc  string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "agency",
 		Short: "Initialise a new agencycli workspace",
-		Example: `  agencycli create agency --name "Acme Agency" --desc "Building the future"
-  cd "Acme Agency"`,
+		Example: `  # Blank agency
+  agencycli create agency --name "Acme Agency" --desc "Building the future"
+
+  # From a local template archive
+  agencycli create agency --name "Acme Agency" --template tech-project.tar.gz
+
+  # From a template directory
+  agencycli create agency --name "Acme Agency" --template ~/templates/tech-project
+
+  # From a URL
+  agencycli create agency --name "Acme Agency" \
+    --template https://github.com/chenhg5/agencycli-templates/releases/download/v1.0.0/tech-project.tar.gz`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -49,25 +63,37 @@ func newCreateAgencyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := os.MkdirAll(root, 0o755); err != nil {
-				return fmt.Errorf("create agency dir: %w", err)
-			}
 
-			a := &entity.Agency{Name: name, Description: desc}
-			if err := scaffold.InitAgency(root, a); err != nil {
-				return err
+			if templateSrc != "" {
+				if err := applyTemplate(root, name, desc, templateSrc); err != nil {
+					return err
+				}
+			} else {
+				if err := os.MkdirAll(root, 0o755); err != nil {
+					return fmt.Errorf("create agency dir: %w", err)
+				}
+				a := &entity.Agency{Name: name, Description: desc}
+				if err := scaffold.InitAgency(root, a); err != nil {
+					return err
+				}
 			}
 
 			fmt.Printf("✓ Agency workspace created: %s\n", root)
 			fmt.Printf("\nNext steps:\n")
 			fmt.Printf("  cd %q\n", name)
-			fmt.Printf("  agencycli create team --name \"engineering\"\n")
+			if templateSrc == "" {
+				fmt.Printf("  agencycli create team --name \"engineering\"\n")
+			} else {
+				fmt.Printf("  agencycli show\n")
+				fmt.Printf("  agencycli hire --project <project> --team <team> --role <role> --model claudecode --name <name>\n")
+			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "Agency name (also used as directory name)")
 	cmd.Flags().StringVar(&desc, "desc", "", "Short description")
+	cmd.Flags().StringVar(&templateSrc, "template", "", "template source: local .tar.gz file, directory, or HTTPS URL")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
@@ -283,4 +309,61 @@ func newCreateProjectCmd() *cobra.Command {
 	cmd.Flags().StringVar(&repo, "repo", "", "Path to the project code repository")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
+}
+
+// ── template apply helper ─────────────────────────────────────────────────────
+
+// applyTemplate creates an agency workspace at root using the template at src.
+// src can be a local .tar.gz, a local directory, or an HTTPS URL to a .tar.gz.
+func applyTemplate(root, agencyName, agencyDesc, src string) error {
+	isURL := strings.HasPrefix(src, "https://") || strings.HasPrefix(src, "http://")
+
+	if isURL {
+		return applyTemplateURL(root, agencyName, agencyDesc, src)
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("template source %q not found: %w", src, err)
+	}
+
+	if info.IsDir() {
+		return tmpl.InitAgencyFromTemplate(root, agencyName, agencyDesc,
+			func(dest, name string) error { return tmpl.ApplyDir(src, dest, name) })
+	}
+
+	// Local archive.
+	return tmpl.InitAgencyFromTemplate(root, agencyName, agencyDesc,
+		func(dest, name string) error { return tmpl.Unpack(src, dest, name) })
+}
+
+func applyTemplateURL(root, agencyName, agencyDesc, url string) error {
+	fmt.Printf("Downloading template from %s ...\n", url)
+
+	resp, err := http.Get(url) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("download template: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download template: HTTP %d from %s", resp.StatusCode, url)
+	}
+
+	// Write to a temp file so we can seek.
+	tmp, err := os.CreateTemp("", "agencycli-template-*.tar.gz")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		return fmt.Errorf("save template: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	return tmpl.InitAgencyFromTemplate(root, agencyName, agencyDesc,
+		func(dest, name string) error { return tmpl.Unpack(tmp.Name(), dest, name) })
 }

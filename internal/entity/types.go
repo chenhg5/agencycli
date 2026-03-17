@@ -416,3 +416,22 @@ type Cron struct {
 	LastRun       *time.Time `yaml:"last_run,omitempty"`
 	LastRunStatus string     `yaml:"last_run_status,omitempty"`
 }
+
+// ─────────────────────────────────────────────
+// Template
+// ─────────────────────────────────────────────
+
+// TemplateManifest is the metadata file (template.json) bundled at the root
+// of every agencycli agency template archive.  Format is intentionally
+// similar to npm package.json for familiarity.
+type TemplateManifest struct {
+	Name        string   `json:"name"`
+	Version     string   `json:"version"`
+	Description string   `json:"description"`
+	Author      string   `json:"author,omitempty"`
+	Email       string   `json:"email,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
+	Homepage    string   `json:"homepage,omitempty"` // repo / docs URL
+	License     string   `json:"license,omitempty"`
+	CreatedAt   string   `json:"createdAt,omitempty"` // RFC3339
+}
