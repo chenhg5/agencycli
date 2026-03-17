@@ -362,9 +362,10 @@ func newTaskDoneCmd() *cobra.Command {
 
 func newTaskConfirmRequestCmd() *cobra.Command {
 	var (
-		taskID     string
-		summary    string
-		actionHint string
+		taskID      string
+		summary     string
+		actionHint  string
+		actionItems []string
 	)
 
 	cmd := &cobra.Command{
@@ -372,7 +373,10 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 		Short: "Route a task to the human inbox for confirmation",
 		Long: `Intended to be called BY the agent when it needs human input:
 
-  agencycli task confirm-request --id <task-id> --summary "what needs your attention"`,
+  agencycli task confirm-request --id <task-id> --summary "PR #42 is ready for your review" \
+    --action-item "Open https://github.com/org/repo/pull/42" \
+    --action-item "Review the diff and approve or request changes" \
+    --action-item "Reply with: approved / needs-changes: <reason>"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -397,22 +401,24 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 			t.Status = entity.TaskStatusAwaitingConfirmation
 			t.UpdatedAt = now
 			t.ConfirmationReq = &entity.ConfirmationRequest{
-				Summary:    summary,
-				ActionHint: actionHint,
+				Summary:     summary,
+				ActionHint:  actionHint,
+				ActionItems: actionItems,
 			}
 			if err := ts.UpdateTask(project, agentName, t); err != nil {
 				return err
 			}
 
 			item := &entity.InboxItem{
-				TaskID:     taskID,
-				Project:    project,
-				Agent:      agentName,
-				Title:      t.Title,
-				Summary:    summary,
-				ActionHint: actionHint,
-				RoutedAt:   now,
-				LogPath:    t.RunLogPath,
+				TaskID:      taskID,
+				Project:     project,
+				Agent:       agentName,
+				Title:       t.Title,
+				Summary:     summary,
+				ActionHint:  actionHint,
+				ActionItems: actionItems,
+				RoutedAt:    now,
+				LogPath:     t.RunLogPath,
 			}
 			if err := ts.AddToInbox(item); err != nil {
 				return err
@@ -420,13 +426,20 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 
 			fmt.Printf("✓ Task %s routed to human inbox\n", taskID)
 			fmt.Printf("  Summary: %s\n", summary)
+			if len(actionItems) > 0 {
+				fmt.Printf("  Action items (%d):\n", len(actionItems))
+				for i, item := range actionItems {
+					fmt.Printf("    %d. %s\n", i+1, item)
+				}
+			}
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&taskID, "id", "", "task ID")
 	cmd.Flags().StringVar(&summary, "summary", "", "one-line summary for the human")
-	cmd.Flags().StringVar(&actionHint, "action-hint", "", "additional context for human action")
+	cmd.Flags().StringVar(&actionHint, "action-hint", "", "additional context / background")
+	cmd.Flags().StringArrayVar(&actionItems, "action-item", nil, "a specific action for the human (repeatable)")
 	return cmd
 }
 

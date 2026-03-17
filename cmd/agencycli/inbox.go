@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -27,6 +28,7 @@ Use 'inbox confirm' or 'inbox reject' to resolve them.`,
 		newInboxShowCmd(),
 		newInboxConfirmCmd(),
 		newInboxRejectCmd(),
+		newInboxForwardCmd(),
 		newInboxCommentCmd(),
 	)
 	return cmd
@@ -79,7 +81,7 @@ func newInboxListCmd() *cobra.Command {
 func newInboxShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show <task-id>",
-		Short: "Show details of an inbox item",
+		Short: "Show full details of an inbox item",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -103,25 +105,85 @@ func newInboxShowCmd() *cobra.Command {
 				return fmt.Errorf("inbox item %q not found", taskID)
 			}
 
-			fmt.Printf("Task ID  : %s\n", found.TaskID)
-			fmt.Printf("Agent    : %s / %s\n", found.Project, found.Agent)
-			fmt.Printf("Title    : %s\n", found.Title)
-			fmt.Printf("Routed   : %s\n", found.RoutedAt.Format(time.RFC3339))
+			hr := "────────────────────────────────────────────────────────────"
+			fmt.Println(hr)
+			fmt.Printf("  INBOX ITEM  %s\n", found.TaskID)
+			fmt.Println(hr)
+			fmt.Printf("  From    : %s / %s\n", found.Project, found.Agent)
+			fmt.Printf("  Title   : %s\n", found.Title)
+			fmt.Printf("  Routed  : %s\n", found.RoutedAt.Format("2006-01-02 15:04:05"))
+			if found.ForwardedTo != "" {
+				fmt.Printf("  Status  : forwarded → %s\n", found.ForwardedTo)
+			}
+			fmt.Println()
+
+			// Agent's summary of what it did and why it needs help
 			if found.Summary != "" {
-				fmt.Printf("\nSummary:\n%s\n", found.Summary)
+				fmt.Println("── What the agent says ──────────────────────────────────────")
+				fmt.Println(found.Summary)
+				fmt.Println()
 			}
 			if found.ActionHint != "" {
-				fmt.Printf("\nHint: %s\n", found.ActionHint)
+				fmt.Println("── Background / context ─────────────────────────────────────")
+				fmt.Println(found.ActionHint)
+				fmt.Println()
 			}
+
+			// Action items checklist
+			if len(found.ActionItems) > 0 {
+				fmt.Println("── Action items (what you need to do) ───────────────────────")
+				for i, item := range found.ActionItems {
+					fmt.Printf("  %d. %s\n", i+1, item)
+				}
+				fmt.Println()
+			}
+
+			// Original task prompt — the full context of what the agent was working on
+			project, agentName, _ := resolveTaskOwner(root, taskID)
+			if project != "" {
+				if t, err2 := taskstore.New(root).GetTask(project, agentName, taskID); err2 == nil {
+					fmt.Println("── Original task (full prompt) ──────────────────────────────")
+					fmt.Println(t.Prompt)
+					fmt.Println()
+				}
+			}
+
+			// Last lines of the agent's run log
 			if found.LogPath != "" {
-				fmt.Printf("\nLog: %s\n", found.LogPath)
+				fmt.Printf("── Last run log  (%s)\n", found.LogPath)
+				if lines, err2 := tailFile(found.LogPath, 20); err2 == nil && len(lines) > 0 {
+					for _, l := range lines {
+						fmt.Println("  " + l)
+					}
+				} else {
+					fmt.Println("  (log unavailable)")
+				}
+				fmt.Println()
 			}
-			fmt.Printf("\nagencycli inbox confirm %s\n", taskID)
-			fmt.Printf("agencycli inbox reject  %s --reason \"...\"\n", taskID)
-			fmt.Printf("agencycli inbox comment %s --message \"...\"\n", taskID)
+
+			// Available actions
+			fmt.Println("── Available actions ────────────────────────────────────────")
+			fmt.Printf("  agencycli --dir %s inbox confirm %s --message \"your reply\"\n", root, taskID)
+			fmt.Printf("  agencycli --dir %s inbox reject  %s --reason \"...\"\n", root, taskID)
+			fmt.Printf("  agencycli --dir %s inbox forward %s --to <project>/<agent> --note \"...\"\n", root, taskID)
+			fmt.Printf("  agencycli --dir %s inbox comment %s --message \"...\"\n", root, taskID)
+			fmt.Println(hr)
 			return nil
 		},
 	}
+}
+
+// tailFile returns the last n lines of a file.
+func tailFile(path string, n int) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return lines, nil
 }
 
 // ── inbox confirm ─────────────────────────────────────────────────────────────
@@ -284,6 +346,133 @@ func newInboxRejectCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&reason, "reason", "", "reason for rejection")
 	return cmd
+}
+
+// ── inbox forward ─────────────────────────────────────────────────────────────
+
+func newInboxForwardCmd() *cobra.Command {
+	var (
+		to   string
+		note string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "forward <task-id>",
+		Short: "Forward a task to another agent for action, then return to inbox",
+		Long: `Forward an inbox item to another agent (e.g. qa-reviewer) for them to do
+work on it. The forwarded task carries the full original context plus your note.
+When that agent finishes, it should call confirm-request which will route the
+result back to your inbox so you can make the final decision.
+
+  agencycli inbox forward t-20260317-abc123 --to cc-connect/qa-reviewer \
+    --note "Please review the diff and let me know if it looks safe to merge."`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if to == "" {
+				return fmt.Errorf("--to is required (format: <project>/<agent>)")
+			}
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			taskID := args[0]
+
+			// Resolve originating task
+			project, agentName, err := resolveTaskOwner(root, taskID)
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			t, err := ts.GetTask(project, agentName, taskID)
+			if err != nil {
+				return err
+			}
+
+			// Parse forwarding target
+			parts := strings.SplitN(to, "/", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				return fmt.Errorf("--to must be in format <project>/<agent>, e.g. cc-connect/qa-reviewer")
+			}
+			targetProject, targetAgent := parts[0], parts[1]
+
+			// Build forwarded task prompt — original context + human note + instructions
+			forwardPrompt := fmt.Sprintf(`# Forwarded task: %s
+
+**Original task from %s/%s:**
+
+%s
+
+---
+
+**Human note (why this was forwarded to you):**
+%s
+
+---
+
+**Instructions:**
+Work through the above task/request and report your findings/result.
+When done, call:
+  agencycli task confirm-request --id <your-task-id> \
+    --summary "<what you found / what action you took>" \
+    --action-item "Review my findings below and confirm or adjust"
+
+The human will see your report and make the final decision.`,
+				t.Title,
+				project, agentName,
+				t.Prompt,
+				noteOrDefault(note, "(no specific note — please review and report back)"),
+			)
+
+			now := time.Now().UTC()
+			forwarded := &entity.Task{
+				ID:        entity.NewTaskID(),
+				Title:     "[Forwarded] " + t.Title,
+				Type:      t.Type,
+				Priority:  t.Priority,
+				Assignee:  to,
+				CreatedBy: "human (forwarded from " + project + "/" + agentName + ")",
+				Status:    entity.TaskStatusPending,
+				Prompt:    forwardPrompt,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+
+			if err := ts.AddTask(targetProject, targetAgent, forwarded); err != nil {
+				return fmt.Errorf("could not create task for %s: %w", to, err)
+			}
+
+			// Mark original inbox item as forwarded (update in place)
+			items, _ := ts.ListInbox()
+			for _, item := range items {
+				if item.TaskID == taskID {
+					item.ForwardedTo = to
+					item.ForwardNote = note
+					// Re-save by removing and re-adding (simpler than partial update)
+					_ = ts.RemoveFromInbox(taskID)
+					_ = ts.AddToInbox(item)
+					break
+				}
+			}
+
+			fmt.Printf("✓ Forwarded task %q to %s\n", t.Title, to)
+			fmt.Printf("  New task ID : %s\n", forwarded.ID)
+			fmt.Printf("  Original inbox item %s remains in awaiting_confirmation.\n", taskID)
+			fmt.Printf("  When %s finishes, it will route results back to your inbox.\n", to)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&to, "to", "", "target agent in format <project>/<agent>")
+	cmd.Flags().StringVar(&note, "note", "", "your note to the target agent explaining what you need")
+	_ = cmd.MarkFlagRequired("to")
+	return cmd
+}
+
+func noteOrDefault(note, def string) string {
+	if note != "" {
+		return note
+	}
+	return def
 }
 
 // ── inbox comment ─────────────────────────────────────────────────────────────

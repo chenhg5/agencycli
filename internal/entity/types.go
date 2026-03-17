@@ -295,8 +295,9 @@ type OnSuccessTrigger struct {
 
 // ConfirmationRequest holds information surfaced to the human inbox.
 type ConfirmationRequest struct {
-	Summary    string `yaml:"summary"`
-	ActionHint string `yaml:"action_hint,omitempty"`
+	Summary     string   `yaml:"summary"`
+	ActionHint  string   `yaml:"action_hint,omitempty"`
+	ActionItems []string `yaml:"action_items,omitempty"` // numbered checklist for the human
 }
 
 // Task is the atomic unit of work assigned to an agent or human.
@@ -345,14 +346,17 @@ func NewTaskID() string {
 // InboxItem is an entry in the human inbox.
 // Stored at <workspace>/.agencycli/inbox.yaml.
 type InboxItem struct {
-	TaskID    string    `yaml:"task_id"`
-	Project   string    `yaml:"project"`
-	Agent     string    `yaml:"agent"`
-	Title     string    `yaml:"title"`
-	Summary   string    `yaml:"summary"`
-	ActionHint string   `yaml:"action_hint,omitempty"`
-	RoutedAt  time.Time `yaml:"routed_at"`
-	LogPath   string    `yaml:"log_path,omitempty"`
+	TaskID      string    `yaml:"task_id"`
+	Project     string    `yaml:"project"`
+	Agent       string    `yaml:"agent"`
+	Title       string    `yaml:"title"`
+	Summary     string    `yaml:"summary"`
+	ActionHint  string    `yaml:"action_hint,omitempty"`
+	ActionItems []string  `yaml:"action_items,omitempty"` // checklist for the human
+	ForwardedTo string    `yaml:"forwarded_to,omitempty"` // set when human forwards to an agent
+	ForwardNote string    `yaml:"forward_note,omitempty"`
+	RoutedAt    time.Time `yaml:"routed_at"`
+	LogPath     string    `yaml:"log_path,omitempty"`
 }
 
 // ─────────────────────────────────────────────
