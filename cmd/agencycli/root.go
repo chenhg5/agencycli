@@ -54,6 +54,7 @@ func init() {
 
 	rootCmd.AddCommand(
 		newCreateCmd(),
+		newRoleCmd(),
 		newHireCmd(),
 		newAssignCmd(),
 		newFireCmd(),

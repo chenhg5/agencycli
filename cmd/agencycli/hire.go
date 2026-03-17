@@ -38,6 +38,7 @@ func buildHireCmd(use string) *cobra.Command {
 	var (
 		project     string
 		team        string
+		role        string
 		model       string
 		agentName   string
 		extraPrompt string
@@ -55,13 +56,14 @@ func buildHireCmd(use string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   use,
 		Short: "Hire an agent for a project (merges context and creates the agent working directory)",
-		Long: `hire (or assign) assembles the full context for a (project, team) pair and writes
-it into an agent working directory under projects/<project>/agents/<name>/.
+		Long: `hire (or assign) assembles the full context for a (project, team[, role]) tuple and
+writes it into an agent working directory under projects/<project>/agents/<name>/.
 
-The context layers are merged in this order:
+Context layers are merged in this order:
   1. Agency
   2. Team chain (from top-level to the specified team)
-  3. Project
+  3. Role (optional — provides extra prompt, skills, and workspace setup)
+  4. Project
 
 The output format depends on --model:
   claudecode   →  CLAUDE.md + .agencycli-context/ + .claude/skills/
@@ -69,22 +71,20 @@ The output format depends on --model:
   cursor       →  .cursorrules + .cursor/rules/agencycli.mdc
   gemini       →  GEMINI.md + .agencycli-context/ + .gemini/skills/
   generic-cli  →  context.md (plain text)`,
-		Example: `  agencycli hire --project "my-api" --team "engineering/backend" \
+		Example: `  # Hire with a role (recommended)
+  agencycli hire --project "my-site" --team "growth" --role "content-writer" \
+               --model "claudecode" --name "writer"
+
+  # Hire without a role (role is optional)
+  agencycli hire --project "my-api" --team "engineering/backend" \
                --model "claudecode" --name "dev"
 
   # Hire with Docker sandbox isolation
-  agencycli hire --project "my-api" --team "engineering/backend" \
-               --model "claudecode" --name "dev" \
-               --sandbox docker
-
-  # Custom image and memory limit
-  agencycli hire --project "my-api" --team "qa" --model "claudecode" --name "reviewer" \
-               --sandbox docker \
-               --sandbox-image "ghcr.io/myorg/my-claude-sandbox:v1" \
-               --sandbox-memory 8192
+  agencycli hire --project "my-api" --team "engineering" --role "backend-dev" \
+               --model "claudecode" --name "dev" --sandbox docker
 
   # assign is identical to hire
-  agencycli assign --project "my-api" --team "engineering/backend" \
+  agencycli assign --project "my-api" --team "engineering" --role "backend-dev" \
                 --model "cursor" --name "cursor-dev"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if project == "" || team == "" || model == "" || agentName == "" {
@@ -117,7 +117,7 @@ The output format depends on --model:
 			}
 
 			builder := ctxbuild.NewBuilder(s)
-			mc, err := builder.Build(project, team)
+			mc, err := builder.Build(project, team, role)
 			if err != nil {
 				return fmt.Errorf("%s: build context: %w", use, err)
 			}
@@ -186,10 +186,21 @@ The output format depends on --model:
 				addDirs = []string{repoAbs}
 			}
 
+			// Run role workspace setup (create dirs/files) if a role was specified.
+			if role != "" {
+				roleMeta, err2 := s.Role(team, role)
+				if err2 == nil {
+					if err3 := applyRoleSetup(roleMeta.Setup, agentDir); err3 != nil {
+						return fmt.Errorf("%s: role setup: %w", use, err3)
+					}
+				}
+			}
+
 			meta := &entity.AgentMeta{
 				Name:        agentName,
 				Project:     project,
 				Team:        team,
+				Role:        role,
 				Model:       agentModel,
 				HiredAt:     time.Now().UTC(),
 				ContextHash: ctxbuild.LayerHashes(mc),
@@ -207,6 +218,7 @@ The output format depends on --model:
 
 	cmd.Flags().StringVar(&project, "project", "", "Project name")
 	cmd.Flags().StringVar(&team, "team", "", "Team path, e.g. \"engineering/backend\"")
+	cmd.Flags().StringVar(&role, "role", "", "Role name within the team (optional, e.g. \"content-writer\")")
 	cmd.Flags().StringVar(&model, "model", "", fmt.Sprintf("Agent model (%s)", joinModels(entity.KnownModels)))
 	cmd.Flags().StringVar(&agentName, "name", "", "Name for this agent (used as directory name)")
 	cmd.Flags().StringVar(&extraPrompt, "extra-prompt", "", "Path to an additional Markdown file to append to the context")
@@ -275,6 +287,30 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 	default:
 		fmt.Printf("    <your-agent-command>\n")
 	}
+}
+
+// applyRoleSetup creates the directories and files specified in a role's setup
+// definition inside the agent's working directory.
+func applyRoleSetup(setup entity.RoleSetup, agentDir string) error {
+	for _, dir := range setup.Dirs {
+		full := filepath.Join(agentDir, dir)
+		if err := os.MkdirAll(full, 0o755); err != nil {
+			return fmt.Errorf("create dir %q: %w", dir, err)
+		}
+	}
+	for _, f := range setup.Files {
+		full := filepath.Join(agentDir, f.Path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return fmt.Errorf("create parent for %q: %w", f.Path, err)
+		}
+		// Only create if it doesn't exist yet (don't overwrite user content).
+		if _, err := os.Stat(full); os.IsNotExist(err) {
+			if err := os.WriteFile(full, []byte(f.Content), 0o644); err != nil {
+				return fmt.Errorf("create file %q: %w", f.Path, err)
+			}
+		}
+	}
+	return nil
 }
 
 func joinModels(models []entity.AgentModel) string {

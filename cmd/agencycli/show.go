@@ -144,7 +144,7 @@ func newShowAgentCmd() *cobra.Command {
 
 			if raw {
 				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Team)
+				mc, err := builder.Build(project, meta.Team, meta.Role)
 				if err != nil {
 					return err
 				}
@@ -160,7 +160,7 @@ func newShowAgentCmd() *cobra.Command {
 				}
 			} else {
 				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Team)
+				mc, err := builder.Build(project, meta.Team, meta.Role)
 				if err != nil {
 					return err
 				}

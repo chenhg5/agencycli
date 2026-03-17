@@ -106,7 +106,7 @@ func syncAgent(s store.Store, project, agentName string, force bool) (bool, erro
 	}
 
 	builder := ctxbuild.NewBuilder(s)
-	mc, err := builder.Build(project, meta.Team)
+	mc, err := builder.Build(project, meta.Team, meta.Role)
 	if err != nil {
 		return false, fmt.Errorf("build context: %w", err)
 	}

@@ -16,11 +16,12 @@ import (
 func newCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create workspace objects (agency, team, project)",
+		Short: "Create workspace objects (agency, team, role, project)",
 	}
 	cmd.AddCommand(
 		newCreateAgencyCmd(),
 		newCreateTeamCmd(),
+		newCreateRoleCmd(),
 		newCreateProjectCmd(),
 	)
 	return cmd
@@ -140,6 +141,102 @@ func newCreateTeamCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Team path, e.g. \"engineering\" or \"engineering/backend\"")
 	cmd.Flags().StringVar(&desc, "desc", "", "Short description")
 	cmd.Flags().StringSliceVar(&skills, "skills", nil, "Comma-separated skill names, e.g. git,bash")
+	_ = cmd.MarkFlagRequired("name")
+	return cmd
+}
+
+// ── create role ───────────────────────────────────────────────────────────────
+
+func newCreateRoleCmd() *cobra.Command {
+	var (
+		teamPath string
+		name     string
+		desc     string
+		skills   []string
+		setupDirs []string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "role",
+		Short: "Create a role definition under a team",
+		Long: `create role adds a new role under teams/<team>/roles/<name>/.
+
+A role is a reusable job template that provides:
+  - An extra prompt layer (teams/<team>/roles/<name>/prompt.md)
+  - Bound skills merged on top of the team's skills
+  - Workspace setup: directories and files created inside the agent dir at hire time
+
+Roles are referenced at hire time with --role.`,
+		Example: `  agencycli create role --team growth --name content-writer \
+               --desc "Creates and publishes marketing content" \
+               --skills content-writing,article-publisher \
+               --setup-dirs "images,reference,generates"
+
+  agencycli create role --team engineering --name backend-dev \
+               --desc "Go backend developer"`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if teamPath == "" || name == "" {
+				return fmt.Errorf("--team and --name are required")
+			}
+
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			s := store.NewFS(root)
+
+			// Verify the team exists.
+			if _, err := s.Team(teamPath); err != nil {
+				return fmt.Errorf("team %q not found — create it first with: agencycli create team --name %q", teamPath, teamPath)
+			}
+
+			roleDir := s.RoleDir(teamPath, name)
+			if _, err := os.Stat(roleDir); err == nil {
+				return fmt.Errorf("role %q already exists at %s", name, roleDir)
+			}
+
+			r := &entity.Role{
+				Name:        name,
+				Description: desc,
+				Skills:      skills,
+				Setup: entity.RoleSetup{
+					Dirs: setupDirs,
+				},
+			}
+			if err := s.SaveRole(teamPath, name, r); err != nil {
+				return err
+			}
+
+			// Create an empty prompt.md stub.
+			stub := fmt.Sprintf("# Role: %s\n\n", name)
+			if desc != "" {
+				stub += desc + "\n\n"
+			}
+			stub += "<!-- Describe this role's responsibilities, working style, and expectations. -->\n"
+			if err := s.SaveRolePrompt(teamPath, name, stub); err != nil {
+				return err
+			}
+
+			fmt.Printf("✓ Role created: teams/%s/roles/%s/\n", teamPath, name)
+			fmt.Printf("  Edit the prompt:  vim teams/%s/roles/%s/prompt.md\n", teamPath, name)
+			if len(skills) > 0 {
+				fmt.Printf("  Bound skills:     %s\n", strings.Join(skills, ", "))
+			}
+			if len(setupDirs) > 0 {
+				fmt.Printf("  Workspace dirs:   %s\n", strings.Join(setupDirs, ", "))
+			}
+			fmt.Printf("\n  Hire an agent into this role:\n")
+			fmt.Printf("    agencycli hire --project <project> --team %q --role %q --model claudecode --name <name>\n", teamPath, name)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&teamPath, "team", "", "Team path the role belongs to, e.g. \"growth\" or \"engineering/backend\"")
+	cmd.Flags().StringVar(&name, "name", "", "Role name, e.g. \"content-writer\"")
+	cmd.Flags().StringVar(&desc, "desc", "", "Short description of the role")
+	cmd.Flags().StringSliceVar(&skills, "skills", nil, "Comma-separated skill names to bind to this role")
+	cmd.Flags().StringSliceVar(&setupDirs, "setup-dirs", nil, "Comma-separated subdirectories to create in the agent workspace at hire time")
+	_ = cmd.MarkFlagRequired("team")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }

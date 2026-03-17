@@ -21,17 +21,19 @@ func NewBuilder(s store.Store) *Builder {
 	return &Builder{store: s}
 }
 
-// Build assembles the MergedContext for projectName with the team
-// context from teamPath. The returned context contains:
+// Build assembles the MergedContext for projectName with the team context from
+// teamPath. roleName is optional (pass "" to skip the role layer).
 //
-//  1. Agency layer
-//  2. Each team in the chain from top-level to teamPath
-//  3. Project layer
+// Layer order:
 //
-// Empty prompt files are silently skipped so callers don't need to guard
-// against empty layers. Skills are deduplicated and collected from all
-// teams in the chain (parent skills are included).
-func (b *Builder) Build(projectName, teamPath string) (*MergedContext, error) {
+//  1. Agency
+//  2. Each team in the chain (top-level → teamPath)
+//  3. Role (when roleName != "")
+//  4. Project
+//
+// Skills are deduplicated and collected from team chain → role (role skills
+// take precedence / are appended). Empty prompt files are silently skipped.
+func (b *Builder) Build(projectName, teamPath, roleName string) (*MergedContext, error) {
 	mc := &MergedContext{}
 
 	// 1. Agency layer
@@ -49,6 +51,25 @@ func (b *Builder) Build(projectName, teamPath string) (*MergedContext, error) {
 	// 2. Team chain layers + skill collection
 	chain := ResolveChain(teamPath)
 	seenSkills := make(map[string]bool)
+
+	addSkill := func(skillName string) {
+		if seenSkills[skillName] {
+			return
+		}
+		seenSkills[skillName] = true
+		skill, err := b.store.Skill(skillName)
+		if err != nil {
+			return // skill definition missing — skip gracefully
+		}
+		skillPrompt, _ := b.store.SkillPrompt(skillName)
+		files := loadSkillFiles(b.store.SkillDir(skillName))
+		mc.Skills = append(mc.Skills, SkillDef{
+			Name:        skill.Name,
+			Description: skill.Description,
+			Prompt:      skillPrompt,
+			Files:       files,
+		})
+	}
 
 	for _, tp := range chain {
 		team, err := b.store.Team(tp)
@@ -71,30 +92,36 @@ func (b *Builder) Build(projectName, teamPath string) (*MergedContext, error) {
 				Content: prompt,
 			})
 		}
-
 		for _, skillName := range team.Skills {
-			if seenSkills[skillName] {
-				continue
-			}
-			seenSkills[skillName] = true
-
-			skill, err := b.store.Skill(skillName)
-			if err != nil {
-				// Skill definition missing — skip gracefully but note it.
-				continue
-			}
-			skillPrompt, _ := b.store.SkillPrompt(skillName)
-			files := loadSkillFiles(b.store.SkillDir(skillName))
-			mc.Skills = append(mc.Skills, SkillDef{
-				Name:        skill.Name,
-				Description: skill.Description,
-				Prompt:      skillPrompt,
-				Files:       files,
-			})
+			addSkill(skillName)
 		}
 	}
 
-	// 3. Project layer
+	// 3. Role layer (optional)
+	if roleName != "" {
+		// The role lives under the leaf team of the chain.
+		leafTeam := teamPath
+		role, err := b.store.Role(leafTeam, roleName)
+		if err != nil {
+			return nil, fmt.Errorf("ctxbuild: role %q/%q: %w", leafTeam, roleName, err)
+		}
+		rolePrompt, err := b.store.RolePrompt(leafTeam, roleName)
+		if err != nil {
+			return nil, fmt.Errorf("ctxbuild: role prompt %q/%q: %w", leafTeam, roleName, err)
+		}
+		if strings.TrimSpace(rolePrompt) != "" {
+			mc.Layers = append(mc.Layers, ContextLayer{
+				Source:  "role:" + leafTeam + "/" + roleName,
+				Content: rolePrompt,
+			})
+		}
+		// Role skills are appended after team skills.
+		for _, skillName := range role.Skills {
+			addSkill(skillName)
+		}
+	}
+
+	// 4. Project layer
 	projectPrompt, err := b.store.ProjectPrompt(projectName)
 	if err != nil {
 		return nil, fmt.Errorf("ctxbuild: project prompt %q: %w", projectName, err)

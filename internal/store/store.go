@@ -15,6 +15,13 @@ type TeamEntry struct {
 	Team *entity.Team
 }
 
+// RoleEntry is a role together with its team path and name.
+type RoleEntry struct {
+	TeamPath string
+	Name     string
+	Role     *entity.Role
+}
+
 // AgentEntry is an agent's metadata together with its location.
 type AgentEntry struct {
 	Project string
@@ -60,6 +67,17 @@ type Store interface {
 	ProjectPrompt(name string) (string, error)
 	SaveProjectPrompt(name string, content string) error
 	ListProjects() ([]*entity.Project, error)
+
+	// ── Roles ─────────────────────────────────────────────────────────────
+	// teamPath is a slash-separated team path, e.g. "engineering".
+	// roleName is the role directory name, e.g. "backend-dev".
+
+	Role(teamPath, roleName string) (*entity.Role, error)
+	SaveRole(teamPath, roleName string, r *entity.Role) error
+	RolePrompt(teamPath, roleName string) (string, error)
+	SaveRolePrompt(teamPath, roleName string, content string) error
+	RoleDir(teamPath, roleName string) string
+	ListRoles(teamPath string) ([]*RoleEntry, error)
 
 	// ── Skills ────────────────────────────────────────────────────────────
 

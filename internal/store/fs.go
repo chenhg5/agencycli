@@ -179,6 +179,70 @@ func (s *fsStore) ListTeams() ([]*TeamEntry, error) {
 	return entries, nil
 }
 
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+func (s *fsStore) RoleDir(teamPath, roleName string) string {
+	return filepath.Join(s.teamDir(teamPath), "roles", roleName)
+}
+
+func (s *fsStore) Role(teamPath, roleName string) (*entity.Role, error) {
+	path := filepath.Join(s.RoleDir(teamPath, roleName), "role.yaml")
+	var r entity.Role
+	if err := readYAML(path, &r); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("store: role %q/%q not found", teamPath, roleName)
+		}
+		return nil, fmt.Errorf("store: read role %q/%q: %w", teamPath, roleName, err)
+	}
+	return &r, nil
+}
+
+func (s *fsStore) SaveRole(teamPath, roleName string, r *entity.Role) error {
+	path := filepath.Join(s.RoleDir(teamPath, roleName), "role.yaml")
+	if err := writeYAML(path, r); err != nil {
+		return fmt.Errorf("store: save role %q/%q: %w", teamPath, roleName, err)
+	}
+	return nil
+}
+
+func (s *fsStore) RolePrompt(teamPath, roleName string) (string, error) {
+	content, err := readText(filepath.Join(s.RoleDir(teamPath, roleName), "prompt.md"))
+	if err != nil {
+		return "", fmt.Errorf("store: read role prompt %q/%q: %w", teamPath, roleName, err)
+	}
+	return content, nil
+}
+
+func (s *fsStore) SaveRolePrompt(teamPath, roleName string, content string) error {
+	if err := writeText(filepath.Join(s.RoleDir(teamPath, roleName), "prompt.md"), content); err != nil {
+		return fmt.Errorf("store: save role prompt %q/%q: %w", teamPath, roleName, err)
+	}
+	return nil
+}
+
+func (s *fsStore) ListRoles(teamPath string) ([]*RoleEntry, error) {
+	base := filepath.Join(s.teamDir(teamPath), "roles")
+	entries, err := os.ReadDir(base)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: list roles for team %q: %w", teamPath, err)
+	}
+	var roles []*RoleEntry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		r, err := s.Role(teamPath, e.Name())
+		if err != nil {
+			continue
+		}
+		roles = append(roles, &RoleEntry{TeamPath: teamPath, Name: e.Name(), Role: r})
+	}
+	return roles, nil
+}
+
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 func (s *fsStore) projectDir(name string) string {

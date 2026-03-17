@@ -121,6 +121,37 @@ type Skill struct {
 	Description string `yaml:"description,omitempty"`
 }
 
+// Role is a reusable job definition that lives under a team.
+// It provides an extra prompt layer, bound skills, and workspace setup
+// instructions that are applied when an agent is hired into this role.
+// Stored at <root>/teams/<team>/roles/<name>/role.yaml.
+type Role struct {
+	Name        string    `yaml:"name"`
+	Description string    `yaml:"description,omitempty"`
+	// Skills lists skill names bound to this role (merged with team skills).
+	Skills      []string  `yaml:"skills,omitempty"`
+	// Setup describes the workspace layout to create inside the agent directory
+	// when an agent is hired into this role.
+	Setup       RoleSetup `yaml:"setup,omitempty"`
+}
+
+// RoleSetup describes the workspace scaffolding applied at hire time.
+type RoleSetup struct {
+	// Dirs lists subdirectories to create inside the agent working directory.
+	// e.g. ["images", "reference", "generates"]
+	Dirs []string `yaml:"dirs,omitempty"`
+	// Files lists files to create (with optional content) inside the agent dir.
+	Files []RoleSetupFile `yaml:"files,omitempty"`
+}
+
+// RoleSetupFile is a file to create during workspace setup.
+type RoleSetupFile struct {
+	// Path is relative to the agent working directory.
+	Path    string `yaml:"path"`
+	// Content is written verbatim. Empty creates an empty file.
+	Content string `yaml:"content,omitempty"`
+}
+
 // AgentMeta records the provenance of a hired agent working directory.
 // Stored at <root>/projects/<project>/agents/<name>/.agencycli-agent.yaml.
 // It is used by `agencycli sync` to detect which context layers have changed.
@@ -134,6 +165,10 @@ type AgentMeta struct {
 	// ContextHash maps each layer source key to the SHA-256 hex digest
 	// of its prompt content at hire time.
 	ContextHash map[string]string `yaml:"context_hash,omitempty"`
+
+	// Role is the optional role name this agent was hired into (e.g. "content-writer").
+	// Empty when the agent was hired without a specific role.
+	Role string `yaml:"role,omitempty"`
 
 	// AddDirs lists additional directories the agent should have access to
 	// beyond its own working directory (e.g. the project's code repository).
