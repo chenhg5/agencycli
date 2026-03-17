@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/runner"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 )
 
@@ -21,20 +23,18 @@ func newDaemonCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "daemon",
 		Short: "Manage the heartbeat scheduler daemon",
-		Long: `The daemon runs a heartbeat loop for each agent that has heartbeat enabled.
+		Long: `The daemon runs heartbeat loops and cron schedulers for agents.
 
-Heartbeat vs Cron:
-  - Heartbeat: blocking loop; fires N minutes AFTER the previous run completes.
-    Only one instance runs at a time per agent (no overlap).
-    All tasks in one wakeup share the same agent session.
-  - Cron (Phase 2): fires at exact calendar times; enqueues a task for the next
-    heartbeat cycle to pick up.
+Heartbeat: fires N minutes AFTER the previous run completes (interval-based).
+  Only one run at a time per agent (no overlap).
+  All tasks in one wakeup cycle share the same agent session.
+
+Cron: fires at exact calendar times (crontab syntax).
+  When a cron fires it enqueues a Task; the heartbeat loop picks it up.
+  If no heartbeat is enabled, the daemon executes the cron task directly.
 
 Start the daemon in the foreground:
-  agencycli daemon start
-
-It will scan all projects/agents, and for each agent with heartbeat.enabled=true,
-start a goroutine that repeatedly: waits → wakes → runs all pending tasks → waits.`,
+  agencycli daemon start`,
 	}
 	cmd.AddCommand(
 		newDaemonStartCmd(),
@@ -59,12 +59,17 @@ func newDaemonStartCmd() *cobra.Command {
 			s := store.NewFS(root)
 
 			type agentKey struct{ project, agent string }
-			var enabled []agentKey
 
 			projects, err := ts.ListProjects()
 			if err != nil {
 				return err
 			}
+
+			// Collect agents with heartbeat enabled.
+			var heartbeatAgents []agentKey
+			// Collect agents with at least one enabled cron.
+			var cronAgents []agentKey
+
 			for _, p := range projects {
 				agents, err := ts.ListAgents(p)
 				if err != nil {
@@ -72,36 +77,79 @@ func newDaemonStartCmd() *cobra.Command {
 				}
 				for _, a := range agents {
 					hb, err := ts.GetHeartbeat(p, a)
-					if err != nil || !hb.Enabled {
-						continue
+					if err == nil && hb.Enabled {
+						heartbeatAgents = append(heartbeatAgents, agentKey{p, a})
 					}
-					enabled = append(enabled, agentKey{p, a})
+					crons, err := ts.ListCrons(p, a)
+					if err == nil {
+						for _, c := range crons {
+							if c.Enabled {
+								cronAgents = append(cronAgents, agentKey{p, a})
+								break
+							}
+						}
+					}
 				}
 			}
 
-			if len(enabled) == 0 {
-				fmt.Println("No agents have heartbeat enabled.")
-				fmt.Println("Enable with: agencycli daemon heartbeat --project P --agent A --enable --interval 30m")
+			if len(heartbeatAgents) == 0 && len(cronAgents) == 0 {
+				fmt.Println("No agents have heartbeat or cron enabled.")
+				fmt.Println("  Heartbeat: agencycli daemon heartbeat --project P --agent A --enable --interval 30m")
+				fmt.Println("  Cron     : agencycli cron add --project P --agent A --schedule \"0 9 * * *\" --title T --prompt P")
 				return nil
 			}
 
 			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			fmt.Printf("Daemon started — watching %d agent(s)\n", len(enabled))
-			for _, k := range enabled {
-				hb, _ := ts.GetHeartbeat(k.project, k.agent)
-				fmt.Printf("  ● %s/%s  interval=%s\n", k.project, k.agent, hb.Interval)
+			fmt.Printf("Daemon started\n")
+			if len(heartbeatAgents) > 0 {
+				fmt.Printf("  Heartbeat agents (%d):\n", len(heartbeatAgents))
+				for _, k := range heartbeatAgents {
+					hb, _ := ts.GetHeartbeat(k.project, k.agent)
+					fmt.Printf("    ● %s/%s  interval=%s\n", k.project, k.agent, hb.Interval)
+				}
+			}
+			if len(cronAgents) > 0 {
+				fmt.Printf("  Cron agents (%d):\n", len(cronAgents))
+				for _, k := range cronAgents {
+					crons, _ := ts.ListCrons(k.project, k.agent)
+					for _, c := range crons {
+						if c.Enabled {
+							fmt.Printf("    ● %s/%s  [%s]  %s\n", k.project, k.agent, c.Schedule, c.Title)
+						}
+					}
+				}
 			}
 			fmt.Println("Press Ctrl+C to stop.")
 
 			var wg sync.WaitGroup
-			for _, k := range enabled {
+
+			// Deduplicate: if agent is in both lists, heartbeat loop handles cron too.
+			heartbeatSet := map[agentKey]bool{}
+			for _, k := range heartbeatAgents {
+				heartbeatSet[k] = true
+			}
+
+			for _, k := range heartbeatAgents {
 				k := k
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 					runHeartbeatLoop(ctx, root, k.project, k.agent, ts, s)
+				}()
+			}
+
+			// Cron-only agents (no heartbeat): run cron loop that executes tasks directly.
+			for _, k := range cronAgents {
+				if heartbeatSet[k] {
+					continue // already handled in heartbeat loop
+				}
+				k := k
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					runCronOnlyLoop(ctx, root, k.project, k.agent, ts, s)
 				}()
 			}
 
@@ -188,7 +236,12 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		hb.PID = os.Getpid()
 		_ = ts.SaveHeartbeat(project, agentName, hb)
 
-		log("waking up — running pending tasks")
+		log("waking up — checking crons and running pending tasks")
+
+		// Fire any due cron jobs (enqueues tasks) before processing the queue.
+		if n := fireDueCrons(ts, project, agentName); n > 0 {
+			log("cron: enqueued %d task(s)", n)
+		}
 
 		if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
 			log("wakeup cycle failed: %v", err)
@@ -308,6 +361,123 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 		}
 	}
 	return nil
+}
+
+// ── cron helpers ─────────────────────────────────────────────────────────────
+
+var daemonCronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+// fireDueCrons inspects all enabled crons for an agent, fires any that are due
+// by enqueuing a new Task, and updates LastRun.  Returns the number enqueued.
+func fireDueCrons(ts taskstore.Store, project, agentName string) int {
+	crons, err := ts.ListCrons(project, agentName)
+	if err != nil || len(crons) == 0 {
+		return 0
+	}
+	now := time.Now()
+	enqueued := 0
+	changed := false
+	for _, c := range crons {
+		if !c.Enabled {
+			continue
+		}
+		sched, err := daemonCronParser.Parse(c.Schedule)
+		if err != nil {
+			continue
+		}
+		// The cron is due if the last scheduled time before now is after LastRun.
+		// We look back 2 minutes to tolerate minor timing jitter.
+		lookback := now.Add(-2 * time.Minute)
+		lastExpected := prevCronTime(sched, now)
+		if lastExpected.IsZero() || lastExpected.Before(lookback) {
+			continue
+		}
+		if c.LastRun != nil && !c.LastRun.Before(lastExpected) {
+			continue // already ran this slot
+		}
+		// Enqueue task.
+		const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+		rb := make([]byte, 6)
+		for i := range rb {
+			rb[i] = chars[rand.Intn(len(chars))]
+		}
+		taskID := fmt.Sprintf("t-%s-%s", now.UTC().Format("20060102"), string(rb))
+		task := &entity.Task{
+			ID:        taskID,
+			Title:     fmt.Sprintf("[cron] %s", c.Title),
+			Status:    entity.TaskStatusPending,
+			Type:      "cron",
+			Priority:  5,
+			Prompt:    c.Prompt,
+			CreatedBy: "cron:" + c.ID,
+			CreatedAt: now.UTC(),
+			UpdatedAt: now.UTC(),
+		}
+		if err := ts.AddTask(project, agentName, task); err == nil {
+			t := now
+			c.LastRun = &t
+			c.LastRunStatus = "enqueued"
+			changed = true
+			enqueued++
+		}
+	}
+	if changed {
+		_ = ts.SaveCrons(project, agentName, crons)
+	}
+	return enqueued
+}
+
+// prevCronTime returns the most recent scheduled time before or equal to `now`.
+func prevCronTime(sched cron.Schedule, now time.Time) time.Time {
+	// Binary search: find t such that Next(t) <= now < Next(t + epsilon).
+	// We approximate by going back one full schedule cycle.
+	// Simple approach: t = now - 1min, then compute Next and see.
+	probe := now.Add(-2 * time.Minute)
+	t := sched.Next(probe)
+	if t.After(now) {
+		return time.Time{}
+	}
+	return t
+}
+
+// runCronOnlyLoop is for agents that have crons but no heartbeat.
+// It checks crons every minute, enqueues due tasks, and runs them immediately.
+func runCronOnlyLoop(ctx context.Context, root, project, agentName string,
+	ts taskstore.Store, s store.Store) {
+
+	log := func(format string, a ...any) {
+		fmt.Printf("[cron %s/%s] %s\n", project, agentName,
+			fmt.Sprintf(format, a...))
+	}
+
+	// Align to the next minute boundary.
+	now := time.Now()
+	nextMinute := now.Truncate(time.Minute).Add(time.Minute)
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(time.Until(nextMinute)):
+	}
+
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		n := fireDueCrons(ts, project, agentName)
+		if n > 0 {
+			log("fired %d cron(s) — running pending tasks", n)
+			hb, _ := ts.GetHeartbeat(project, agentName)
+			if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
+				log("task execution error: %v", err)
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // isAlreadyRunning checks whether the PID recorded in heartbeat is still alive.

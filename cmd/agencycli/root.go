@@ -68,6 +68,7 @@ func init() {
 		newInboxCmd(),
 		newSessionCmd(),
 		newDaemonCmd(),
+		newCronCmd(),
 		newSandboxCmd(),
 	)
 }
