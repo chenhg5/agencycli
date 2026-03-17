@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -41,7 +42,9 @@ Use 'inbox confirm' or 'inbox reject' to resolve them.`,
 // ── inbox list ────────────────────────────────────────────────────────────────
 
 func newInboxListCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+
+	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all items awaiting confirmation",
@@ -54,6 +57,13 @@ func newInboxListCmd() *cobra.Command {
 			items, err := ts.ListInbox()
 			if err != nil {
 				return err
+			}
+
+			if jsonOut {
+				if items == nil {
+					items = []*entity.InboxItem{}
+				}
+				return printJSON(items)
 			}
 
 			if len(items) == 0 {
@@ -77,12 +87,16 @@ func newInboxListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	return cmd
 }
 
 // ── inbox show ────────────────────────────────────────────────────────────────
 
 func newInboxShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+
+	cmd := &cobra.Command{
 		Use:   "show <task-id>",
 		Short: "Show full details of an inbox item",
 		Args:  cobra.ExactArgs(1),
@@ -108,6 +122,23 @@ func newInboxShowCmd() *cobra.Command {
 				return fmt.Errorf("inbox item %q not found", taskID)
 			}
 
+			// Fetch the original task prompt for enriched output.
+			project, agentName, _ := resolveTaskOwner(root, taskID)
+			var taskPrompt string
+			if project != "" {
+				if t, err2 := taskstore.New(root).GetTask(project, agentName, taskID); err2 == nil {
+					taskPrompt = t.Prompt
+				}
+			}
+
+			if jsonOut {
+				out := map[string]any{
+					"inbox_item":  found,
+					"task_prompt": taskPrompt,
+				}
+				return printJSON(out)
+			}
+
 			hr := "────────────────────────────────────────────────────────────"
 			fmt.Println(hr)
 			fmt.Printf("  INBOX ITEM  %s\n", found.TaskID)
@@ -119,7 +150,6 @@ func newInboxShowCmd() *cobra.Command {
 			}
 			fmt.Println()
 
-			// Agent's summary of what it did and why it needs help
 			if found.Summary != "" {
 				fmt.Println("── What the agent says ──────────────────────────────────────")
 				fmt.Println(found.Summary)
@@ -131,7 +161,6 @@ func newInboxShowCmd() *cobra.Command {
 				fmt.Println()
 			}
 
-			// Action items checklist
 			if len(found.ActionItems) > 0 {
 				fmt.Println("── Action items (what you need to do) ───────────────────────")
 				for i, item := range found.ActionItems {
@@ -140,17 +169,12 @@ func newInboxShowCmd() *cobra.Command {
 				fmt.Println()
 			}
 
-			// Original task prompt — the full context of what the agent was working on
-			project, agentName, _ := resolveTaskOwner(root, taskID)
-			if project != "" {
-				if t, err2 := taskstore.New(root).GetTask(project, agentName, taskID); err2 == nil {
-					fmt.Println("── Original task (full prompt) ──────────────────────────────")
-					fmt.Println(t.Prompt)
-					fmt.Println()
-				}
+			if taskPrompt != "" {
+				fmt.Println("── Original task (full prompt) ──────────────────────────────")
+				fmt.Println(taskPrompt)
+				fmt.Println()
 			}
 
-			// Last lines of the agent's run log
 			if found.LogPath != "" {
 				fmt.Printf("── Last run log  (%s)\n", found.LogPath)
 				if lines, err2 := tailFile(found.LogPath, 20); err2 == nil && len(lines) > 0 {
@@ -163,7 +187,6 @@ func newInboxShowCmd() *cobra.Command {
 				fmt.Println()
 			}
 
-			// Available actions
 			fmt.Println("── Available actions ────────────────────────────────────────")
 			fmt.Printf("  agencycli --dir %s inbox confirm %s --message \"your reply\"\n", root, taskID)
 			fmt.Printf("  agencycli --dir %s inbox reject  %s --reason \"...\"\n", root, taskID)
@@ -173,6 +196,8 @@ func newInboxShowCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	return cmd
 }
 
 // tailFile returns the last n lines of a file.
@@ -603,6 +628,7 @@ func newInboxMessagesCmd() *cobra.Command {
 		recipient string
 		all       bool
 		mark      bool
+		jsonOut   bool
 	)
 
 	cmd := &cobra.Command{
@@ -631,6 +657,14 @@ Use --all to show all messages including already-read ones.`,
 			if err != nil {
 				return err
 			}
+
+			if jsonOut {
+				if msgs == nil {
+					msgs = []*entity.Message{}
+				}
+				return printJSON(msgs)
+			}
+
 			if len(msgs) == 0 {
 				if all {
 					fmt.Printf("No messages for %s.\n", recipient)
@@ -669,6 +703,7 @@ Use --all to show all messages including already-read ones.`,
 	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox to inspect: 'human' (default) or 'project/agent'")
 	cmd.Flags().BoolVar(&all, "all", false, "show all messages including already-read ones")
 	cmd.Flags().BoolVar(&mark, "mark-read", false, "mark displayed messages as read after listing")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	return cmd
 }
 
@@ -749,4 +784,12 @@ func newInboxReplyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human')")
 	_ = cmd.MarkFlagRequired("body")
 	return cmd
+}
+
+// printJSON marshals v to indented JSON and writes it to stdout.
+func printJSON(v any) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	return enc.Encode(v)
 }
