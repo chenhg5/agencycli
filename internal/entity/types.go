@@ -377,6 +377,17 @@ type HeartbeatConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Interval string `yaml:"interval"` // Go duration string, e.g. "30m", "1h"
 
+	// ActiveHours restricts wakeups to a specific time window each day.
+	// Format: "HH:MM-HH:MM" in local time, e.g. "09:00-18:00".
+	// If empty, wakeups are allowed at any time.
+	// Overnight ranges like "22:00-06:00" are supported.
+	ActiveHours string `yaml:"active_hours,omitempty"`
+
+	// ActiveDays restricts wakeups to specific days of the week.
+	// Comma-separated list of day names (Mon,Tue,Wed,Thu,Fri,Sat,Sun) or
+	// short aliases (weekdays, weekends).  Empty means every day.
+	ActiveDays string `yaml:"active_days,omitempty"`
+
 	// SessionScope determines session sharing strategy within a wakeup cycle.
 	SessionScope SessionScope `yaml:"session_scope,omitempty"`
 

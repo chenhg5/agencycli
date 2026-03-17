@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -159,6 +160,20 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			return
 		}
 
+		// Check active-hours / active-days window before waking up.
+		if !isInActiveWindow(hb) {
+			nextWake := nextWindowStart(hb)
+			if nextWake > 0 {
+				log("outside active window — sleeping %s until window opens", nextWake.Round(time.Minute))
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(nextWake):
+				}
+				continue
+			}
+		}
+
 		// Check overlap: if PID is set and process is still running, skip.
 		if isAlreadyRunning(hb) {
 			log("skipping wakeup — agent process still running (pid=%d)", hb.PID)
@@ -309,6 +324,132 @@ func isAlreadyRunning(hb *entity.HeartbeatConfig) bool {
 	return err == nil
 }
 
+// ── active-window helpers ─────────────────────────────────────────────────────
+
+// isInActiveWindow returns true if the current local time falls within the
+// heartbeat's configured ActiveHours and ActiveDays restrictions.
+// Both fields are optional; empty means "always allowed".
+func isInActiveWindow(hb *entity.HeartbeatConfig) bool {
+	now := time.Now()
+
+	if hb.ActiveDays != "" && !isActiveDay(hb.ActiveDays, now) {
+		return false
+	}
+	if hb.ActiveHours != "" {
+		ok, _ := isActiveHour(hb.ActiveHours, now)
+		return ok
+	}
+	return true
+}
+
+// nextWindowStart returns how long to sleep until the active window opens.
+// Returns 0 if the window is currently open or cannot be determined.
+func nextWindowStart(hb *entity.HeartbeatConfig) time.Duration {
+	now := time.Now()
+
+	// If active-hours is set, compute exact time until window start.
+	if hb.ActiveHours != "" {
+		_, next := isActiveHour(hb.ActiveHours, now)
+		return next
+	}
+	// If only active-days: sleep until midnight then re-check.
+	tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	return time.Until(tomorrow)
+}
+
+// parseHHMM parses "HH:MM" into hour and minute.
+func parseHHMM(s string) (int, int, error) {
+	var h, m int
+	if _, err := fmt.Sscanf(s, "%d:%d", &h, &m); err != nil {
+		return 0, 0, fmt.Errorf("invalid time %q (want HH:MM)", s)
+	}
+	return h, m, nil
+}
+
+// isActiveHour checks whether now is within the "HH:MM-HH:MM" range.
+// Also returns duration until the window starts (0 if already inside).
+func isActiveHour(activeHours string, now time.Time) (bool, time.Duration) {
+	parts := strings.SplitN(activeHours, "-", 2)
+	if len(parts) != 2 {
+		return true, 0 // malformed — don't block
+	}
+	startH, startM, err1 := parseHHMM(strings.TrimSpace(parts[0]))
+	endH, endM, err2 := parseHHMM(strings.TrimSpace(parts[1]))
+	if err1 != nil || err2 != nil {
+		return true, 0
+	}
+
+	loc := now.Location()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), startH, startM, 0, 0, loc)
+	todayEnd := time.Date(now.Year(), now.Month(), now.Day(), endH, endM, 0, 0, loc)
+
+	// Overnight range (e.g. 22:00-06:00): end wraps to next day.
+	overnight := todayEnd.Before(todayStart) || todayEnd.Equal(todayStart)
+	if overnight {
+		todayEnd = todayEnd.Add(24 * time.Hour)
+	}
+
+	// Check whether now is inside [start, end).
+	if now.Equal(todayStart) || (now.After(todayStart) && now.Before(todayEnd)) {
+		return true, 0
+	}
+
+	// Compute time until window opens.
+	nextOpen := todayStart
+	if now.After(todayStart) {
+		// Start already passed today; next open is tomorrow's start.
+		nextOpen = todayStart.Add(24 * time.Hour)
+	}
+	return false, time.Until(nextOpen)
+}
+
+// isActiveDay checks whether now's weekday is allowed by the activeDays spec.
+// Supported: comma-separated "Mon","Tue","Wed","Thu","Fri","Sat","Sun"
+// or the aliases "weekdays" (Mon-Fri) and "weekends" (Sat-Sun).
+func isActiveDay(activeDays string, now time.Time) bool {
+	wd := now.Weekday()
+	for _, token := range strings.Split(activeDays, ",") {
+		t := strings.TrimSpace(strings.ToLower(token))
+		switch t {
+		case "weekdays":
+			if wd >= time.Monday && wd <= time.Friday {
+				return true
+			}
+		case "weekends":
+			if wd == time.Saturday || wd == time.Sunday {
+				return true
+			}
+		default:
+			// Match abbreviated or full day names.
+			day, err := parseDayName(t)
+			if err == nil && wd == day {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func parseDayName(s string) (time.Weekday, error) {
+	switch strings.ToLower(s) {
+	case "sun", "sunday":
+		return time.Sunday, nil
+	case "mon", "monday":
+		return time.Monday, nil
+	case "tue", "tuesday":
+		return time.Tuesday, nil
+	case "wed", "wednesday":
+		return time.Wednesday, nil
+	case "thu", "thursday":
+		return time.Thursday, nil
+	case "fri", "friday":
+		return time.Friday, nil
+	case "sat", "saturday":
+		return time.Saturday, nil
+	}
+	return 0, fmt.Errorf("unknown day %q", s)
+}
+
 // ── daemon heartbeat (configure) ─────────────────────────────────────────────
 
 func newDaemonHeartbeatCmd() *cobra.Command {
@@ -319,6 +460,8 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 		disable      bool
 		interval     string
 		sessionScope string
+		activeHours  string
+		activeDays   string
 	)
 
 	cmd := &cobra.Command{
@@ -327,6 +470,18 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 		Example: `  # Enable heartbeat with 30-minute interval
   agencycli daemon heartbeat --project cc-connect --agent qa-reviewer \
     --enable --interval 30m
+
+  # Only wake up between 09:00 and 18:00 on weekdays
+  agencycli daemon heartbeat --project cc-connect --agent dev \
+    --enable --interval 1h --active-hours "09:00-18:00" --active-days "weekdays"
+
+  # Night-shift agent: only wake up between 22:00 and 06:00
+  agencycli daemon heartbeat --project cc-connect --agent dev \
+    --active-hours "22:00-06:00"
+
+  # Clear active-hours restriction (run anytime)
+  agencycli daemon heartbeat --project cc-connect --agent dev \
+    --active-hours ""
 
   # Disable
   agencycli daemon heartbeat --project cc-connect --agent qa-reviewer --disable
@@ -371,6 +526,39 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 			if hb.SessionScope == "" {
 				hb.SessionScope = entity.SessionScopeCycle
 			}
+			if cmd.Flags().Changed("active-hours") {
+				if activeHours != "" {
+					// Validate format.
+					parts := strings.SplitN(activeHours, "-", 2)
+					if len(parts) != 2 {
+						return fmt.Errorf("--active-hours must be HH:MM-HH:MM, got %q", activeHours)
+					}
+					if _, _, err := parseHHMM(strings.TrimSpace(parts[0])); err != nil {
+						return err
+					}
+					if _, _, err := parseHHMM(strings.TrimSpace(parts[1])); err != nil {
+						return err
+					}
+				}
+				hb.ActiveHours = activeHours
+				changed = true
+			}
+			if cmd.Flags().Changed("active-days") {
+				// Validate tokens.
+				if activeDays != "" {
+					for _, tok := range strings.Split(activeDays, ",") {
+						t := strings.TrimSpace(strings.ToLower(tok))
+						if t == "weekdays" || t == "weekends" {
+							continue
+						}
+						if _, err := parseDayName(t); err != nil {
+							return fmt.Errorf("unknown day %q in --active-days", tok)
+						}
+					}
+				}
+				hb.ActiveDays = activeDays
+				changed = true
+			}
 
 			if changed {
 				if err := ts.SaveHeartbeat(project, agentName, hb); err != nil {
@@ -387,6 +575,23 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 			fmt.Printf("  Status  : %s\n", status)
 			fmt.Printf("  Interval: %s\n", taskstore.FormatDuration(hb.Interval))
 			fmt.Printf("  Session : %s\n", hb.SessionScope)
+			if hb.ActiveHours != "" {
+				fmt.Printf("  Active hours: %s\n", hb.ActiveHours)
+			}
+			if hb.ActiveDays != "" {
+				fmt.Printf("  Active days : %s\n", hb.ActiveDays)
+			}
+			if hb.ActiveHours == "" && hb.ActiveDays == "" {
+				fmt.Printf("  Active window: any time\n")
+			}
+			if !hb.Enabled {
+				fmt.Printf("  (currently disabled — no wakeups scheduled)\n")
+			} else if !isInActiveWindow(hb) {
+				dur := nextWindowStart(hb)
+				if dur > 0 {
+					fmt.Printf("  ⏸  outside active window — next wakeup in %s\n", dur.Round(time.Minute))
+				}
+			}
 			if hb.LastWakeup != nil {
 				fmt.Printf("  Last    : %s  (%s)\n",
 					hb.LastWakeup.Format(time.RFC3339), hb.LastWakeupStatus)
@@ -404,5 +609,7 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&disable, "disable", false, "disable heartbeat")
 	cmd.Flags().StringVar(&interval, "interval", "", "heartbeat interval (e.g. 30m, 1h)")
 	cmd.Flags().StringVar(&sessionScope, "session-scope", "", "session scope: cycle (default) or task")
+	cmd.Flags().StringVar(&activeHours, "active-hours", "", `restrict wakeups to a time window, e.g. "09:00-18:00" or "22:00-06:00"`)
+	cmd.Flags().StringVar(&activeDays, "active-days", "", `restrict wakeups to specific days, e.g. "weekdays", "Mon,Wed,Fri", "Sat,Sun"`)
 	return cmd
 }
