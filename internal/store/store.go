@@ -22,6 +22,14 @@ type AgentEntry struct {
 	Meta    *entity.AgentMeta
 }
 
+// FiredAgentEntry is a soft-deleted agent together with its archived location.
+type FiredAgentEntry struct {
+	Project      string
+	FiredDirName string // directory name under .fired/, e.g. "dev-claude-20260316-163152"
+	OriginalName string // agent name before firing
+	Meta         *entity.AgentMeta
+}
+
 // Store is the single access point for all workspace data.
 // All path arguments are relative to the workspace root.
 type Store interface {
@@ -67,4 +75,11 @@ type Store interface {
 
 	// AgentDir returns the absolute path of an agent's working directory.
 	AgentDir(project, name string) string
+
+	// FiredAgentDir returns the absolute path of the soft-delete archive directory
+	// for a given fired-directory name (e.g. "dev-<timestamp>").
+	FiredAgentDir(project, firedDirName string) string
+
+	// ListFiredAgents returns all soft-deleted agents for a project.
+	ListFiredAgents(project string) ([]*FiredAgentEntry, error)
 }

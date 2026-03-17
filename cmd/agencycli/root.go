@@ -56,6 +56,7 @@ func init() {
 		newCreateCmd(),
 		newHireCmd(),
 		newAssignCmd(),
+		newFireCmd(),
 		newSyncCmd(),
 		newListCmd(),
 		newShowCmd(),

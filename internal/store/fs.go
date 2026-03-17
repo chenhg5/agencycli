@@ -335,6 +335,10 @@ func (s *fsStore) ListAgents(project string) ([]*AgentEntry, error) {
 		if !e.IsDir() {
 			continue
 		}
+		// Skip hidden/system directories (e.g. .fired)
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
 		meta, err := s.AgentMeta(project, e.Name())
 		if err != nil {
 			continue
@@ -342,4 +346,48 @@ func (s *fsStore) ListAgents(project string) ([]*AgentEntry, error) {
 		agents = append(agents, &AgentEntry{Project: project, Name: e.Name(), Meta: meta})
 	}
 	return agents, nil
+}
+
+func (s *fsStore) FiredAgentDir(project, firedDirName string) string {
+	return s.abs("projects", project, "agents", ".fired", firedDirName)
+}
+
+func (s *fsStore) ListFiredAgents(project string) ([]*FiredAgentEntry, error) {
+	base := s.abs("projects", project, "agents", ".fired")
+	entries, err := os.ReadDir(base)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: list fired agents for %q: %w", project, err)
+	}
+
+	var fired []*FiredAgentEntry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		firedDirName := e.Name()
+		firedDir := filepath.Join(base, firedDirName)
+
+		// Derive original name: strip the trailing "-YYYYMMDD-HHMMSS" suffix if present.
+		originalName := firedDirName
+		if len(firedDirName) > 16 && firedDirName[len(firedDirName)-16] == '-' {
+			originalName = firedDirName[:len(firedDirName)-16]
+		}
+
+		// Read meta from the archived directory.
+		metaPath := filepath.Join(firedDir, ".agencycli-agent.yaml")
+		var meta entity.AgentMeta
+		if err := readYAML(metaPath, &meta); err != nil {
+			continue // skip entries without valid meta
+		}
+		fired = append(fired, &FiredAgentEntry{
+			Project:      project,
+			FiredDirName: firedDirName,
+			OriginalName: originalName,
+			Meta:         &meta,
+		})
+	}
+	return fired, nil
 }
