@@ -299,20 +299,15 @@ type OnSuccessTrigger struct {
 
 // ProjectConfig is the declarative definition of a project.
 // Stored at <agency>/projects/<project>/project.yaml.
-// It describes which agents exist, their roles, how they wake up, and which
-// workflows are relevant to the project.  Running `agencycli project apply`
-// reads this file and brings the live state into sync (hire agents, configure
-// heartbeats/crons).  It can also be kept in project-blueprints/<name>.yaml
-// inside a template so users can bootstrap a project in one step.
+// It describes which agents exist, their roles, how they wake up, and their
+// playbooks.  Running `agencycli project apply` reads this file and brings the
+// live state into sync (hire agents, configure heartbeats/crons, install
+// playbooks).  It can also be kept in project-blueprints/<name>.yaml inside a
+// template so users can bootstrap a project in one step.
 type ProjectConfig struct {
 	Name        string      `yaml:"name"`
 	Description string      `yaml:"description,omitempty"`
 	Agents      []AgentSpec `yaml:"agents"`
-
-	// Workflows lists the workflow names this project uses.
-	// These are for documentation / `project apply` to show next steps.
-	// Start a workflow instance with: agencycli workflow run <name> --project <project>
-	Workflows []string `yaml:"workflows,omitempty"`
 }
 
 // AgentSpec is one agent definition inside ProjectConfig.
@@ -326,9 +321,15 @@ type AgentSpec struct {
 	// Repos lists additional repository paths to mount/expose to the agent.
 	Repos []string `yaml:"repos,omitempty"`
 
+	// Playbook is the filename (without path) of the agent's wakeup routine,
+	// resolved from agent-playbooks/<playbook> in the agency root.
+	// When set, `project apply` copies the file into the agent workspace as
+	// wakeup.md and sets HeartbeatConfig.WakeupPrompt = "@wakeup.md".
+	// Example: "pm.md"
+	Playbook string `yaml:"playbook,omitempty"`
+
 	// Heartbeat defines the autonomous wakeup schedule.
-	// If omitted the agent is purely reactive (only wakes when `run` is called
-	// manually or triggered by the workflow routing engine).
+	// If omitted the agent is purely reactive.
 	Heartbeat *HeartbeatConfig `yaml:"heartbeat,omitempty"`
 
 	// Crons adds scheduled tasks to the agent's queue on a crontab schedule.
@@ -386,11 +387,7 @@ type Task struct {
 	// RunLogPath is set by the runner after execution.
 	RunLogPath string `yaml:"run_log_path,omitempty"`
 
-	// Workflow fields — set when this task was created by a workflow route.
-	WorkflowID string            `yaml:"workflow_id,omitempty"`  // instance ID
-	TemplateID string            `yaml:"template_id,omitempty"`  // task template id
-	Vars       map[string]string `yaml:"vars,omitempty"`         // template vars at creation time
-	RoutedAt   *time.Time        `yaml:"routed_at,omitempty"`    // set when workflow routing ran
+	Vars map[string]string `yaml:"vars,omitempty"`
 }
 
 // NewTaskID generates a sortable unique task ID.
@@ -403,20 +400,65 @@ func NewTaskID() string {
 	return fmt.Sprintf("t-%s-%s", time.Now().UTC().Format("20060102"), string(b))
 }
 
+// Message is an asynchronous, non-blocking communication between any two
+// participants — human or agent.  Unlike InboxItem (which blocks a task
+// waiting for confirmation), a Message is fire-and-forget from the sender's
+// perspective.  The recipient reads it on their next wakeup.
+//
+// Recipient/sender format:
+//   "human"               → the agency owner's global inbox
+//   "project/agent"       → e.g. "cc-connect/pm"
+//
+// Storage:
+//   human:  <agency>/.agencycli/messages.yaml
+//   agent:  <agency>/projects/<project>/agents/<agent>/messages.yaml
+type Message struct {
+	ID      string     `yaml:"id"`
+	From    string     `yaml:"from"`              // "human" or "project/agent"
+	To      string     `yaml:"to"`                // "human" or "project/agent"
+	Subject string     `yaml:"subject,omitempty"`
+	Body    string     `yaml:"body"`
+	ReplyTo string     `yaml:"reply_to,omitempty"` // ID of message being replied to
+	SentAt  time.Time  `yaml:"sent_at"`
+	ReadAt  *time.Time `yaml:"read_at,omitempty"`  // nil = unread
+}
+
+// NewMessageID returns a unique message ID.
+func NewMessageID() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = chars[time.Now().UnixNano()%int64(len(chars))]
+		time.Sleep(0)
+	}
+	// Use time-based prefix for ordering.
+	return fmt.Sprintf("msg-%s-%s", time.Now().UTC().Format("20060102"), randomAlpha(6))
+}
+
+func randomAlpha(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	src := time.Now().UnixNano()
+	for i := range b {
+		src = src*6364136223846793005 + 1442695040888963407
+		b[i] = chars[uint64(src)>>33%uint64(len(chars))]
+	}
+	return string(b)
+}
+
 // InboxItem is an entry in the human inbox.
 // Stored at <workspace>/.agencycli/inbox.yaml.
 type InboxItem struct {
-	TaskID      string    `yaml:"task_id"`
-	Project     string    `yaml:"project"`
-	Agent       string    `yaml:"agent"`
-	Title       string    `yaml:"title"`
-	Summary     string    `yaml:"summary"`
-	ActionHint  string    `yaml:"action_hint,omitempty"`
-	ActionItems []string  `yaml:"action_items,omitempty"` // checklist for the human
-	ForwardedTo string    `yaml:"forwarded_to,omitempty"` // set when human forwards to an agent
-	ForwardNote string    `yaml:"forward_note,omitempty"`
-	RoutedAt    time.Time `yaml:"routed_at"`
-	LogPath     string    `yaml:"log_path,omitempty"`
+	TaskID      string   `yaml:"task_id"`
+	Project     string   `yaml:"project"`
+	Agent       string   `yaml:"agent"`
+	Title       string   `yaml:"title"`
+	Summary     string   `yaml:"summary"`
+	ActionHint  string   `yaml:"action_hint,omitempty"`
+	ActionItems []string `yaml:"action_items,omitempty"` // checklist for the human
+	ForwardedTo string   `yaml:"forwarded_to,omitempty"` // set when human forwards to an agent
+	ForwardNote string   `yaml:"forward_note,omitempty"`
+	LogPath     string   `yaml:"log_path,omitempty"`
 }
 
 // ─────────────────────────────────────────────
@@ -451,6 +493,14 @@ type HeartbeatConfig struct {
 	// SessionScope determines session sharing strategy within a wakeup cycle.
 	SessionScope SessionScope `yaml:"session_scope,omitempty"`
 
+	// WakeupPrompt is executed as a synthetic task when the agent's pending
+	// queue is empty on wakeup.  This gives agents like PM and QA a default
+	// autonomous routine (scan issues, review PRs, etc.) without requiring an
+	// explicit task to be queued first.
+	// Can be inline text or a path prefixed with "@" (relative to agent dir).
+	// Example: "@wakeup.md" reads the prompt from <agent-dir>/wakeup.md.
+	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
+
 	// Runtime state (mutated by daemon / runner).
 	PID               int        `yaml:"pid,omitempty"`
 	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
@@ -480,104 +530,6 @@ type Cron struct {
 // ─────────────────────────────────────────────
 // Template
 // ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
-// Workflow
-// ─────────────────────────────────────────────
-
-// WorkflowManifest is the top-level definition of an async workflow.
-// Stored as YAML at <agency>/workflows/<name>.yaml or
-// <agency>/projects/<project>/workflows/<name>.yaml.
-type WorkflowManifest struct {
-	Name        string             `yaml:"name"`
-	Version     string             `yaml:"version,omitempty"`
-	Description string             `yaml:"description,omitempty"`
-	Templates   []WFTaskTemplate   `yaml:"templates"`
-	Routes      []WFRoute          `yaml:"routes"`
-	Entry       *WFEntry           `yaml:"entry"`
-	Triggers    []WFTrigger        `yaml:"triggers,omitempty"`
-}
-
-// WFTaskTemplate is a reusable task definition with variable slots {{var}}.
-type WFTaskTemplate struct {
-	ID       string `yaml:"id"`
-	Title    string `yaml:"title"`
-	Agent    string `yaml:"agent"`              // agent name in the project
-	Type     string `yaml:"type,omitempty"`
-	Priority int    `yaml:"priority,omitempty"` // default 0 (high)
-	Prompt   string `yaml:"prompt"`
-}
-
-// WFRoute is triggered when a task with a matching template completes.
-type WFRoute struct {
-	On     WFCondition  `yaml:"on"`
-	Create *WFCreate    `yaml:"create,omitempty"` // enqueue a new task
-	Inbox  *WFInbox     `yaml:"inbox,omitempty"`  // route to human inbox
-}
-
-// WFCondition matches a completed task by template ID and terminal status.
-type WFCondition struct {
-	Template   string `yaml:"template"`
-	Status     string `yaml:"status"`               // success | failed | any
-	MaxTrigger int    `yaml:"max_trigger,omitempty"` // circuit-breaker; 0 = unlimited
-}
-
-// WFCreate describes a task to enqueue when a route fires.
-type WFCreate struct {
-	Template string            `yaml:"template"`
-	Vars     map[string]string `yaml:"vars,omitempty"`
-}
-
-// WFInbox routes completion to the human inbox instead of creating a task.
-type WFInbox struct {
-	Title       string   `yaml:"title"`
-	Summary     string   `yaml:"summary,omitempty"`
-	ActionItems []string `yaml:"action_items,omitempty"`
-}
-
-// WFEntry defines the first task created when a workflow is started.
-type WFEntry struct {
-	Template string            `yaml:"template"`
-	Vars     map[string]string `yaml:"vars,omitempty"`
-}
-
-// WFTrigger declares how the workflow can be started automatically.
-type WFTrigger struct {
-	Type     string            `yaml:"type"`               // manual | cron
-	Schedule string            `yaml:"schedule,omitempty"` // crontab (type=cron)
-	Inputs   map[string]string `yaml:"inputs,omitempty"`
-}
-
-// WorkflowInstance is the runtime state of one workflow execution.
-// Stored at <agency>/projects/<project>/workflow-runs/<id>.yaml.
-type WorkflowInstance struct {
-	ID       string `yaml:"id"`
-	Workflow string `yaml:"workflow"` // manifest name
-	Project  string `yaml:"project"`
-	Status   string `yaml:"status"` // running | done | failed
-
-	Inputs map[string]string `yaml:"inputs,omitempty"`
-
-	// StepOutputs maps template_id → agent's task.Summary (for {{steps.X.summary}})
-	StepOutputs map[string]string `yaml:"step_outputs,omitempty"`
-
-	// RouteTriggers tracks how many times each route key has fired (circuit-breaker).
-	// Key: "<template_id>:<status>", e.g. "implement:failed"
-	RouteTriggers map[string]int `yaml:"route_triggers,omitempty"`
-
-	StartedAt  time.Time  `yaml:"started_at"`
-	FinishedAt *time.Time `yaml:"finished_at,omitempty"`
-}
-
-// NewWorkflowInstanceID generates a sortable workflow instance ID.
-func NewWorkflowInstanceID() string {
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 6)
-	for i := range b {
-		b[i] = chars[rand.Intn(len(chars))]
-	}
-	return fmt.Sprintf("wf-%s-%s", time.Now().UTC().Format("20060102"), string(b))
-}
 
 // TemplateManifest is the metadata file (template.json) bundled at the root
 // of every agencycli agency template archive.  Format is intentionally

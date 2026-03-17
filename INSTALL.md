@@ -42,9 +42,13 @@ Agency                   ← global context shared by every agent
 
 **Skills** are reusable capability definitions (instructions + scripts). They are bound to teams or roles and deployed into each agent's working directory automatically on `hire` or `sync`.
 
-**Workflows** define how tasks flow between agents asynchronously. When one agent finishes and calls `task done --summary "..."`, the routing engine creates the next task for the next agent — no orchestrator is blocked waiting.
+**Agent playbooks** (`wakeup.md` files) define what an agent does when its task queue is empty — for example, scanning GitHub issues, reviewing open PRs, or sending status updates. Store them in `agent-playbooks/` and reference them from `project.yaml` via the `playbook:` field. `project apply` installs them automatically.
 
-**Project blueprints** declare which agents a project needs, their heartbeat schedule, and which workflows are active. Running `project apply` hires every agent and wires up all schedules in one command.
+**Task queues** drive all agent work. Tasks have priorities (0=critical … 3=low); the daemon always picks the highest-priority pending task first. The wakeup routine fires as a low-priority synthetic task when the queue is empty.
+
+**Async inbox messaging** lets any participant (agent or human) send non-blocking messages to any other. Recipients see their unread messages automatically at the top of their wakeup prompt.
+
+**Project blueprints** declare which agents a project needs, their heartbeat schedule, and which playbooks to install. Running `project apply` hires every agent and wires up all schedules in one command.
 
 ---
 
@@ -69,9 +73,9 @@ agencycli project blueprints
 
 Output example:
 ```
-BLUEPRINT  AGENTS  WORKFLOWS
-─────────  ──────  ─────────
-default    2       feature-dev
+BLUEPRINT     AGENTS  PLAYBOOKS
+────────────  ──────  ─────────
+cc-connect    3       pm.md, qa-reviewer.md
 ```
 
 ### Step 3 — Create a project from a blueprint
@@ -81,7 +85,7 @@ agencycli create project --name "my-service" --blueprint default \
   --desc "My REST API service"
 ```
 
-This writes `projects/my-service/project.yaml` pre-filled with agent definitions, heartbeat schedules, and workflow references.
+This writes `projects/my-service/project.yaml` pre-filled with agent definitions, heartbeat schedules, and playbook references.
 
 ### Step 4 — Review the project configuration
 
@@ -89,9 +93,9 @@ This writes `projects/my-service/project.yaml` pre-filled with agent definitions
 agencycli project show --project my-service
 ```
 
-You will see each agent, its model, role, sandbox setting, and heartbeat schedule. Edit `projects/my-service/project.yaml` if you want to adjust anything before applying.
+You will see each agent, its model, role, sandbox setting, heartbeat schedule, and playbook. Edit `projects/my-service/project.yaml` if you want to adjust anything before applying.
 
-### Step 5 — Apply: hire agents and configure schedules
+### Step 5 — Apply: hire agents, configure schedules, install playbooks
 
 ```bash
 agencycli project apply --project my-service
@@ -101,6 +105,8 @@ This single command:
 - Hires every agent declared in `project.yaml`
 - Writes `heartbeat.yaml` for agents with a heartbeat schedule
 - Writes `crons.yaml` for agents with cron jobs
+- Copies `agent-playbooks/<playbook>` → `agents/<name>/wakeup.md` for agents with a `playbook:` field
+- Sets `wakeup_prompt: "@wakeup.md"` in each agent's `heartbeat.yaml`
 - Merges the full context chain (agency → team → role → project) into each agent's working directory
 
 Use `--dry-run` to preview without making changes:
@@ -129,24 +135,28 @@ agencycli sync --project my-service
 agencycli daemon start
 ```
 
-Agents now wake up automatically on their heartbeat schedule, process pending tasks, and sleep again. Session continuity is preserved across cycles.
+Agents now wake up automatically on their heartbeat schedule:
+- If there are **pending tasks**, the daemon picks the highest-priority one and runs it.
+- If the queue is **empty** and a `wakeup.md` is configured, the agent runs its playbook autonomously (scanning issues, reviewing PRs, etc.).
+- Any **unread inbox messages** are automatically prepended to the wakeup prompt so the agent sees them immediately.
 
-### Step 8 — Run a workflow
-
-```bash
-agencycli workflow run feature-dev --project my-service \
-  --input feature="User login with OAuth" \
-  --input background="Auth sprint, due end of Q2"
-```
-
-The entry task is enqueued for the first agent. When it completes (calling `task done --summary "..."`), the routing engine automatically enqueues the next task for the next agent.
-
-### Step 9 — Monitor progress
+### Step 8 — Monitor
 
 ```bash
-agencycli workflow instances --project my-service
-agencycli workflow status <instance-id> --project my-service
-agencycli inbox list                  # human confirmations arrive here
+# Task confirmations awaiting your decision
+agencycli inbox list
+
+# Async messages from agents
+agencycli inbox messages
+
+# Task queue for a specific agent (sorted by priority)
+agencycli task list --project my-service --agent pm
+
+# Token usage across all agents
+agencycli task tokens --project my-service --all-agents
+
+# Emergency halt: cancel all pending/running tasks
+agencycli task stop-all --project my-service --all-agents
 ```
 
 ---
@@ -240,79 +250,39 @@ agencycli role skill remove --team engineering --role developer --skill github-p
 agencycli role list --team engineering
 ```
 
-### Step 5 — Write a workflow definition
+### Step 5 — Write agent playbooks
+
+Playbooks define what an agent does when it wakes up with no pending tasks.
 
 ```bash
-mkdir -p workflows
+mkdir -p agent-playbooks
 ```
 
-```yaml
-# workflows/feature-dev.yaml
-name: feature-dev
-version: "1.0"
-description: "Dev implements, QA reviews, human approves"
+```markdown
+<!-- agent-playbooks/dev.md -->
+# Dev Autonomous Routine
 
-templates:
-  - id: implement
-    title: "Implement: {{inputs.feature}}"
-    agent: dev
-    prompt: |
-      Feature request: {{inputs.feature}}
-      Background: {{inputs.background}}
+You are the lead developer. Each wakeup cycle:
 
-      Implement the feature and open a PR, then call:
-        agencycli --dir $AGENCY_DIR task done --id $TASK_ID \
-          --status success --summary "PR #<number> opened: <description>"
+## Step 1: Check unread messages
+(Injected automatically above this prompt if any — reply with `inbox reply <msg-id> --from project/dev --body "..."`)
 
-  - id: review
-    title: "Review: {{inputs.feature}}"
-    agent: qa
-    prompt: |
-      Review the implementation of: {{inputs.feature}}
-      Dev summary: {{task.summary}}
+## Step 2: Scan for work
+Check if any tasks are pending:
+  agencycli --dir $AGENCY_DIR task list --project my-api --agent dev
 
-      Review the PR, then call:
-        agencycli --dir $AGENCY_DIR task done --id $TASK_ID \
-          --status success --summary "QA PASS: <what was verified>"
+## Step 3: Self-assign from backlog (if PM has left tasks)
+Pick the highest-priority pending task and start work.
 
-entry:
-  template: implement
-
-routes:
-  - on:
-      template: implement
-      status: success
-    create:
-      template: review
-
-  - on:
-      template: review
-      status: success
-    inbox:
-      title: "Approve: {{inputs.feature}}"
-      summary: "Dev: {{steps.implement.summary}}\nQA: {{task.summary}}"
-      action_items:
-        - "Review the PR linked in the dev summary"
-        - "Confirm it is ready to merge"
-
-  - on:
-      template: review
-      status: failed
-      max_trigger: 3
-    create:
-      template: implement
-      vars:
-        background: "Previous attempt failed QA: {{task.error}} — fix and retry"
+## Done
+  agencycli --dir $AGENCY_DIR task done --id $TASK_ID --status success --summary "..."
 ```
 
-**Variable placeholders:**
-
-| Placeholder | Value |
-|-------------|-------|
-| `{{inputs.KEY}}` | `--input key=value` from `workflow run` |
-| `{{task.summary}}` | agent's `--summary` from `task done` |
-| `{{task.error}}` | error from a failed task |
-| `{{steps.TEMPLATE_ID.summary}}` | summary from an earlier completed step |
+Key patterns:
+- Unread messages are **auto-injected** at the top of the prompt by the daemon — no need to call `inbox messages` in the playbook
+- To reply to a message: `agencycli inbox reply <msg-id> --from project/agent --body "..."`
+- To send a non-blocking message to another agent: `agencycli inbox send --from project/dev --to project/pm --subject "..." --body "..."`
+- To pause and wait for human confirmation: `agencycli task confirm-request --id $TASK_ID --summary "..." --action-item "..."`
 
 ### Step 6 — Create a project blueprint
 
@@ -331,25 +301,23 @@ agents:
     team: engineering
     model: claudecode
     sandbox: true
+    playbook: dev.md          # installed as wakeup.md by project apply
     heartbeat:
       enabled: true
       interval: 30m
-      active_hours: "09:00-20:00"  # only wake in this window (local time)
-      active_days: weekdays         # Mon–Fri only
-
-  - name: qa
-    role: qa-engineer
-    team: engineering
-    model: claudecode
-    sandbox: true
-    heartbeat:
-      enabled: true
-      interval: 1h
       active_hours: "09:00-20:00"
       active_days: weekdays
 
-workflows:
-  - feature-dev
+  - name: pm
+    role: pm
+    team: product
+    model: claudecode
+    playbook: pm.md
+    heartbeat:
+      enabled: true
+      interval: 30m
+      active_hours: "09:00-20:00"
+      active_days: weekdays
 ```
 
 ### Step 7 — Create and apply a project
@@ -362,7 +330,7 @@ agencycli create project --name "my-api" --blueprint default \
 # Review the generated config
 agencycli project show --project my-api
 
-# Apply: hire agents + configure heartbeats
+# Apply: hire agents + configure heartbeats + install playbooks
 agencycli project apply --project my-api
 ```
 
@@ -380,31 +348,29 @@ agencycli sync --project my-api
 agencycli daemon start
 ```
 
-### Step 9 — Run a workflow
-
-```bash
-agencycli workflow run feature-dev --project my-api \
-  --input feature="Rate limiting" \
-  --input background="Security hardening sprint"
-```
-
 ---
 
-## Working with tasks directly (without workflows)
+## Working with tasks directly
 
 ```bash
-# Add a task manually
+# Add a task manually (agents pick this up on next wakeup)
 agencycli task add \
   --project my-api --agent dev \
   --title "Fix login redirect" --type bug --priority 1 \
   --prompt "The redirect is broken on mobile Safari. Fix and open a PR."
 
-# Run manually
+# Run manually (bypasses daemon scheduling)
 agencycli run --project my-api --agent dev
 
-# Or run a quick one-off prompt
+# Run a quick one-off prompt
 agencycli exec --project my-api --agent dev \
   --prompt "Run gh issue list and summarise all open issues"
+
+# View token usage
+agencycli task tokens --project my-api --agent dev
+
+# Emergency halt
+agencycli task stop-all --project my-api --all-agents --include-running
 ```
 
 ---
@@ -418,7 +384,7 @@ agencycli cron add \
   --project my-api --agent dev \
   --title "Weekly dependency audit" \
   --schedule "0 9 * * 1" \
-  --prompt "Run `go list -m -u all` and open a PR updating any outdated dependencies."
+  --prompt "Run 'go list -m -u all' and open a PR updating any outdated dependencies."
 
 agencycli cron list --project my-api --agent dev
 ```
@@ -429,7 +395,9 @@ The cron definition is also declarable in `project.yaml` under `agents[*].crons`
 
 ## Human inbox
 
-Agents can route tasks to you for decisions or approvals:
+### Task confirmations (blocking)
+
+Agents call `task confirm-request` when they need your decision before proceeding. The task pauses until you respond.
 
 ```bash
 agencycli inbox list
@@ -440,7 +408,27 @@ agencycli inbox comment <task-id> --message "Check the auth module specifically"
 agencycli inbox forward <task-id> --to my-api/dev --note "Please re-check the edge case"
 ```
 
-The inbox is also rendered to `inbox.md` at the workspace root.
+### Async messages (non-blocking)
+
+Any agent or human can send a message to any inbox. The recipient reads it on their next wakeup.
+
+```bash
+# Human → agent
+agencycli inbox send --to my-api/pm \
+  --subject "Prioritise issue #42" \
+  --body "Customer reported this as critical. Please move to P0."
+
+# Read your messages (human inbox by default)
+agencycli inbox messages
+
+# Inspect an agent's mailbox
+agencycli inbox messages --recipient my-api/pm --all
+
+# Reply
+agencycli inbox reply <msg-id> --body "Noted, I'll update the backlog on next wakeup."
+```
+
+The inbox task-confirmation list is also rendered to `.agencycli/inbox.md` at the workspace root for easy reading.
 
 ---
 
@@ -452,8 +440,8 @@ Restrict when an agent can wake up:
 agencycli daemon heartbeat \
   --project my-api --agent dev \
   --enable --interval 30m \
-  --active-hours "09:00-18:00" \   # only between 9am and 6pm
-  --active-days  "weekdays"         # Mon–Fri only
+  --active-hours "09:00-18:00" \
+  --active-days  "weekdays"
 ```
 
 Supported `--active-days` values: `weekdays`, `weekends`, or `Mon,Tue,Wed,Thu,Fri,Sat,Sun` (comma-separated).
@@ -464,7 +452,7 @@ Overnight windows like `22:00-06:00` work correctly.
 
 ## Templates — share your agency
 
-Pack your agency (teams, roles, skills, workflows, project-blueprints) as a shareable archive:
+Pack your agency (teams, roles, skills, agent playbooks, project blueprints) as a shareable archive:
 
 ```bash
 agencycli template pack --output tech-agency.tar.gz \
@@ -473,6 +461,8 @@ agencycli template pack --output tech-agency.tar.gz \
   --description "Standard software engineering agency template" \
   --keywords "engineering,software,go"
 ```
+
+The archive includes: `agency-prompt.md`, `teams/`, `skills/`, `agent-playbooks/`, `project-blueprints/`.
 
 Inspect a template before using it:
 
@@ -504,13 +494,13 @@ agencycli sync --force                       # force regenerate everything
 
 ---
 
-## --dir flag
+## `--dir` flag
 
 Run any command against a workspace outside your current directory:
 
 ```bash
 agencycli --dir /path/to/MyAgency list agents
-agencycli --dir /path/to/MyAgency workflow run feature-dev --project my-api --input ...
+agencycli --dir /path/to/MyAgency task list --project my-api --agent dev
 agencycli --dir /path/to/MyAgency inbox list
 agencycli --dir /path/to/MyAgency daemon start
 ```
@@ -526,9 +516,9 @@ agencycli --dir /path/to/MyAgency daemon start
 | Role management | `role list`, `role skill add/remove` |
 | Agent lifecycle | `hire`/`assign`, `fire`, `sync`, `list`, `show` |
 | Execution | `exec`, `run` |
-| Tasks | `task add/list/show/done/retry/cancel/confirm-request` |
-| Inbox | `inbox list/show/confirm/reject/comment/forward` |
-| Workflow | `workflow list/show/run/instances/status` |
+| Tasks | `task add/list/show/done/retry/cancel/confirm-request/stop-all/tokens` |
+| Inbox (confirmations) | `inbox list/show/confirm/reject/comment/forward` |
+| Inbox (messaging) | `inbox send/messages/reply` |
 | Scheduling | `daemon start/stop/status/heartbeat`, `cron add/list/delete/enable/disable` |
 | Templates | `template pack/info` |
 | Session | `session show/set/clear` |
@@ -557,8 +547,9 @@ agencycli <command> <subcommand> --help
 [ ] mkdir -p skills/<name> && write skill.yaml + prompt.md
 [ ] agencycli role skill add --team engineering --role developer --skill <name>
 
-[ ] mkdir -p workflows && write workflows/feature-dev.yaml
+[ ] mkdir -p agent-playbooks && write agent-playbooks/dev.md
 [ ] mkdir -p project-blueprints && write project-blueprints/default.yaml
+      (reference playbook: dev.md in the blueprint)
 
 [ ] agencycli create project --name "my-app" --blueprint default --repo /path/to/repo
 [ ] Edit projects/my-app/prompt.md  (tech stack, build commands, PR conventions)
@@ -566,9 +557,9 @@ agencycli <command> <subcommand> --help
 
 [ ] agencycli daemon start
 
-[ ] agencycli workflow run feature-dev --project my-app --input feature="First feature"
-[ ] agencycli workflow instances --project my-app
-[ ] agencycli inbox list
+[ ] agencycli inbox list          # check for task confirmations
+[ ] agencycli inbox messages      # check for async messages from agents
+[ ] agencycli task list --project my-app --agent dev
 ```
 
 ## Setup checklist — from a template
@@ -581,5 +572,6 @@ agencycli <command> <subcommand> --help
 [ ] Edit projects/my-app/prompt.md  (project-specific context)
 [ ] agencycli project apply --project my-app
 [ ] agencycli daemon start
-[ ] agencycli workflow run <name> --project my-app --input ...
+[ ] agencycli inbox list
+[ ] agencycli inbox messages
 ```

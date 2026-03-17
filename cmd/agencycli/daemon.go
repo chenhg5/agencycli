@@ -65,97 +65,97 @@ func newDaemonStartCmd() *cobra.Command {
 				return err
 			}
 
-			// Collect agents with heartbeat enabled.
-			var heartbeatAgents []agentKey
-			// Collect agents with at least one enabled cron.
-			var cronAgents []agentKey
+		// Collect agents with heartbeat enabled.
+		var heartbeatAgents []agentKey
+		// Collect agents with at least one enabled cron.
+		var cronAgents []agentKey
 
-			for _, p := range projects {
-				agents, err := ts.ListAgents(p)
-				if err != nil {
-					continue
-				}
-				for _, a := range agents {
-					hb, err := ts.GetHeartbeat(p, a)
-					if err == nil && hb.Enabled {
-						heartbeatAgents = append(heartbeatAgents, agentKey{p, a})
-					}
-					crons, err := ts.ListCrons(p, a)
-					if err == nil {
-						for _, c := range crons {
-							if c.Enabled {
-								cronAgents = append(cronAgents, agentKey{p, a})
-								break
-							}
-						}
-					}
-				}
+		for _, p := range projects {
+			agents, err := ts.ListAgents(p)
+			if err != nil {
+				continue
 			}
-
-			if len(heartbeatAgents) == 0 && len(cronAgents) == 0 {
-				fmt.Println("No agents have heartbeat or cron enabled.")
-				fmt.Println("  Heartbeat: agencycli daemon heartbeat --project P --agent A --enable --interval 30m")
-				fmt.Println("  Cron     : agencycli cron add --project P --agent A --schedule \"0 9 * * *\" --title T --prompt P")
-				return nil
-			}
-
-			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-			defer cancel()
-
-			fmt.Printf("Daemon started\n")
-			if len(heartbeatAgents) > 0 {
-				fmt.Printf("  Heartbeat agents (%d):\n", len(heartbeatAgents))
-				for _, k := range heartbeatAgents {
-					hb, _ := ts.GetHeartbeat(k.project, k.agent)
-					fmt.Printf("    ● %s/%s  interval=%s\n", k.project, k.agent, hb.Interval)
+			for _, a := range agents {
+				hb, err := ts.GetHeartbeat(p, a)
+				if err == nil && hb.Enabled {
+					heartbeatAgents = append(heartbeatAgents, agentKey{p, a})
 				}
-			}
-			if len(cronAgents) > 0 {
-				fmt.Printf("  Cron agents (%d):\n", len(cronAgents))
-				for _, k := range cronAgents {
-					crons, _ := ts.ListCrons(k.project, k.agent)
+				crons, err := ts.ListCrons(p, a)
+				if err == nil {
 					for _, c := range crons {
 						if c.Enabled {
-							fmt.Printf("    ● %s/%s  [%s]  %s\n", k.project, k.agent, c.Schedule, c.Title)
+							cronAgents = append(cronAgents, agentKey{p, a})
+							break
 						}
 					}
 				}
 			}
-			fmt.Println("Press Ctrl+C to stop.")
+		}
 
-			var wg sync.WaitGroup
-
-			// Deduplicate: if agent is in both lists, heartbeat loop handles cron too.
-			heartbeatSet := map[agentKey]bool{}
-			for _, k := range heartbeatAgents {
-				heartbeatSet[k] = true
-			}
-
-			for _, k := range heartbeatAgents {
-				k := k
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					runHeartbeatLoop(ctx, root, k.project, k.agent, ts, s)
-				}()
-			}
-
-			// Cron-only agents (no heartbeat): run cron loop that executes tasks directly.
-			for _, k := range cronAgents {
-				if heartbeatSet[k] {
-					continue // already handled in heartbeat loop
-				}
-				k := k
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					runCronOnlyLoop(ctx, root, k.project, k.agent, ts, s)
-				}()
-			}
-
-			wg.Wait()
-			fmt.Println("\nDaemon stopped.")
+		if len(heartbeatAgents) == 0 && len(cronAgents) == 0 {
+			fmt.Println("No agents have heartbeat or cron enabled.")
+			fmt.Println("  Heartbeat: agencycli daemon heartbeat --project P --agent A --enable --interval 30m")
+			fmt.Println("  Cron     : agencycli cron add --project P --agent A --schedule \"0 9 * * *\" --title T --prompt P")
 			return nil
+		}
+
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
+
+		fmt.Printf("Daemon started\n")
+		if len(heartbeatAgents) > 0 {
+			fmt.Printf("  Heartbeat agents (%d):\n", len(heartbeatAgents))
+			for _, k := range heartbeatAgents {
+				hb, _ := ts.GetHeartbeat(k.project, k.agent)
+				fmt.Printf("    ● %s/%s  interval=%s\n", k.project, k.agent, hb.Interval)
+			}
+		}
+		if len(cronAgents) > 0 {
+			fmt.Printf("  Cron agents (%d):\n", len(cronAgents))
+			for _, k := range cronAgents {
+				crons, _ := ts.ListCrons(k.project, k.agent)
+				for _, c := range crons {
+					if c.Enabled {
+						fmt.Printf("    ● %s/%s  [%s]  %s\n", k.project, k.agent, c.Schedule, c.Title)
+					}
+				}
+			}
+		}
+		fmt.Println("Press Ctrl+C to stop.")
+
+		var wg sync.WaitGroup
+
+		// Deduplicate: if agent is in both lists, heartbeat loop handles cron too.
+		heartbeatSet := map[agentKey]bool{}
+		for _, k := range heartbeatAgents {
+			heartbeatSet[k] = true
+		}
+
+		for _, k := range heartbeatAgents {
+			k := k
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runHeartbeatLoop(ctx, root, k.project, k.agent, ts, s)
+			}()
+		}
+
+		// Cron-only agents (no heartbeat): run cron loop that executes tasks directly.
+		for _, k := range cronAgents {
+			if heartbeatSet[k] {
+				continue // already handled in heartbeat loop
+			}
+			k := k
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runCronOnlyLoop(ctx, root, k.project, k.agent, ts, s)
+			}()
+		}
+
+		wg.Wait()
+		fmt.Println("\nDaemon stopped.")
+		return nil
 		},
 	}
 }
@@ -276,6 +276,62 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			return err
 		}
 		if task == nil {
+			// Queue is empty.  If a wakeup prompt is configured, run it once
+			// as a synthetic (non-persisted) task so the agent can perform
+			// its autonomous routine (scan issues, review PRs, etc.).
+			if hb.WakeupPrompt != "" {
+				prompt, pErr := resolveWakeupPrompt(hb.WakeupPrompt, agentDir(root, project, agentName))
+				if pErr == nil && prompt != "" {
+					// Prepend any unread messages to the wakeup prompt.
+					recipient := project + "/" + agentName
+					unread, _ := ts.ListUnreadMessages(recipient)
+					if len(unread) > 0 {
+						var msgSection strings.Builder
+						msgSection.WriteString("## 📬 未读消息\n\n")
+						msgSection.WriteString("你收到了以下消息，请在本次唤醒中处理：\n\n")
+						for _, m := range unread {
+							msgSection.WriteString(fmt.Sprintf("---\n**[%s] From: %s**",
+								m.SentAt.Local().Format("01-02 15:04"), m.From))
+							if m.Subject != "" {
+								msgSection.WriteString(fmt.Sprintf("  Subject: %s", m.Subject))
+							}
+							msgSection.WriteString(fmt.Sprintf("\nID: `%s`\n\n%s\n\n", m.ID, m.Body))
+						}
+						msgSection.WriteString("---\n\n")
+						msgSection.WriteString("如需回复某条消息：\n")
+						msgSection.WriteString("  agencycli --dir /root/code/TechStudio inbox reply <msg-id> --body \"...\"\n\n")
+						prompt = msgSection.String() + prompt
+						fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine (%d unread message(s))\n",
+							project, agentName, len(unread))
+					} else {
+						fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine\n", project, agentName)
+					}
+					syntheticTask := &entity.Task{
+						ID:        entity.NewTaskID(),
+						Title:     "[wakeup] routine",
+						Type:      "wakeup",
+						Priority:  9, // lowest, runs only when queue is empty
+						Status:    entity.TaskStatusInProgress,
+						Prompt:    prompt,
+						CreatedBy: "heartbeat:wakeup",
+						CreatedAt: time.Now().UTC(),
+						UpdatedAt: time.Now().UTC(),
+					}
+					result, rErr := r.RunTask(project, agentName, syntheticTask, sessionID)
+					if rErr == nil {
+						if result.SessionID != "" {
+							sessionID = result.SessionID
+							latestHB, _ := ts.GetHeartbeat(project, agentName)
+							latestHB.SessionID = sessionID
+							_ = ts.SaveHeartbeat(project, agentName, latestHB)
+						}
+						// Mark messages as read after a successful wakeup run.
+						if len(unread) > 0 {
+							_ = ts.MarkMessagesRead(recipient)
+						}
+					}
+				}
+			}
 			break
 		}
 
@@ -343,13 +399,12 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			task.UpdatedAt = time.Now().UTC()
 			_ = ts.UpdateTask(project, agentName, task)
 			item := &entity.InboxItem{
-				TaskID:   task.ID,
-				Project:  project,
-				Agent:    agentName,
-				Title:    task.Title,
-				Summary:  result.Summary,
-				RoutedAt: time.Now().UTC(),
-				LogPath:  task.RunLogPath,
+				TaskID:  task.ID,
+				Project: project,
+				Agent:   agentName,
+				Title:   task.Title,
+				Summary: result.Summary,
+				LogPath: task.RunLogPath,
 			}
 			_ = ts.AddToInbox(item)
 			fmt.Printf("[heartbeat %s/%s] ? task %s awaiting confirmation\n", project, agentName, task.ID)
@@ -361,6 +416,29 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 		}
 	}
 	return nil
+}
+
+// agentDir returns the filesystem path of an agent's workspace.
+func agentDir(root, project, agentName string) string {
+	return root + "/projects/" + project + "/agents/" + agentName
+}
+
+// resolveWakeupPrompt resolves a wakeup prompt value:
+//   - If it starts with "@", the rest is treated as a path relative to agentDir.
+//   - Otherwise the value itself is the prompt text.
+func resolveWakeupPrompt(value, agentDir string) (string, error) {
+	if strings.HasPrefix(value, "@") {
+		path := strings.TrimPrefix(value, "@")
+		if !strings.HasPrefix(path, "/") {
+			path = agentDir + "/" + path
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return value, nil
 }
 
 // ── cron helpers ─────────────────────────────────────────────────────────────
@@ -624,14 +702,15 @@ func parseDayName(s string) (time.Weekday, error) {
 
 func newDaemonHeartbeatCmd() *cobra.Command {
 	var (
-		project      string
-		agentName    string
-		enable       bool
-		disable      bool
-		interval     string
-		sessionScope string
-		activeHours  string
-		activeDays   string
+		project          string
+		agentName        string
+		enable           bool
+		disable          bool
+		interval         string
+		sessionScope     string
+		activeHours      string
+		activeDays       string
+		wakeupPromptFile string
 	)
 
 	cmd := &cobra.Command{
@@ -656,8 +735,12 @@ func newDaemonHeartbeatCmd() *cobra.Command {
   # Disable
   agencycli daemon heartbeat --project cc-connect --agent qa-reviewer --disable
 
-  # Show current config
-  agencycli daemon heartbeat --project cc-connect --agent qa-reviewer`,
+		# Show current config
+  agencycli daemon heartbeat --project cc-connect --agent qa-reviewer
+
+  # Set a wakeup routine (runs when queue is empty)
+  agencycli daemon heartbeat --project cc-connect --agent pm \
+    --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/wakeup.md`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -729,6 +812,14 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 				hb.ActiveDays = activeDays
 				changed = true
 			}
+			if wakeupPromptFile != "" {
+				// Verify the file exists and is readable.
+				if _, err := os.ReadFile(wakeupPromptFile); err != nil {
+					return fmt.Errorf("cannot read wakeup prompt file: %w", err)
+				}
+				hb.WakeupPrompt = "@" + wakeupPromptFile
+				changed = true
+			}
 
 			if changed {
 				if err := ts.SaveHeartbeat(project, agentName, hb); err != nil {
@@ -762,6 +853,13 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 					fmt.Printf("  ⏸  outside active window — next wakeup in %s\n", dur.Round(time.Minute))
 				}
 			}
+			if hb.WakeupPrompt != "" {
+				display := hb.WakeupPrompt
+				if len(display) > 60 {
+					display = display[:57] + "..."
+				}
+				fmt.Printf("  Wakeup  : %s\n", display)
+			}
 			if hb.LastWakeup != nil {
 				fmt.Printf("  Last    : %s  (%s)\n",
 					hb.LastWakeup.Format(time.RFC3339), hb.LastWakeupStatus)
@@ -781,5 +879,6 @@ func newDaemonHeartbeatCmd() *cobra.Command {
 	cmd.Flags().StringVar(&sessionScope, "session-scope", "", "session scope: cycle (default) or task")
 	cmd.Flags().StringVar(&activeHours, "active-hours", "", `restrict wakeups to a time window, e.g. "09:00-18:00" or "22:00-06:00"`)
 	cmd.Flags().StringVar(&activeDays, "active-days", "", `restrict wakeups to specific days, e.g. "weekdays", "Mon,Wed,Fri", "Sat,Sun"`)
+	cmd.Flags().StringVar(&wakeupPromptFile, "wakeup-prompt-file", "", "path to a markdown file used as the default wakeup routine when queue is empty")
 	return cmd
 }

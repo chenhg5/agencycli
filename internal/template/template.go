@@ -36,8 +36,8 @@ var skeletonEntries = []string{
 	"agency-prompt.md",
 	"teams",
 	"skills",
-	"workflows",
-	"project-blueprints",
+	"agent-playbooks",      // wakeup.md files for each agent role
+	"project-blueprints",  // declarative project.yaml blueprints
 }
 
 // ── Pack ─────────────────────────────────────────────────────────────────────

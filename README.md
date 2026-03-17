@@ -1,8 +1,8 @@
 # agencycli
 
-**agencycli** is a CLI tool for managing AI agent teams through an agency-style organisational structure. Define teams, roles, projects, and workflows once — hire agents with fully assembled context, assign them tasks, and let them work autonomously on a heartbeat schedule.
+**agencycli** is a CLI tool for managing AI agent teams through an agency-style organisational structure. Define teams, roles, projects, and agent playbooks once — hire agents with fully assembled context, assign them tasks, and let them work autonomously on a heartbeat schedule.
 
-No more copy-pasting prompts between sessions. No more context drift. No more manually wiring up who does what next.
+No more copy-pasting prompts between sessions. No more context drift. No more manually wiring up who does what.
 
 ## Core model
 
@@ -20,7 +20,7 @@ Agency                ← global rules, values, tone
                  └─ Project ← concrete product or initiative
 ```
 
-Agents work autonomously via a **heartbeat loop** — wake up, process all pending tasks, sleep — with conversation continuity preserved across cycles. Complex multi-agent flows are coordinated by an **async workflow engine**: each agent does its part and calls `task done --summary "..."`, the engine routes the result to the next agent automatically.
+Agents work autonomously via a **heartbeat loop** — wake up, process all pending tasks, sleep. When the task queue is empty, a **wakeup routine** (`wakeup.md`) runs as a default prompt, letting agents proactively scan for new work (GitHub issues, open PRs, etc.). Agents communicate asynchronously via **inbox messaging** — any agent or human can send a message to any other participant; recipients read it on their next wakeup.
 
 ---
 
@@ -35,26 +35,33 @@ Agents work autonomously via a **heartbeat loop** — wake up, process all pendi
 
 ### Layer 2 — Task automation
 
-- Per-agent **task queues** with a 7-state lifecycle
+- Per-agent **task queues** with a 7-state lifecycle and priority ordering (0=critical … 3=low)
 - **Heartbeat daemon**: non-overlapping wakeup loop, session-preserving, with time-window scheduling (`active_hours`, `active_days`)
+- **Wakeup routine**: when the task queue is empty, the agent runs `wakeup.md` as a synthetic task — enabling autonomous proactive work without manual task assignment
 - **Cron jobs**: add recurring tasks on a crontab schedule
-- **Human inbox**: agents route `awaiting_confirmation` tasks here; you confirm/reject/forward
+- **Human inbox**: agents route `awaiting_confirmation` tasks here via `task confirm-request`; you confirm/reject/forward
+- **Async messaging**: any participant (agent or human) can send non-blocking messages to any other participant's inbox
 - **Docker sandbox**: isolated containers with credentials and repos auto-mounted
 
-### Layer 3 — Async workflow orchestration
+### Layer 3 — Agent playbooks
 
-Workflows are defined as **task templates + routing rules**, not sequential scripts. Each agent works at its own pace:
+Playbooks (`wakeup.md` files) define how an agent behaves when it wakes up with an empty task queue. Package them in `agent-playbooks/` to distribute with templates.
 
-1. Agent A receives a task, completes it, calls `task done --summary "..."`
-2. The routing engine reads the workflow definition, finds the matching route, and enqueues a task for Agent B — passing `{{task.summary}}` and any variables
-3. Agent B picks it up on its next heartbeat wakeup
-4. Final results route to the human inbox for approval
+```yaml
+# project.yaml
+agents:
+  - name: pm
+    playbook: pm.md          # copied to agent dir as wakeup.md on project apply
+    heartbeat:
+      enabled: true
+      interval: 30m
+```
 
-No orchestrator is blocked waiting. Agents are fully decoupled.
+When `project apply` runs, it copies `agent-playbooks/pm.md` → `agents/pm/wakeup.md` and automatically sets `wakeup_prompt: "@wakeup.md"` in `heartbeat.yaml`.
 
 ### Layer 4 — Templates
 
-Package an entire agency (teams, roles, skills, workflows, project blueprints) as a `.tar.gz` template. Share it, apply it to a new agency with one command.
+Package an entire agency (teams, roles, skills, agent playbooks, project blueprints) as a `.tar.gz` template. Share it, apply it to a new agency with one command.
 
 ---
 
@@ -91,7 +98,7 @@ cd agencycli && make install
 
 ## Quick start — from a template (recommended)
 
-Templates bundle teams, roles, skills, workflows, and project blueprints in one archive:
+Templates bundle teams, roles, skills, agent playbooks, and project blueprints in one archive:
 
 ```bash
 # 1. Create an agency from a shared template
@@ -102,27 +109,22 @@ cd MyAgency
 # 2. List the project blueprints the template ships with
 agencycli project blueprints
 
-# 3. Create a project — project.yaml is pre-filled with agents, heartbeats, workflows
+# 3. Create a project — project.yaml is pre-filled with agents, heartbeats, and playbooks
 agencycli create project --name "my-service" --blueprint default
 
 # 4. Review what will be created
 agencycli project show --project my-service
 
-# 5. Apply: hire all agents + configure heartbeats + crons in one command
+# 5. Apply: hire all agents + configure heartbeats + install wakeup.md playbooks
 agencycli project apply --project my-service
 
-# 6. Start the daemon — agents now wake up on schedule
+# 6. Start the daemon — agents now wake up on schedule and run their playbooks
 agencycli daemon start
 
-# 7. Kick off a workflow
-agencycli workflow run feature-dev --project my-service \
-  --input feature="User login" \
-  --input background="Auth sprint Q2"
-
-# 8. Monitor
-agencycli workflow instances --project my-service
-agencycli workflow status <instance-id> --project my-service
-agencycli inbox list       # human confirmations arrive here
+# 7. Monitor
+agencycli inbox list          # task confirmations awaiting your decision
+agencycli inbox messages      # async messages from agents
+agencycli task list --project my-service --agent pm
 ```
 
 ## Quick start — from scratch
@@ -135,11 +137,10 @@ cd MyAgency
 # 2. Create teams and roles
 agencycli create team --name "engineering"
 agencycli create role --team "engineering" --name "developer"
-agencycli create role --team "engineering" --name "qa-engineer"
 
-# 3. Write a workflow definition
-mkdir -p workflows
-# edit workflows/feature-dev.yaml (see Workflow section below)
+# 3. Write agent playbooks
+mkdir -p agent-playbooks
+# edit agent-playbooks/dev.md — defines what the dev agent does when it wakes up
 
 # 4. Create a project blueprint
 mkdir -p project-blueprints
@@ -161,8 +162,10 @@ agencycli daemon start
 MyAgency/
   .agencycli/
     agency.yaml              # workspace metadata
-    inbox.yaml               # human inbox (auto-managed)
+    inbox.yaml               # human task-confirmation inbox (auto-managed)
     inbox.md                 # human-readable inbox (auto-generated)
+    messages.yaml            # async messages delivered to human
+
   agency-prompt.md           # agency-wide context
 
   teams/
@@ -173,9 +176,6 @@ MyAgency/
         developer/
           role.yaml          # skills[], setup (dirs/files to create)
           prompt.md          # role-specific context layer
-        qa-engineer/
-          role.yaml
-          prompt.md
 
   skills/                    # no built-ins — define only what you need
     github-push-relay/
@@ -183,27 +183,26 @@ MyAgency/
       prompt.md              # uses {{SKILL_DIR}} for script paths
       git-push-github.sh     # bundled file, chmod+x preserved
 
-  workflows/                 # async workflow definitions (shared)
-    feature-dev.yaml
+  agent-playbooks/           # wakeup.md templates, distributed with the agency template
+    pm.md
+    qa-reviewer.md
 
   project-blueprints/        # project templates packaged with the agency template
-    default.yaml             # declares agents, heartbeats, and active workflows
+    default.yaml             # declares agents, heartbeats, and playbooks
 
   projects/
     my-api/
-      project.yaml           # declarative: agents + heartbeats + crons + workflows
+      project.yaml           # declarative: agents + heartbeats + crons + playbooks
       prompt.md              # project-specific context
-      workflows/             # project-specific workflow overrides
-      workflow-runs/         # runtime workflow instance state
-        wf-20260317-abc123.yaml
       agents/
         dev/
-          .agencycli-agent.yaml  # model, team, role, sandbox, add_dirs
           CLAUDE.md              # merged context (@imports all layers)
+          wakeup.md              # agent's autonomous routine (installed by project apply)
           tasks.yaml             # active task queue
           tasks_archive.yaml     # completed tasks
           heartbeat.yaml         # wakeup config (set by project apply)
           crons.yaml             # scheduled tasks (set by project apply)
+          messages.yaml          # async messages delivered to this agent
           runs/                  # execution logs
           .agencycli-context/    # individual layer files (managed)
           .claude/skills/        # deployed skill files
@@ -230,10 +229,10 @@ agencycli create project --name "my-api" --blueprint default  # from a project b
 # List blueprints shipped with the template
 agencycli project blueprints
 
-# Show project.yaml (agents, heartbeats, workflows)
+# Show project.yaml (agents, heartbeats, playbooks)
 agencycli project show --project my-api
 
-# One-command bootstrap: hire all agents + configure heartbeats/crons
+# One-command bootstrap: hire all agents + configure heartbeats/crons + install playbooks
 agencycli project apply --project my-api
 agencycli project apply --project my-api --dry-run   # preview
 agencycli project apply --project my-api --force     # re-hire existing agents
@@ -255,16 +254,16 @@ agents:
       interval: 30m
       active_hours: "09:00-20:00"
       active_days: weekdays
-  - name: qa
-    role: qa-engineer
-    team: engineering
+    playbook: dev.md          # installed as wakeup.md by project apply
+
+  - name: pm
+    role: product-manager
+    team: product
     model: claudecode
-    sandbox: true
     heartbeat:
       enabled: true
-      interval: 1h
-workflows:
-  - feature-dev
+      interval: 30m
+    playbook: pm.md
 ```
 
 ### `hire` / `assign` / `fire` / `sync`
@@ -286,82 +285,6 @@ agencycli fire --project my-api --agent dev           # soft delete → .fired/
 agencycli fire --project my-api --agent dev --force   # hard delete
 ```
 
-### `workflow` — async orchestration
-
-```bash
-agencycli workflow list [--project P]
-agencycli workflow show <name> [--project P]
-agencycli workflow run  <name> --project P [--input key=value ...]
-agencycli workflow instances --project P [--status running|done|failed]
-agencycli workflow status <instance-id> --project P
-```
-
-**`workflows/feature-dev.yaml`** example:
-
-```yaml
-name: feature-dev
-version: "1.0"
-description: "Dev implements a feature, QA reviews, human approves"
-
-templates:
-  - id: implement
-    title: "Implement: {{inputs.feature}}"
-    agent: dev
-    prompt: |
-      Implement the feature: {{inputs.feature}}
-      Background: {{inputs.background}}
-      When done: agencycli task done --id $TASK_ID --status success \
-        --summary "Brief description of what was done"
-
-  - id: review
-    title: "Review: {{inputs.feature}}"
-    agent: qa
-    prompt: |
-      Review the implementation of: {{inputs.feature}}
-      Dev summary: {{task.summary}}
-      When done: agencycli task done --id $TASK_ID --status success \
-        --summary "QA PASS/FAIL: ..."
-
-entry:
-  template: implement
-
-routes:
-  - on:
-      template: implement
-      status: success
-    create:
-      template: review
-
-  - on:
-      template: review
-      status: success
-    inbox:
-      title: "Approve: {{inputs.feature}}"
-      summary: "Dev: {{steps.implement.summary}}\nQA: {{task.summary}}"
-      action_items:
-        - "Review the changes"
-        - "Confirm ready to ship"
-
-  - on:
-      template: review
-      status: failed
-      max_trigger: 3         # circuit-breaker
-    create:
-      template: implement
-      vars:
-        background: "QA failed: {{task.error}} — fix and retry"
-```
-
-**Variable interpolation** in prompts and `vars`:
-
-| Placeholder | Value |
-|-------------|-------|
-| `{{inputs.KEY}}` | `--input key=value` passed to `workflow run` |
-| `{{task.summary}}` | what the previous agent reported via `--summary` |
-| `{{task.error}}` | error from a failed task |
-| `{{steps.TEMPLATE_ID.summary}}` | output of any earlier completed step |
-| `{{task.vars.KEY}}` | vars inherited from the triggering task |
-
 ### `task` — task queue
 
 ```bash
@@ -372,15 +295,24 @@ agencycli task show   <task-id>
 agencycli task cancel <task-id>
 agencycli task retry  <task-id>
 
+# Stop all running or pending tasks (emergency halt)
+agencycli task stop-all --project P [--agent A | --all-agents] \
+                        [--include-running] [--no-pending]
+
+# View token usage and cost across agent runs
+agencycli task tokens --project P [--agent A | --all-agents] [--all]
+
 # Called by the agent inside its prompt:
 agencycli task done --id <id> --status success --summary "what was done"
 agencycli task done --id <id> --status failed  --error "reason"
 
-# Route to human inbox (called by agent):
+# Route to human inbox for a decision (blocks current task until human responds):
 agencycli task confirm-request --id <id> --summary "PR ready" \
   --action-item "Review the diff" \
-  --action-item "Approve or request changes"
+  --action-item "Confirm merge"
 ```
+
+**Task priority:** 0=critical, 1=high, 2=normal (default), 3=low. The daemon always picks the highest-priority pending task first.
 
 **Task lifecycle:**
 ```
@@ -398,8 +330,11 @@ agencycli run  --project P --agent A --task <id>  # run a specific task
 agencycli exec --project P --agent A --prompt "..." # one-shot, no task queue
 ```
 
-### `inbox` — human confirmations
+### `inbox` — human confirmations and async messaging
 
+The inbox has two distinct concepts:
+
+**Task confirmations** — an agent pauses and waits for your decision:
 ```bash
 agencycli inbox list
 agencycli inbox show    <task-id>         # shows summary, action items, log tail
@@ -409,9 +344,30 @@ agencycli inbox comment <task-id> --message "..."
 agencycli inbox forward <task-id> --to <project>/<agent> --note "..."
 ```
 
+**Async messages** — non-blocking communication between any participants:
+```bash
+# Send a message to an agent or the human
+agencycli inbox send --to cc-connect/pm --subject "Prioritise issue #42" --body "..."
+agencycli inbox send --to human --from cc-connect/pm --subject "Backlog update" --body "..."
+agencycli inbox send --to cc-connect/dev-claude --from cc-connect/pm \
+  --subject "New task context" --body "Extra info for the task I just created..."
+
+# Read messages (human's mailbox by default)
+agencycli inbox messages
+agencycli inbox messages --recipient cc-connect/pm   # inspect an agent's mailbox
+agencycli inbox messages --all                       # include already-read messages
+agencycli inbox messages --mark-read                 # mark as read after listing
+
+# Reply to a message
+agencycli inbox reply <msg-id> --body "..."
+agencycli inbox reply <msg-id> --from cc-connect/pm --body "..."
+```
+
+Agents receive unread messages automatically at the top of their wakeup prompt — no need to poll in `wakeup.md`. Messages are marked as read after a successful wakeup run.
+
 ### `daemon` — heartbeat scheduler
 
-The heartbeat is a **non-overlapping wakeup loop**: after each cycle completes all pending tasks, the agent sleeps for `interval`, then wakes again. Session continuity is preserved across cycles.
+The heartbeat is a **non-overlapping wakeup loop**: after each cycle completes all pending tasks, the agent sleeps for `interval`, then wakes again. When the queue is empty, the **wakeup routine** fires instead.
 
 ```bash
 # Configure heartbeat for one agent
@@ -419,6 +375,10 @@ agencycli daemon heartbeat --project P --agent A \
   --enable --interval 30m \
   --active-hours "09:00-18:00" \  # only wake in this window (local time)
   --active-days  "weekdays"       # Mon–Fri only (or Mon,Wed,Fri / weekends)
+
+# Set a wakeup routine (runs when queue is empty)
+agencycli daemon heartbeat --project P --agent A \
+  --wakeup-prompt-file /path/to/wakeup.md
 
 # Start daemon (all enabled agents)
 agencycli daemon start
@@ -446,6 +406,7 @@ Crons enqueue a new task each time the schedule fires. The daemon checks for due
 
 ```bash
 # Pack the current agency as a shareable template
+# Includes: agency-prompt.md, teams/, skills/, agent-playbooks/, project-blueprints/
 agencycli template pack --output tech-agency.tar.gz \
   --name "tech-project" --version "1.0.0" \
   --author "Alice" --email "alice@example.com" \
@@ -461,8 +422,8 @@ agencycli create agency --name "MyAgency" --template tech-agency.tar.gz
 agencycli create agency --name "MyAgency" --template https://example.com/tpl.tar.gz
 ```
 
-A template archive contains: `agency-prompt.md`, `teams/`, `skills/`, `workflows/`, `project-blueprints/`.  
-A `template.json` in the archive root holds metadata (similar to `npm package.json`).
+A template archive contains: `agency-prompt.md`, `teams/`, `skills/`, `agent-playbooks/`, `project-blueprints/`.  
+A `template.json` in the archive root holds metadata (name, version, author, email, description, keywords).
 
 ### `role` — role management
 
@@ -489,8 +450,8 @@ agencycli version
 All commands work against a workspace outside the current directory:
 
 ```bash
-agencycli --dir /path/to/MyAgency workflow run feature-dev --project my-api --input ...
 agencycli --dir /path/to/MyAgency inbox list
+agencycli --dir /path/to/MyAgency task list --project my-api --agent dev
 agencycli --dir /path/to/MyAgency daemon start
 ```
 
@@ -514,6 +475,20 @@ Use `{{SKILL_DIR}}/git-push-github.sh` to push code to GitHub.
 ```
 
 Bind to teams (`team.yaml`) or roles (`role.yaml`). After changing skills, run `agencycli sync`.
+
+---
+
+## Agent playbooks
+
+Playbooks live in `agent-playbooks/` and define what an agent does when it wakes up with an empty task queue. They are referenced from `project.yaml` via the `playbook:` field on each agent spec and installed as `wakeup.md` by `project apply`.
+
+```
+agent-playbooks/
+  pm.md          ← PM autonomous routine: scan issues, maintain backlog, confirm with human
+  qa-reviewer.md ← QA autonomous routine: scan open PRs, review, request merge confirmation
+```
+
+The daemon auto-injects any **unread inbox messages** at the top of the wakeup prompt before running the routine. No explicit polling needed in `wakeup.md`.
 
 ---
 
@@ -556,26 +531,27 @@ docker build --build-arg CN_MIRROR=1 -t agencycli/sandbox-claudecode docker/sand
 - [x] `--dir` global flag
 
 ### Task automation ✓
-- [x] Task queue per agent (7-state machine)
+- [x] Task queue per agent (7-state machine, priority ordering)
 - [x] Human inbox with confirm / reject / comment / forward
+- [x] Async messaging: `inbox send / messages / reply` (non-blocking, any participant)
 - [x] `run` / `exec`
 - [x] Session continuity across heartbeat cycles
 - [x] Heartbeat daemon with active-hours / active-days windows
+- [x] Wakeup routine (`wakeup.md`) — runs when task queue is empty
+- [x] Unread message injection into wakeup prompt (auto)
 - [x] Cron scheduling (`cron add/list/delete/enable/disable`)
 - [x] Docker sandbox
-- [x] `on_success` triggers
+- [x] `task stop-all` — emergency halt for running/pending tasks
+- [x] `task tokens` — token usage and cost per agent/task
 
-### Workflow orchestration ✓
-- [x] Async workflow engine: task templates + routing rules
-- [x] Variable interpolation (`{{inputs.*}}`, `{{task.summary}}`, `{{steps.*}}`)
-- [x] Circuit-breaker (`max_trigger` per route)
-- [x] `workflow run / list / show / instances / status`
-- [x] `task done --summary` — agent output passed to next step
-- [x] Routing on `success`, `failed`, or `any`
-- [x] Inbox routing from workflows
+### Agent playbooks ✓
+- [x] `agent-playbooks/` directory in agency structure
+- [x] `playbook:` field in `project.yaml` AgentSpec
+- [x] `project apply` installs playbook as `wakeup.md` + sets `wakeup_prompt`
+- [x] Playbooks included in template archives
 
 ### Project blueprints ✓
-- [x] `project.yaml` — declarative agents + heartbeats + crons + workflows
+- [x] `project.yaml` — declarative agents + heartbeats + crons + playbooks
 - [x] `project show / apply / blueprints`
 - [x] `create project --blueprint`
 
@@ -584,12 +560,11 @@ docker build --build-arg CN_MIRROR=1 -t agencycli/sandbox-claudecode docker/sand
 - [x] `template info` — inspect metadata
 - [x] `create agency --template` — local file, directory, or HTTPS URL
 - [x] `template.json` metadata (name, version, author, email, description, keywords)
-- [x] `project-blueprints/` included in template archives
+- [x] `agent-playbooks/` and `project-blueprints/` included in template archives
 
 ### Planned
 - [ ] `depends_on` task dependency resolution
 - [ ] Run log rotation
-- [ ] Workflow cron triggers (auto-start workflows on schedule)
 - [ ] E2B / Daytona sandbox provider
 
 ---

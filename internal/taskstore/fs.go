@@ -295,8 +295,7 @@ func (s *FSStore) regenerateInboxMD(items []*entity.InboxItem) error {
 	} else {
 		fmt.Fprintf(&buf, "# Inbox — %d item(s) awaiting your confirmation\n\n", len(items))
 		for _, item := range items {
-			fmt.Fprintf(&buf, "## [%s / %s] %s\n", item.Project, item.Agent, item.Title)
-			fmt.Fprintf(&buf, "> Routed at: %s\n\n", item.RoutedAt.Format("2006-01-02 15:04"))
+			fmt.Fprintf(&buf, "## [%s / %s] %s\n\n", item.Project, item.Agent, item.Title)
 			if item.Summary != "" {
 				fmt.Fprintf(&buf, "%s\n\n", item.Summary)
 			}
@@ -504,114 +503,85 @@ func (s *FSStore) ListProjectBlueprints() ([]string, error) {
 	return out, nil
 }
 
-// ── Workflows ─────────────────────────────────────────────────────────────────
+// ── Messages ──────────────────────────────────────────────────────────────────
 
-func (s *FSStore) workflowRunsDir(project string) string {
-	return filepath.Join(s.projectDir(project), "workflow-runs")
+const messagesYAML = "messages.yaml"
+
+// messagesPath returns the path to the messages file for a recipient.
+// recipient is "human" or "project/agent".
+func (s *FSStore) messagesPath(recipient string) string {
+	if recipient == "human" {
+		return filepath.Join(s.root, aiosDir, messagesYAML)
+	}
+	// "project/agent"
+	parts := strings.SplitN(recipient, "/", 2)
+	if len(parts) != 2 {
+		return filepath.Join(s.root, aiosDir, messagesYAML)
+	}
+	return filepath.Join(s.root, "projects", parts[0], "agents", parts[1], messagesYAML)
 }
 
-func (s *FSStore) GetWorkflow(project, name string) (*entity.WorkflowManifest, error) {
-	// Search project-level first, then agency-level.
-	candidates := []string{
-		filepath.Join(s.projectDir(project), "workflows", name+".yaml"),
-		filepath.Join(s.root, "workflows", name+".yaml"),
-	}
-	for _, p := range candidates {
-		data, err := os.ReadFile(p)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		var wf entity.WorkflowManifest
-		return &wf, yaml.Unmarshal(data, &wf)
-	}
-	return nil, nil
-}
-
-func (s *FSStore) ListWorkflows(project string) ([]*entity.WorkflowManifest, error) {
-	seen := map[string]bool{}
-	var out []*entity.WorkflowManifest
-	dirs := []string{
-		filepath.Join(s.projectDir(project), "workflows"),
-		filepath.Join(s.root, "workflows"),
-	}
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
-				continue
-			}
-			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-			if err != nil {
-				continue
-			}
-			var wf entity.WorkflowManifest
-			if err := yaml.Unmarshal(data, &wf); err != nil || wf.Name == "" {
-				continue
-			}
-			if seen[wf.Name] {
-				continue // project-level already added
-			}
-			seen[wf.Name] = true
-			out = append(out, &wf)
-		}
-	}
-	return out, nil
-}
-
-func (s *FSStore) SaveWorkflowInstance(project string, inst *entity.WorkflowInstance) error {
-	dir := s.workflowRunsDir(project)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+func (s *FSStore) SendMessage(msg *entity.Message) error {
+	msgs, err := s.ListMessages(msg.To)
+	if err != nil {
 		return err
 	}
-	return writeYAMLAtomic(filepath.Join(dir, inst.ID+".yaml"), inst)
-}
-
-func (s *FSStore) GetWorkflowInstance(project, id string) (*entity.WorkflowInstance, error) {
-	data, err := os.ReadFile(filepath.Join(s.workflowRunsDir(project), id+".yaml"))
-	if err != nil {
-		return nil, err
+	msgs = append([]*entity.Message{msg}, msgs...) // newest first
+	path := s.messagesPath(msg.To)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
 	}
-	var inst entity.WorkflowInstance
-	return &inst, yaml.Unmarshal(data, &inst)
+	return writeYAMLAtomic(path, msgs)
 }
 
-func (s *FSStore) ListWorkflowInstances(project string) ([]*entity.WorkflowInstance, error) {
-	dir := s.workflowRunsDir(project)
-	entries, err := os.ReadDir(dir)
+func (s *FSStore) ListMessages(recipient string) ([]*entity.Message, error) {
+	path := s.messagesPath(recipient)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	var out []*entity.WorkflowInstance
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			continue
-		}
-		var inst entity.WorkflowInstance
-		if err := yaml.Unmarshal(data, &inst); err == nil {
-			out = append(out, &inst)
+	var msgs []*entity.Message
+	if err := yaml.Unmarshal(data, &msgs); err != nil {
+		return nil, err
+	}
+	return msgs, nil
+}
+
+func (s *FSStore) ListUnreadMessages(recipient string) ([]*entity.Message, error) {
+	all, err := s.ListMessages(recipient)
+	if err != nil {
+		return nil, err
+	}
+	var unread []*entity.Message
+	for _, m := range all {
+		if m.ReadAt == nil {
+			unread = append(unread, m)
 		}
 	}
-	// Newest first.
-	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-		out[i], out[j] = out[j], out[i]
+	return unread, nil
+}
+
+func (s *FSStore) MarkMessagesRead(recipient string) error {
+	msgs, err := s.ListMessages(recipient)
+	if err != nil {
+		return err
 	}
-	return out, nil
+	now := time.Now().UTC()
+	changed := false
+	for _, m := range msgs {
+		if m.ReadAt == nil {
+			m.ReadAt = &now
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	path := s.messagesPath(recipient)
+	return writeYAMLAtomic(path, msgs)
 }
 
 // Compile-time assertion: FSStore must fully implement Store.

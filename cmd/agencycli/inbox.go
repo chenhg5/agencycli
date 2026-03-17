@@ -30,6 +30,10 @@ Use 'inbox confirm' or 'inbox reject' to resolve them.`,
 		newInboxRejectCmd(),
 		newInboxForwardCmd(),
 		newInboxCommentCmd(),
+		// Async message commands (non-blocking, any participant can use these)
+		newInboxSendCmd(),
+		newInboxMessagesCmd(),
+		newInboxReplyCmd(),
 	)
 	return cmd
 }
@@ -59,14 +63,13 @@ func newInboxListCmd() *cobra.Command {
 
 			fmt.Printf("Inbox — %d item(s) awaiting confirmation\n\n", len(items))
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "TASK ID\tPROJECT/AGENT\tTITLE\tROUTED AT")
-			fmt.Fprintln(w, "───────\t─────────────\t─────\t─────────")
+			fmt.Fprintln(w, "TASK ID\tPROJECT/AGENT\tTITLE")
+			fmt.Fprintln(w, "───────\t─────────────\t─────")
 			for _, item := range items {
-				fmt.Fprintf(w, "%s\t%s/%s\t%s\t%s\n",
+				fmt.Fprintf(w, "%s\t%s/%s\t%s\n",
 					item.TaskID,
 					item.Project, item.Agent,
 					item.Title,
-					item.RoutedAt.Format("2006-01-02 15:04"),
 				)
 			}
 			w.Flush()
@@ -111,7 +114,6 @@ func newInboxShowCmd() *cobra.Command {
 			fmt.Println(hr)
 			fmt.Printf("  From    : %s / %s\n", found.Project, found.Agent)
 			fmt.Printf("  Title   : %s\n", found.Title)
-			fmt.Printf("  Routed  : %s\n", found.RoutedAt.Format("2006-01-02 15:04:05"))
 			if found.ForwardedTo != "" {
 				fmt.Printf("  Status  : forwarded → %s\n", found.ForwardedTo)
 			}
@@ -278,13 +280,12 @@ func newInboxConfirmCmd() *cobra.Command {
 				// Update inbox item summary.
 				_ = ts.RemoveFromInbox(taskID)
 				item := &entity.InboxItem{
-					TaskID:   taskID,
-					Project:  project,
-					Agent:    agentName,
-					Title:    t.Title,
-					Summary:  result.Summary,
-					RoutedAt: time.Now().UTC(),
-					LogPath:  result.LogPath,
+					TaskID:  taskID,
+					Project: project,
+					Agent:   agentName,
+					Title:   t.Title,
+					Summary: result.Summary,
+					LogPath: result.LogPath,
 				}
 				_ = ts.AddToInbox(item)
 				fmt.Printf("? Task %s needs another confirmation round\n", taskID)
@@ -524,5 +525,228 @@ func newInboxCommentCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&message, "message", "", "comment text")
+	return cmd
+}
+
+// ── inbox send ────────────────────────────────────────────────────────────────
+
+func newInboxSendCmd() *cobra.Command {
+	var (
+		to      string
+		subject string
+		body    string
+		replyTo string
+		from    string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "send",
+		Short: "Send an async message to an agent or human",
+		Long: `Send a non-blocking async message to any participant.
+
+Recipient format:
+  --to human                 → agency owner's inbox
+  --to cc-connect/pm         → project cc-connect, agent pm
+  --to cc-connect/dev-claude → project cc-connect, agent dev-claude
+
+The recipient will see the message on their next wakeup (agents) or in
+'inbox messages' (human).  Unlike 'task confirm-request', sending a message
+does not block any task.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if body == "" {
+				return fmt.Errorf("--body is required")
+			}
+			sender := from
+			if sender == "" {
+				sender = "human"
+			}
+			msg := &entity.Message{
+				ID:      entity.NewMessageID(),
+				From:    sender,
+				To:      to,
+				Subject: subject,
+				Body:    body,
+				ReplyTo: replyTo,
+				SentAt:  time.Now().UTC(),
+			}
+			ts := taskstore.New(root)
+			if err := ts.SendMessage(msg); err != nil {
+				return fmt.Errorf("send message: %w", err)
+			}
+			fmt.Printf("✓ Message sent  [%s]\n", msg.ID)
+			fmt.Printf("  To      : %s\n", msg.To)
+			if msg.Subject != "" {
+				fmt.Printf("  Subject : %s\n", msg.Subject)
+			}
+			fmt.Printf("  From    : %s\n", msg.From)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&to, "to", "", "recipient: 'human' or 'project/agent'")
+	cmd.Flags().StringVar(&subject, "subject", "", "optional subject line")
+	cmd.Flags().StringVar(&body, "body", "", "message body")
+	cmd.Flags().StringVar(&replyTo, "reply-to", "", "ID of message being replied to")
+	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human'; agents set this to 'project/agent')")
+	_ = cmd.MarkFlagRequired("to")
+	return cmd
+}
+
+// ── inbox messages ────────────────────────────────────────────────────────────
+
+func newInboxMessagesCmd() *cobra.Command {
+	var (
+		recipient string
+		all       bool
+		mark      bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "messages",
+		Short: "List async messages (from agents or other humans)",
+		Long: `List async messages delivered to a mailbox.
+
+By default shows only unread messages for 'human'.
+Use --recipient to inspect an agent's mailbox.
+Use --all to show all messages including already-read ones.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if recipient == "" {
+				recipient = "human"
+			}
+			ts := taskstore.New(root)
+			var msgs []*entity.Message
+			if all {
+				msgs, err = ts.ListMessages(recipient)
+			} else {
+				msgs, err = ts.ListUnreadMessages(recipient)
+			}
+			if err != nil {
+				return err
+			}
+			if len(msgs) == 0 {
+				if all {
+					fmt.Printf("No messages for %s.\n", recipient)
+				} else {
+					fmt.Printf("No unread messages for %s.\n", recipient)
+				}
+				return nil
+			}
+			fmt.Printf("Messages for %s (%d):\n\n", recipient, len(msgs))
+			for _, m := range msgs {
+				status := "●"
+				if m.ReadAt != nil {
+					status = "○"
+				}
+				fmt.Printf("%s [%s] ID: %s\n", status, m.SentAt.Local().Format("01-02 15:04"), m.ID)
+				fmt.Printf("  From    : %s\n", m.From)
+				if m.Subject != "" {
+					fmt.Printf("  Subject : %s\n", m.Subject)
+				}
+				if m.ReplyTo != "" {
+					fmt.Printf("  Reply-to: %s\n", m.ReplyTo)
+				}
+				fmt.Printf("\n  %s\n\n", strings.ReplaceAll(m.Body, "\n", "\n  "))
+				fmt.Println(strings.Repeat("─", 60))
+			}
+			if mark {
+				if err := ts.MarkMessagesRead(recipient); err != nil {
+					return err
+				}
+				fmt.Printf("✓ Marked %d message(s) as read.\n", len(msgs))
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox to inspect: 'human' (default) or 'project/agent'")
+	cmd.Flags().BoolVar(&all, "all", false, "show all messages including already-read ones")
+	cmd.Flags().BoolVar(&mark, "mark-read", false, "mark displayed messages as read after listing")
+	return cmd
+}
+
+// ── inbox reply ───────────────────────────────────────────────────────────────
+
+func newInboxReplyCmd() *cobra.Command {
+	var (
+		body      string
+		from      string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "reply <msg-id>",
+		Short: "Reply to an async message",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			msgID := args[0]
+			if body == "" {
+				return fmt.Errorf("--body is required")
+			}
+			ts := taskstore.New(root)
+
+			// Find the original message to determine the reply recipient.
+			// Search human mailbox first, then all agents.
+			var original *entity.Message
+			recipients := []string{"human"}
+			projects, _ := ts.ListProjects()
+			for _, proj := range projects {
+				agents, _ := ts.ListAgents(proj)
+				for _, ag := range agents {
+					recipients = append(recipients, proj+"/"+ag)
+				}
+			}
+			for _, rec := range recipients {
+				all, _ := ts.ListMessages(rec)
+				for _, m := range all {
+					if m.ID == msgID {
+						original = m
+						break
+					}
+				}
+				if original != nil {
+					break
+				}
+			}
+			if original == nil {
+				return fmt.Errorf("message %s not found", msgID)
+			}
+
+			sender := from
+			if sender == "" {
+				sender = "human"
+			}
+			reply := &entity.Message{
+				ID:      entity.NewMessageID(),
+				From:    sender,
+				To:      original.From, // reply goes back to the sender
+				Subject: "Re: " + original.Subject,
+				Body:    body,
+				ReplyTo: msgID,
+				SentAt:  time.Now().UTC(),
+			}
+			if err := ts.SendMessage(reply); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Reply sent  [%s]\n", reply.ID)
+			fmt.Printf("  To      : %s\n", reply.To)
+			fmt.Printf("  Re      : %s\n", msgID)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&body, "body", "", "reply body")
+	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human')")
+	_ = cmd.MarkFlagRequired("body")
 	return cmd
 }

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -10,7 +14,6 @@ import (
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
-	"github.com/chenhg5/agencycli/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +30,8 @@ func newTaskCmd() *cobra.Command {
 		newTaskConfirmRequestCmd(),
 		newTaskRetryCmd(),
 		newTaskCancelCmd(),
+		newTaskStopAllCmd(),
+		newTaskTokensCmd(),
 	)
 	return cmd
 }
@@ -112,14 +117,12 @@ func newTaskAddCmd() *cobra.Command {
 				if err := ts.AddTask(project, agentName, t); err != nil {
 					return err
 				}
-				now := time.Now().UTC()
 				item := &entity.InboxItem{
-					TaskID:   t.ID,
-					Project:  project,
-					Agent:    agentName,
-					Title:    t.Title,
-					Summary:  promptText,
-					RoutedAt: now,
+					TaskID:  t.ID,
+					Project: project,
+					Agent:   agentName,
+					Title:   t.Title,
+					Summary: promptText,
 				}
 				if err := ts.AddToInbox(item); err != nil {
 					return err
@@ -193,14 +196,30 @@ func newTaskListCmd() *cobra.Command {
 				return nil
 			}
 
+			// Sort: in_progress first, then by priority asc, then created_at asc.
+			sort.Slice(tasks, func(i, j int) bool {
+				ti, tj := tasks[i], tasks[j]
+				// in_progress always first
+				iRun := ti.Status == entity.TaskStatusInProgress
+				jRun := tj.Status == entity.TaskStatusInProgress
+				if iRun != jRun {
+					return iRun
+				}
+				if ti.Priority != tj.Priority {
+					return ti.Priority < tj.Priority
+				}
+				return ti.CreatedAt.Before(tj.CreatedAt)
+			})
+
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "STATUS\tID\tPRI\tTITLE")
-			fmt.Fprintln(w, "──────\t──\t───\t─────")
+			fmt.Fprintln(w, "STATUS\tID\tPRI\tCREATED\tTITLE")
+			fmt.Fprintln(w, "──────\t──\t───\t───────\t─────")
 			for _, t := range tasks {
-				fmt.Fprintf(w, "%s %s\t%s\t%s\t%s\n",
+				fmt.Fprintf(w, "%s %s\t%s\t%s\t%s\t%s\n",
 					taskstore.StatusIcon(t.Status), t.Status,
 					t.ID,
 					taskstore.PriorityLabel(t.Priority),
+					t.CreatedAt.Local().Format("01-02 15:04"),
 					t.Title,
 				)
 			}
@@ -328,7 +347,6 @@ The --summary value is passed to the next step via workflow routing ({{task.summ
 			}
 
 			ts := taskstore.New(root)
-			s := store.NewFS(root)
 			t, err := ts.GetTask(project, agentName, taskID)
 			if err != nil {
 				return err
@@ -354,11 +372,6 @@ The --summary value is passed to the next step via workflow routing ({{task.summ
 				if err := fireOnSuccessTriggers(root, project, agentName, t); err != nil {
 					fmt.Fprintf(os.Stderr, "warning: some triggers failed: %v\n", err)
 				}
-			}
-
-			// Trigger workflow routing (idempotent — no-op if not a workflow task).
-			if err := workflow.Route(root, project, t, ts, s); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: workflow routing failed: %v\n", err)
 			}
 
 			fmt.Printf("✓ Task %s marked %s\n", taskID, finalStatus)
@@ -435,7 +448,6 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 				Summary:     summary,
 				ActionHint:  actionHint,
 				ActionItems: actionItems,
-				RoutedAt:    now,
 				LogPath:     t.RunLogPath,
 			}
 			if err := ts.AddToInbox(item); err != nil {
@@ -637,12 +649,11 @@ func fireOnSuccessTriggers(root, project, agentName string, t *entity.Task) erro
 				continue
 			}
 			item := &entity.InboxItem{
-				TaskID:   newTask.ID,
-				Project:  targetProject,
-				Agent:    targetAgent,
-				Title:    newTask.Title,
-				Summary:  newTask.Prompt,
-				RoutedAt: now,
+				TaskID:  newTask.ID,
+				Project: targetProject,
+				Agent:   targetAgent,
+				Title:   newTask.Title,
+				Summary: newTask.Prompt,
 			}
 			_ = ts.AddToInbox(item)
 		} else {
@@ -676,3 +687,367 @@ func rewriteArchive(root, project, agentName string, tasks []*entity.Task) error
 func resolveStores(root string) (taskstore.Store, store.Store) {
 	return taskstore.New(root), store.NewFS(root)
 }
+
+// ── task stop-all ─────────────────────────────────────────────────────────────
+
+func newTaskStopAllCmd() *cobra.Command {
+	var (
+		project    string
+		agentName  string
+		allAgents  bool
+		noPending  bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "stop-all",
+		Short: "Cancel all pending (and optionally in-progress) tasks",
+		Long: `Cancels every pending task in the queue. Tasks that are currently in-progress
+(agent is running) are also cancelled in the store so no workflow routing fires
+when they finish — but the running Docker container is not forcibly killed.
+
+Use --no-pending to skip pending tasks and only cancel in-progress ones.`,
+		Example: `  # Cancel all pending tasks for one agent
+  agencycli task stop-all --project cc-connect --agent dev-claude
+
+  # Cancel all pending tasks across the whole project
+  agencycli task stop-all --project cc-connect --all-agents
+
+  # Cancel including in-progress (marks them failed in store)
+  agencycli task stop-all --project cc-connect --all-agents --include-running`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if project == "" {
+				return fmt.Errorf("--project is required")
+			}
+			includeRunning, _ := cmd.Flags().GetBool("include-running")
+
+			ts := taskstore.New(root)
+			s := store.NewFS(root)
+
+			// Collect agents to process.
+			var agents []string
+			if allAgents {
+				agents, err = ts.ListAgents(project)
+				if err != nil {
+					return err
+				}
+			} else {
+				if agentName == "" {
+					return fmt.Errorf("--agent or --all-agents is required")
+				}
+				agents = []string{agentName}
+			}
+			_ = s
+
+			total := 0
+			for _, ag := range agents {
+				tasks, err := ts.ListTasks(project, ag)
+				if err != nil {
+					continue
+				}
+				for _, t := range tasks {
+					switch t.Status {
+					case entity.TaskStatusPending, entity.TaskStatusBlocked:
+						if noPending {
+							continue
+						}
+					case entity.TaskStatusInProgress:
+						if !includeRunning {
+							continue
+						}
+					default:
+						continue
+					}
+
+					now := time.Now().UTC()
+					t.Status = entity.TaskStatusCancelled
+					t.FinishedAt = &now
+					t.UpdatedAt = now
+					t.LastError = "cancelled by stop-all"
+					if err := ts.ArchiveTask(project, ag, t); err != nil {
+						fmt.Fprintf(os.Stderr, "  warn: cancel %s/%s: %v\n", ag, t.ID, err)
+						continue
+					}
+					fmt.Printf("  ✗ cancelled  %-22s  %s/%s\n", t.ID, ag, t.Title)
+					total++
+				}
+			}
+
+			if total == 0 {
+				fmt.Println("No cancellable tasks found.")
+			} else {
+				fmt.Printf("\n✓ Cancelled %d task(s)\n", total)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&project, "project", "", "project name")
+	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
+	cmd.Flags().BoolVar(&allAgents, "all-agents", false, "apply to all agents in the project")
+	cmd.Flags().BoolVar(&noPending, "no-pending", false, "skip pending tasks (only cancel in-progress)")
+	cmd.Flags().Bool("include-running", false, "also cancel tasks currently in-progress")
+	_ = cmd.MarkFlagRequired("project")
+	return cmd
+}
+
+// ── task tokens ───────────────────────────────────────────────────────────────
+
+// tokenUsage holds token counts from a single run log.
+type tokenUsage struct {
+	InputTokens       int64
+	OutputTokens      int64
+	CacheReadTokens   int64
+	TotalCostUSD      float64
+	HasCost           bool // true when total_cost_usd came from the log
+}
+
+type resultUsage struct {
+	InputTokens           int64 `json:"input_tokens"`
+	OutputTokens          int64 `json:"output_tokens"`
+	CacheReadInputTokens  int64 `json:"cache_read_input_tokens"`
+}
+
+type resultLine struct {
+	Type        string      `json:"type"`
+	TotalCostUSD float64    `json:"total_cost_usd"`
+	Usage       resultUsage `json:"usage"`
+}
+
+func newTaskTokensCmd() *cobra.Command {
+	var (
+		project   string
+		agentName string
+		taskID    string
+		allTasks  bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "tokens",
+		Short: "Show token usage and estimated cost from run logs",
+		Long: `Parses Claude stream-json run logs and aggregates input/output token counts.
+Cost is estimated using Anthropic's Claude pricing (configurable via env):
+  ANTHROPIC_INPUT_PRICE_PER_M  (default: 3.0  USD per 1M input tokens)
+  ANTHROPIC_OUTPUT_PRICE_PER_M (default: 15.0 USD per 1M output tokens)`,
+		Example: `  # Tokens for a specific task
+  agencycli task tokens --project cc-connect --agent pm --task t-20260317-18omal
+
+  # Aggregate all tasks for an agent
+  agencycli task tokens --project cc-connect --agent pm --all
+
+  # All agents in project
+  agencycli task tokens --project cc-connect --all-agents`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if project == "" {
+				return fmt.Errorf("--project is required")
+			}
+
+			allAgentsFlag, _ := cmd.Flags().GetBool("all-agents")
+
+			ts := taskstore.New(root)
+
+			inputPrice := getEnvFloat("ANTHROPIC_INPUT_PRICE_PER_M", 3.0)
+			outputPrice := getEnvFloat("ANTHROPIC_OUTPUT_PRICE_PER_M", 15.0)
+
+			var agentList []string
+			if allAgentsFlag {
+				agentList, err = ts.ListAgents(project)
+				if err != nil {
+					return err
+				}
+			} else {
+				if agentName == "" {
+					return fmt.Errorf("--agent or --all-agents is required")
+				}
+				agentList = []string{agentName}
+			}
+
+			type agentSummary struct {
+				name  string
+				usage tokenUsage
+				tasks int
+			}
+			var summaries []agentSummary
+			grandTotal := tokenUsage{}
+
+			for _, ag := range agentList {
+				logDir, err := ts.RunLogDir(project, ag)
+				if err != nil {
+					continue
+				}
+
+				entries, err := os.ReadDir(logDir)
+				if err != nil {
+					continue
+				}
+
+				agUsage := tokenUsage{}
+				taskCount := 0
+
+				for _, e := range entries {
+					if e.IsDir() || !strings.HasSuffix(e.Name(), ".log") {
+						continue
+					}
+					// Filter by task ID if specified.
+					if taskID != "" && !strings.Contains(e.Name(), taskID) {
+						continue
+					}
+
+					u, err := parseLogTokens(logDir + "/" + e.Name())
+					if err != nil {
+						continue
+					}
+					if u.InputTokens == 0 && u.OutputTokens == 0 && !u.HasCost {
+						continue
+					}
+					agUsage.InputTokens += u.InputTokens
+					agUsage.OutputTokens += u.OutputTokens
+					agUsage.CacheReadTokens += u.CacheReadTokens
+					agUsage.TotalCostUSD += u.TotalCostUSD
+					agUsage.HasCost = agUsage.HasCost || u.HasCost
+					taskCount++
+
+					if taskID != "" || allTasks {
+						costStr := fmt.Sprintf("$%.4f", u.TotalCostUSD)
+						if !u.HasCost {
+							costStr = fmt.Sprintf("~$%.4f", calcCost(u.InputTokens, u.OutputTokens, inputPrice, outputPrice))
+						}
+						fmt.Printf("  %-44s  in=%7s  out=%6s  cache=%6s  %s\n",
+							e.Name(),
+							formatTokens(u.InputTokens),
+							formatTokens(u.OutputTokens),
+							formatTokens(u.CacheReadTokens),
+							costStr,
+						)
+					}
+				}
+
+			summaries = append(summaries, agentSummary{ag, agUsage, taskCount})
+			grandTotal.InputTokens += agUsage.InputTokens
+			grandTotal.OutputTokens += agUsage.OutputTokens
+			grandTotal.CacheReadTokens += agUsage.CacheReadTokens
+			grandTotal.TotalCostUSD += agUsage.TotalCostUSD
+			grandTotal.HasCost = grandTotal.HasCost || agUsage.HasCost
+		}
+
+			fmt.Println()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "AGENT\tTASKS\tINPUT\tOUTPUT\tCACHE HIT\tCOST")
+			fmt.Fprintln(w, "─────\t─────\t─────\t──────\t─────────\t────")
+			for _, s := range summaries {
+				var costStr string
+				if s.usage.HasCost {
+					costStr = fmt.Sprintf("$%.4f", s.usage.TotalCostUSD)
+				} else {
+					costStr = fmt.Sprintf("~$%.4f", calcCost(s.usage.InputTokens, s.usage.OutputTokens, inputPrice, outputPrice))
+				}
+				fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\n",
+					s.name, s.tasks,
+					formatTokens(s.usage.InputTokens),
+					formatTokens(s.usage.OutputTokens),
+					formatTokens(s.usage.CacheReadTokens),
+					costStr,
+				)
+			}
+			if len(summaries) > 1 {
+				var totalCostStr string
+				if grandTotal.HasCost {
+					totalCostStr = fmt.Sprintf("$%.4f", grandTotal.TotalCostUSD)
+				} else {
+					totalCostStr = fmt.Sprintf("~$%.4f", calcCost(grandTotal.InputTokens, grandTotal.OutputTokens, inputPrice, outputPrice))
+				}
+				fmt.Fprintln(w, "─────\t─────\t─────\t──────\t─────────\t────")
+				fmt.Fprintf(w, "TOTAL\t-\t%s\t%s\t%s\t%s\n",
+					formatTokens(grandTotal.InputTokens),
+					formatTokens(grandTotal.OutputTokens),
+					formatTokens(grandTotal.CacheReadTokens),
+					totalCostStr,
+				)
+			}
+			w.Flush()
+			if !grandTotal.HasCost {
+				fmt.Printf("\nEstimated pricing: $%.2f/M input, $%.2f/M output\n(override with ANTHROPIC_INPUT_PRICE_PER_M / ANTHROPIC_OUTPUT_PRICE_PER_M)\n",
+					inputPrice, outputPrice)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&project, "project", "", "project name")
+	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
+	cmd.Flags().StringVar(&taskID, "task", "", "filter by task ID")
+	cmd.Flags().BoolVar(&allTasks, "all", false, "show per-run breakdown")
+	cmd.Flags().Bool("all-agents", false, "aggregate across all agents in the project")
+	_ = cmd.MarkFlagRequired("project")
+	return cmd
+}
+
+// ── token helpers ─────────────────────────────────────────────────────────────
+
+func parseLogTokens(path string) (tokenUsage, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return tokenUsage{}, err
+	}
+	defer f.Close()
+
+	// Prefer the final `result` line which has aggregate token counts and
+	// the exact cost already calculated by the Claude API. Fall back to the
+	// last `assistant` message usage if no result line is present.
+	var result tokenUsage
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 10*1024*1024), 10*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		// Quick filter to skip irrelevant lines without full unmarshal.
+		if len(line) < 10 {
+			continue
+		}
+		var rl resultLine
+		if err := json.Unmarshal(line, &rl); err != nil {
+			continue
+		}
+		if rl.Type == "result" {
+			result.InputTokens = rl.Usage.InputTokens
+			result.OutputTokens = rl.Usage.OutputTokens
+			result.CacheReadTokens = rl.Usage.CacheReadInputTokens
+			result.TotalCostUSD = rl.TotalCostUSD
+			result.HasCost = true
+		}
+	}
+	return result, scanner.Err()
+}
+
+func calcCost(in, out int64, inPricePerM, outPricePerM float64) float64 {
+	return float64(in)/1e6*inPricePerM + float64(out)/1e6*outPricePerM
+}
+
+func formatTokens(n int64) string {
+	if n >= 1_000_000 {
+		return fmt.Sprintf("%.2fM", float64(n)/1e6)
+	}
+	if n >= 1_000 {
+		return fmt.Sprintf("%.1fk", float64(n)/1e3)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+func getEnvFloat(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		var f float64
+		if _, err := fmt.Sscanf(v, "%f", &f); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+// Ensure math is used (needed for potential future rounding).
+var _ = math.Round

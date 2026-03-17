@@ -58,7 +58,7 @@ type Store interface {
 	// SaveCrons replaces the entire cron list for the agent atomically.
 	SaveCrons(project, agent string, crons []*entity.Cron) error
 
-	// ── Inbox ────────────────────────────────────────────────────────────────
+	// ── Inbox (task confirmations) ───────────────────────────────────────────
 
 	// AddToInbox routes a task to the human confirmation inbox.
 	// Implementations should also refresh the human-readable inbox summary.
@@ -69,6 +69,22 @@ type Store interface {
 
 	// RemoveFromInbox removes an item by task ID and refreshes the inbox summary.
 	RemoveFromInbox(taskID string) error
+
+	// ── Messages (async agent ↔ human / agent ↔ agent) ───────────────────────
+
+	// SendMessage delivers a message to the recipient's mailbox.
+	// recipient is "human" or "project/agent".
+	SendMessage(msg *entity.Message) error
+
+	// ListMessages returns all messages for a recipient (newest first).
+	// recipient is "human" or "project/agent".
+	ListMessages(recipient string) ([]*entity.Message, error)
+
+	// ListUnreadMessages returns only unread messages for a recipient.
+	ListUnreadMessages(recipient string) ([]*entity.Message, error)
+
+	// MarkMessagesRead marks all unread messages for a recipient as read.
+	MarkMessagesRead(recipient string) error
 
 	// ── Discovery ────────────────────────────────────────────────────────────
 
@@ -101,22 +117,4 @@ type Store interface {
 	// ListProjectBlueprints returns names of all available blueprints.
 	ListProjectBlueprints() ([]string, error)
 
-	// ── Workflows ─────────────────────────────────────────────────────────────
-
-	// GetWorkflow searches for a workflow manifest by name.
-	// Search order: projects/<project>/workflows/<name>.yaml, then workflows/<name>.yaml.
-	// Returns nil, nil if not found.
-	GetWorkflow(project, name string) (*entity.WorkflowManifest, error)
-
-	// ListWorkflows returns all workflow manifests visible to the project.
-	ListWorkflows(project string) ([]*entity.WorkflowManifest, error)
-
-	// SaveWorkflowInstance persists a workflow instance state.
-	SaveWorkflowInstance(project string, inst *entity.WorkflowInstance) error
-
-	// GetWorkflowInstance retrieves a workflow instance by ID.
-	GetWorkflowInstance(project, id string) (*entity.WorkflowInstance, error)
-
-	// ListWorkflowInstances returns all instances for a project, newest first.
-	ListWorkflowInstances(project string) ([]*entity.WorkflowInstance, error)
 }
