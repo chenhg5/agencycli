@@ -6,7 +6,7 @@ This document is a complete guide for installing `agencycli` and building your f
 
 ## 1. Install agencycli
 
-Choose **one** of the three methods below.
+Choose **one** method:
 
 ### Option A — npm (recommended, no Go required)
 
@@ -22,86 +22,161 @@ go install github.com/chenhg5/agencycli/cmd/agencycli@latest
 agencycli version
 ```
 
-### Option C — Download a pre-built binary
+### Option C — Pre-built binary
 
-Go to [https://github.com/chenhg5/agencycli/releases](https://github.com/chenhg5/agencycli/releases), download the archive for your platform, extract it, and move the binary to a directory on your `PATH`.
-
-```bash
-# Example: Linux amd64
-curl -L https://github.com/chenhg5/agencycli/releases/latest/download/agencycli-v0.1.0-linux-amd64.tar.gz \
-  | tar xz
-mv agencycli-v0.1.0-linux-amd64 /usr/local/bin/agencycli
-chmod +x /usr/local/bin/agencycli
-agencycli version
-```
+Download from [https://github.com/chenhg5/agencycli/releases](https://github.com/chenhg5/agencycli/releases) and move to a directory on your `PATH`.
 
 ---
 
 ## 2. Understand the structure
 
-agencycli organises agents in a four-level hierarchy:
-
 ```
 Agency                   ← global context shared by every agent
   └─ Team                ← capability group (engineering, qa, growth…)
-       └─ Role           ← job function within the team (go-developer, pr-reviewer…)
-            └─ Project   ← concrete product or repo
-                 └─ Agent ← individual AI agent instance (model + context + skills)
+       └─ Role           ← job function (developer, qa-engineer, content-writer…)
+            └─ Project   ← concrete product or code repository
+                 └─ Agent ← individual AI agent (model + merged context + skills)
 ```
 
-**Context flows top-down.** Every agent automatically inherits: agency context → team context → role context → project context.
+**Context flows top-down.** Every agent automatically inherits: agency → team → role → project context.
 
-**Skills** are reusable capabilities (tool instructions, scripts) defined once and bound to teams or roles. They are automatically deployed into each agent's working directory on `hire` or `sync`.
+**Skills** are reusable capability definitions (instructions + scripts). They are bound to teams or roles and deployed into each agent's working directory automatically on `hire` or `sync`.
+
+**Workflows** define how tasks flow between agents asynchronously. When one agent finishes and calls `task done --summary "..."`, the routing engine creates the next task for the next agent — no orchestrator is blocked waiting.
+
+**Project blueprints** declare which agents a project needs, their heartbeat schedule, and which workflows are active. Running `project apply` hires every agent and wires up all schedules in one command.
 
 ---
 
-## 3. Create an agency workspace
+## Path A — Start from a template (recommended)
+
+If someone gives you an agency template (`.tar.gz` or URL), this is the fastest path.
+
+### Step 1 — Create agency from template
 
 ```bash
-# Create a new workspace directory and initialise it
-agencycli create agency --name "MyAgency" --desc "We build great software with AI agents"
+agencycli create agency --name "MyAgency" \
+  --template https://example.com/tech-agency.tar.gz
 
-# Enter the workspace — all subsequent commands run from here
 cd MyAgency
 ```
 
-This creates:
-```
-MyAgency/
-  .agencycli/agency.yaml    ← workspace metadata
-  agency-prompt.md          ← edit this: add your global rules, values, and tone
-```
-
-**Edit `agency-prompt.md` now.** Add anything every agent should always know: coding standards, communication style, how to handle blockers, how to report progress.
-
----
-
-## 4. Create teams
-
-Teams group agents by capability. Use nested paths for sub-teams.
+### Step 2 — List available project blueprints
 
 ```bash
-agencycli create team --name "engineering" --desc "Software engineers"
-agencycli create team --name "engineering/backend" --desc "Go/API services"
-agencycli create team --name "qa" --desc "Quality assurance"
-agencycli create team --name "product" --desc "Product management"
-agencycli create team --name "growth" --desc "Content and marketing"
+agencycli project blueprints
 ```
 
-Each team gets a `teams/<name>/prompt.md` — edit it to add team-specific standards (e.g. coding conventions for engineering, review criteria for QA).
+Output example:
+```
+BLUEPRINT  AGENTS  WORKFLOWS
+─────────  ──────  ─────────
+default    2       feature-dev
+```
+
+### Step 3 — Create a project from a blueprint
+
+```bash
+agencycli create project --name "my-service" --blueprint default \
+  --desc "My REST API service"
+```
+
+This writes `projects/my-service/project.yaml` pre-filled with agent definitions, heartbeat schedules, and workflow references.
+
+### Step 4 — Review the project configuration
+
+```bash
+agencycli project show --project my-service
+```
+
+You will see each agent, its model, role, sandbox setting, and heartbeat schedule. Edit `projects/my-service/project.yaml` if you want to adjust anything before applying.
+
+### Step 5 — Apply: hire agents and configure schedules
+
+```bash
+agencycli project apply --project my-service
+```
+
+This single command:
+- Hires every agent declared in `project.yaml`
+- Writes `heartbeat.yaml` for agents with a heartbeat schedule
+- Writes `crons.yaml` for agents with cron jobs
+- Merges the full context chain (agency → team → role → project) into each agent's working directory
+
+Use `--dry-run` to preview without making changes:
+```bash
+agencycli project apply --project my-service --dry-run
+```
+
+### Step 6 — Edit context prompts
+
+```bash
+vim agency-prompt.md                                         # global rules
+vim teams/engineering/prompt.md                              # team standards
+vim teams/engineering/roles/developer/prompt.md              # role responsibilities
+vim projects/my-service/prompt.md                            # project specifics
+```
+
+After editing, re-sync all agents:
+
+```bash
+agencycli sync --project my-service
+```
+
+### Step 7 — Start the daemon
+
+```bash
+agencycli daemon start
+```
+
+Agents now wake up automatically on their heartbeat schedule, process pending tasks, and sleep again. Session continuity is preserved across cycles.
+
+### Step 8 — Run a workflow
+
+```bash
+agencycli workflow run feature-dev --project my-service \
+  --input feature="User login with OAuth" \
+  --input background="Auth sprint, due end of Q2"
+```
+
+The entry task is enqueued for the first agent. When it completes (calling `task done --summary "..."`), the routing engine automatically enqueues the next task for the next agent.
+
+### Step 9 — Monitor progress
+
+```bash
+agencycli workflow instances --project my-service
+agencycli workflow status <instance-id> --project my-service
+agencycli inbox list                  # human confirmations arrive here
+```
 
 ---
 
-## 5. Add skills
+## Path B — Build from scratch
 
-Skills are reusable capabilities you define. There are no built-in skills — only what you need.
+### Step 1 — Create the workspace
 
-A skill is a directory under `skills/` containing:
-- `skill.yaml` — name and description
-- `prompt.md` — instructions injected into the agent's context
-- Any additional files (scripts, templates) — all are bundled and deployed automatically
+```bash
+agencycli create agency --name "MyAgency" --desc "Building great software with AI"
+cd MyAgency
+```
 
-Use `{{SKILL_DIR}}` in `prompt.md` to reference the path of a bundled script file:
+Edit `agency-prompt.md` — add anything every agent should always know: coding standards, communication style, how to handle blockers, how to report progress.
+
+### Step 2 — Create teams
+
+```bash
+agencycli create team --name "engineering"          --desc "Software engineers"
+agencycli create team --name "engineering/backend"  --desc "Go/API services"
+agencycli create team --name "qa"                   --desc "Quality assurance"
+agencycli create team --name "product"              --desc "Product management"
+agencycli create team --name "growth"               --desc "Content and marketing"
+```
+
+Edit `teams/<name>/prompt.md` to add team-specific conventions.
+
+### Step 3 — Add skills
+
+Skills have no built-in entries — define only what you need:
 
 ```bash
 mkdir -p skills/github-pr-review
@@ -110,7 +185,7 @@ mkdir -p skills/github-pr-review
 ```yaml
 # skills/github-pr-review/skill.yaml
 name: github-pr-review
-description: Instructions for reviewing and approving GitHub pull requests
+description: Instructions for reviewing GitHub pull requests
 ```
 
 ```markdown
@@ -118,45 +193,32 @@ description: Instructions for reviewing and approving GitHub pull requests
 ## Skill: GitHub PR Review
 
 When asked to review a PR:
-1. Run `gh pr view <number>` to read the description
-2. Run `gh pr diff <number>` to inspect all changes
-3. Check for obvious bugs, missing tests, and security issues
-4. Approve with `gh pr review <number> --approve` or request changes with `--request-changes`
+1. Run `gh pr view <number>` and `gh pr diff <number>`
+2. Check for bugs, missing tests, security issues
+3. Approve with `gh pr review <number> --approve` or request changes
 ```
 
-Bind skills to a team (all agents in the team inherit them):
+You can also bundle scripts alongside `prompt.md`. Use `{{SKILL_DIR}}` to reference them:
+
+```markdown
+Use `{{SKILL_DIR}}/my-script.sh` to run the deployment.
+```
+
+### Step 4 — Create roles
 
 ```bash
-# Edit teams/qa/team.yaml and add under skills:
-#   skills:
-#     - github-pr-review
+agencycli create role --team "engineering" --name "developer"    --desc "Implements features"
+agencycli create role --team "engineering" --name "qa-engineer"  --desc "Reviews and tests"
+agencycli create role --team "product"     --name "pm"           --desc "Owns roadmap and tasks"
+agencycli create role --team "growth"      --name "content-writer" --desc "Writes and publishes"
 ```
 
-Or bind to a role (see Section 6 below).
-
----
-
-## 6. Create roles
-
-Roles define the job function of an agent within a team. They add an extra context layer and can bind skills and set up initial workspace directories.
-
-```bash
-# Create roles
-agencycli create role --team "engineering" --name "go-developer"   --desc "Implements Go services"
-agencycli create role --team "engineering" --name "release-engineer" --desc "Manages releases"
-agencycli create role --team "qa"          --name "pr-reviewer"     --desc "Reviews PRs"
-agencycli create role --team "product"     --name "product-manager" --desc "Owns roadmap and tasks"
-agencycli create role --team "growth"      --name "content-writer"  --desc "Writes and publishes content"
-```
-
-Each role gets a `teams/<team>/roles/<role>/` directory. Edit these two files:
-
-- **`role.yaml`** — skills and workspace setup:
+Edit each role:
 
 ```yaml
-# teams/engineering/roles/go-developer/role.yaml
-name: go-developer
-description: Implements features and fixes bugs for Go projects
+# teams/engineering/roles/developer/role.yaml
+name: developer
+description: Implements features and fixes bugs
 skills:
   - github-pr-review
 setup:
@@ -165,237 +227,312 @@ setup:
     - notes
 ```
 
-- **`prompt.md`** — role-specific instructions the agent will always follow.
-
-Bind or unbind skills to a role at any time:
-
-```bash
-agencycli role skill add    --team engineering --role go-developer --skill github-pr-review
-agencycli role skill remove --team engineering --role go-developer --skill github-pr-review
-agencycli role list --team engineering    # see all roles and their current skills
+```markdown
+<!-- teams/engineering/roles/developer/prompt.md -->
+You are a senior software engineer. You write clean, tested, documented code...
 ```
 
----
-
-## 7. Create projects
-
-A project corresponds to a real code repository or work stream.
+Bind or unbind skills at any time:
 
 ```bash
-agencycli create project --name "my-api" \
-  --desc "REST API service" \
-  --repo "/absolute/path/to/my-api"   # local repo path; auto-added to agent's working dirs
+agencycli role skill add    --team engineering --role developer --skill github-pr-review
+agencycli role skill remove --team engineering --role developer --skill github-pr-review
+agencycli role list --team engineering
+```
+
+### Step 5 — Write a workflow definition
+
+```bash
+mkdir -p workflows
+```
+
+```yaml
+# workflows/feature-dev.yaml
+name: feature-dev
+version: "1.0"
+description: "Dev implements, QA reviews, human approves"
+
+templates:
+  - id: implement
+    title: "Implement: {{inputs.feature}}"
+    agent: dev
+    prompt: |
+      Feature request: {{inputs.feature}}
+      Background: {{inputs.background}}
+
+      Implement the feature and open a PR, then call:
+        agencycli --dir $AGENCY_DIR task done --id $TASK_ID \
+          --status success --summary "PR #<number> opened: <description>"
+
+  - id: review
+    title: "Review: {{inputs.feature}}"
+    agent: qa
+    prompt: |
+      Review the implementation of: {{inputs.feature}}
+      Dev summary: {{task.summary}}
+
+      Review the PR, then call:
+        agencycli --dir $AGENCY_DIR task done --id $TASK_ID \
+          --status success --summary "QA PASS: <what was verified>"
+
+entry:
+  template: implement
+
+routes:
+  - on:
+      template: implement
+      status: success
+    create:
+      template: review
+
+  - on:
+      template: review
+      status: success
+    inbox:
+      title: "Approve: {{inputs.feature}}"
+      summary: "Dev: {{steps.implement.summary}}\nQA: {{task.summary}}"
+      action_items:
+        - "Review the PR linked in the dev summary"
+        - "Confirm it is ready to merge"
+
+  - on:
+      template: review
+      status: failed
+      max_trigger: 3
+    create:
+      template: implement
+      vars:
+        background: "Previous attempt failed QA: {{task.error}} — fix and retry"
+```
+
+**Variable placeholders:**
+
+| Placeholder | Value |
+|-------------|-------|
+| `{{inputs.KEY}}` | `--input key=value` from `workflow run` |
+| `{{task.summary}}` | agent's `--summary` from `task done` |
+| `{{task.error}}` | error from a failed task |
+| `{{steps.TEMPLATE_ID.summary}}` | summary from an earlier completed step |
+
+### Step 6 — Create a project blueprint
+
+```bash
+mkdir -p project-blueprints
+```
+
+```yaml
+# project-blueprints/default.yaml
+name: "{{PROJECT_NAME}}"
+description: "Service managed by engineering team"
+
+agents:
+  - name: dev
+    role: developer
+    team: engineering
+    model: claudecode
+    sandbox: true
+    heartbeat:
+      enabled: true
+      interval: 30m
+      active_hours: "09:00-20:00"  # only wake in this window (local time)
+      active_days: weekdays         # Mon–Fri only
+
+  - name: qa
+    role: qa-engineer
+    team: engineering
+    model: claudecode
+    sandbox: true
+    heartbeat:
+      enabled: true
+      interval: 1h
+      active_hours: "09:00-20:00"
+      active_days: weekdays
+
+workflows:
+  - feature-dev
+```
+
+### Step 7 — Create and apply a project
+
+```bash
+# Create the project (writes project.yaml from blueprint)
+agencycli create project --name "my-api" --blueprint default \
+  --desc "REST API service" --repo "/absolute/path/to/my-api"
+
+# Review the generated config
+agencycli project show --project my-api
+
+# Apply: hire agents + configure heartbeats
+agencycli project apply --project my-api
 ```
 
 Edit `projects/my-api/prompt.md` — add project-specific context: tech stack, build/test commands, PR conventions, issue tracker URL.
 
----
-
-## 8. Hire agents
-
-`hire` (and its alias `assign`) assembles the full context chain and creates an agent working directory. It also applies role workspace setup automatically.
+Re-sync after editing:
 
 ```bash
-# Hire a Go developer for my-api
-agencycli hire \
-  --project "my-api" \
-  --team    "engineering" \
-  --role    "go-developer" \
-  --model   "claudecode" \
-  --name    "dev"
-
-# Hire a QA reviewer
-agencycli hire \
-  --project "my-api" \
-  --team    "qa" \
-  --role    "pr-reviewer" \
-  --model   "claudecode" \
-  --name    "reviewer"
-
-# Hire inside a Docker sandbox (for isolation)
-agencycli hire \
-  --project "my-api" \
-  --team    "engineering" \
-  --role    "go-developer" \
-  --model   "claudecode" \
-  --name    "dev-sandbox" \
-  --sandbox docker
+agencycli sync --project my-api
 ```
 
-Available models: `claudecode`, `codex`, `cursor`, `gemini`, `qoder`, `opencode`, `iflow`, `generic-cli`
-
-The hired agent's working directory is at `projects/<project>/agents/<name>/` and contains everything the agent needs to start immediately (context file, skills, task queue, heartbeat config).
-
----
-
-## 9. Start an agent manually
+### Step 8 — Start the daemon
 
 ```bash
-# Claude Code
-cd projects/my-api/agents/dev
-claude
-
-# Codex
-cd projects/my-api/agents/dev
-codex
-
-# Gemini CLI
-cd projects/my-api/agents/dev
-gemini
-```
-
-The agent automatically loads its context file (`CLAUDE.md`, `AGENTS.md`, etc.) and skills from the working directory.
-
----
-
-## 10. Run one-off prompts (exec)
-
-Test an agent without waiting for the task queue:
-
-```bash
-agencycli exec \
-  --project my-api \
-  --agent   dev \
-  --prompt  "Run gh issue list and summarise all open issues"
-```
-
-Output streams to stdout. Logs are saved to `projects/my-api/agents/dev/runs/`.
-
----
-
-## 11. Assign tasks
-
-```bash
-# Add a task for the developer
-agencycli task add \
-  --project my-api \
-  --agent   dev \
-  --title   "Implement user pagination" \
-  --type    feature \
-  --priority 1 \
-  --prompt  "Add cursor-based pagination to GET /users. Page size default 20, max 100. Update OpenAPI spec."
-
-# Add a task that requires human approval first
-agencycli task add \
-  --project my-api \
-  --agent   pm \
-  --title   "Q2 roadmap review" \
-  --assignee human \
-  --prompt  "Is the AI search feature in scope for Q2?"
-
-# List tasks
-agencycli task list --project my-api --agent dev
-```
-
-Run a task manually:
-
-```bash
-agencycli run --project my-api --agent dev
-```
-
----
-
-## 12. Set up heartbeat automation
-
-The heartbeat loop wakes the agent every N minutes to process all pending tasks, then sleeps again. Cycles never overlap. Session continuity is preserved across cycles.
-
-```bash
-# Configure heartbeat intervals
-agencycli daemon heartbeat --project my-api --agent dev      --enable --interval 30m
-agencycli daemon heartbeat --project my-api --agent reviewer --enable --interval 1h
-
-# Start the daemon (manages all enabled agents)
 agencycli daemon start
 ```
 
----
-
-## 13. Human inbox
-
-Agents can route tasks to you for approval:
+### Step 9 — Run a workflow
 
 ```bash
-agencycli inbox                          # list all pending human decisions
-agencycli inbox show    <task-id>        # view details
-agencycli inbox confirm <task-id>        # approve → agent resumes automatically
-agencycli inbox confirm <task-id> --message "Focus on the auth module only"
-agencycli inbox reject  <task-id> --reason "out of scope"
+agencycli workflow run feature-dev --project my-api \
+  --input feature="Rate limiting" \
+  --input background="Security hardening sprint"
 ```
 
-The inbox is also available as `inbox.md` in the workspace root.
+---
+
+## Working with tasks directly (without workflows)
+
+```bash
+# Add a task manually
+agencycli task add \
+  --project my-api --agent dev \
+  --title "Fix login redirect" --type bug --priority 1 \
+  --prompt "The redirect is broken on mobile Safari. Fix and open a PR."
+
+# Run manually
+agencycli run --project my-api --agent dev
+
+# Or run a quick one-off prompt
+agencycli exec --project my-api --agent dev \
+  --prompt "Run gh issue list and summarise all open issues"
+```
 
 ---
 
-## 14. Context sync
+## Cron jobs
 
-After editing any `prompt.md`, `team.yaml`, `role.yaml`, or skill file, re-sync agents to propagate changes:
+Add recurring tasks to any agent:
 
 ```bash
-agencycli sync                               # sync all agents with changed context
-agencycli sync --project my-api             # sync one project
-agencycli sync --project my-api --name dev  # sync one agent
+agencycli cron add \
+  --project my-api --agent dev \
+  --title "Weekly dependency audit" \
+  --schedule "0 9 * * 1" \
+  --prompt "Run `go list -m -u all` and open a PR updating any outdated dependencies."
+
+agencycli cron list --project my-api --agent dev
+```
+
+The cron definition is also declarable in `project.yaml` under `agents[*].crons`, so it is applied automatically by `project apply`.
+
+---
+
+## Human inbox
+
+Agents can route tasks to you for decisions or approvals:
+
+```bash
+agencycli inbox list
+agencycli inbox show    <task-id>   # full prompt, action items, log tail
+agencycli inbox confirm <task-id> --message "Approved — merge when CI passes"
+agencycli inbox reject  <task-id> --reason "Out of scope for this sprint"
+agencycli inbox comment <task-id> --message "Check the auth module specifically"
+agencycli inbox forward <task-id> --to my-api/dev --note "Please re-check the edge case"
+```
+
+The inbox is also rendered to `inbox.md` at the workspace root.
+
+---
+
+## Heartbeat time windows
+
+Restrict when an agent can wake up:
+
+```bash
+agencycli daemon heartbeat \
+  --project my-api --agent dev \
+  --enable --interval 30m \
+  --active-hours "09:00-18:00" \   # only between 9am and 6pm
+  --active-days  "weekdays"         # Mon–Fri only
+```
+
+Supported `--active-days` values: `weekdays`, `weekends`, or `Mon,Tue,Wed,Thu,Fri,Sat,Sun` (comma-separated).
+
+Overnight windows like `22:00-06:00` work correctly.
+
+---
+
+## Templates — share your agency
+
+Pack your agency (teams, roles, skills, workflows, project-blueprints) as a shareable archive:
+
+```bash
+agencycli template pack --output tech-agency.tar.gz \
+  --name "tech-project" --version "1.0.0" \
+  --author "Alice" --email "alice@example.com" \
+  --description "Standard software engineering agency template" \
+  --keywords "engineering,software,go"
+```
+
+Inspect a template before using it:
+
+```bash
+agencycli template info tech-agency.tar.gz
+agencycli template info tech-agency.tar.gz --json
+```
+
+Create an agency from a template:
+
+```bash
+agencycli create agency --name "MyAgency" --template tech-agency.tar.gz
+agencycli create agency --name "MyAgency" --template https://example.com/tpl.tar.gz
+agencycli create agency --name "MyAgency" --template ./my-local-template-dir
+```
+
+---
+
+## Context sync
+
+After editing any prompt, skill, or role, regenerate affected agent working directories:
+
+```bash
+agencycli sync                               # all agents with changed context
+agencycli sync --project my-api             # one project
+agencycli sync --project my-api --name dev  # one agent
 agencycli sync --force                       # force regenerate everything
 ```
 
 ---
 
-## 15. View and inspect
+## --dir flag
 
-```bash
-agencycli list teams
-agencycli list projects
-agencycli list agents
-
-agencycli role list --team engineering
-
-agencycli show agent my-api dev
-agencycli show agent my-api dev --raw    # print full merged context
-
-agencycli session show --project my-api --agent dev
-agencycli session clear --project my-api --agent dev   # start a fresh conversation
-```
-
----
-
-## 16. Fire (remove) an agent
-
-```bash
-# Soft delete — moves the agent directory to agents/.fired/<name>-<timestamp>/
-agencycli fire --project my-api --agent dev
-
-# Hard delete — permanently removes the agent directory
-agencycli fire --project my-api --agent dev --force
-```
-
----
-
-## 17. Use --dir for remote workspaces
-
-All commands accept `--dir` to target a workspace outside the current directory:
+Run any command against a workspace outside your current directory:
 
 ```bash
 agencycli --dir /path/to/MyAgency list agents
-agencycli --dir /path/to/MyAgency sync
-agencycli --dir /path/to/MyAgency exec --project my-api --agent dev --prompt "..."
+agencycli --dir /path/to/MyAgency workflow run feature-dev --project my-api --input ...
+agencycli --dir /path/to/MyAgency inbox list
+agencycli --dir /path/to/MyAgency daemon start
 ```
 
 ---
 
-## Reference: complete command list
+## Command reference
 
-| Category | Command |
-|----------|---------|
-| Workspace | `create agency`, `create team`, `create project`, `create role` |
-| Role mgmt | `role list`, `role skill add`, `role skill remove` |
-| Agent lifecycle | `hire` / `assign`, `fire`, `sync`, `list`, `show` |
+| Category | Commands |
+|----------|----------|
+| Workspace | `create agency/team/role/project` |
+| Project lifecycle | `project show/apply/blueprints` |
+| Role management | `role list`, `role skill add/remove` |
+| Agent lifecycle | `hire`/`assign`, `fire`, `sync`, `list`, `show` |
 | Execution | `exec`, `run` |
 | Tasks | `task add/list/show/done/retry/cancel/confirm-request` |
-| Inbox | `inbox list/show/confirm/reject/comment` |
-| Automation | `daemon start/stop/status`, `daemon heartbeat` |
+| Inbox | `inbox list/show/confirm/reject/comment/forward` |
+| Workflow | `workflow list/show/run/instances/status` |
+| Scheduling | `daemon start/stop/status/heartbeat`, `cron add/list/delete/enable/disable` |
+| Templates | `template pack/info` |
 | Session | `session show/set/clear` |
 | Meta | `version` |
-
-For detailed flags on any command:
 
 ```bash
 agencycli <command> --help
@@ -404,23 +541,45 @@ agencycli <command> <subcommand> --help
 
 ---
 
-## Typical agency setup checklist
+## Setup checklist — from scratch
 
 ```
-[ ] agencycli create agency --name "..."
-[ ] Edit agency-prompt.md (global rules)
+[ ] agencycli create agency --name "..." --desc "..."
+[ ] Edit agency-prompt.md  (global rules, values, communication style)
+
 [ ] agencycli create team --name "engineering"
-[ ] Edit teams/engineering/prompt.md (coding standards)
-[ ] agencycli create role --team engineering --name go-developer
-[ ] Edit teams/engineering/roles/go-developer/prompt.md (role responsibilities)
-[ ] Edit teams/engineering/roles/go-developer/role.yaml (skills, setup dirs)
-[ ] mkdir -p skills/<skill-name> && write skill.yaml and prompt.md
-[ ] agencycli role skill add --team engineering --role go-developer --skill <name>
-[ ] agencycli create project --name "my-app" --repo /path/to/repo
-[ ] Edit projects/my-app/prompt.md (project context, build commands)
-[ ] agencycli hire --project my-app --team engineering --role go-developer --model claudecode --name dev
-[ ] agencycli exec --project my-app --agent dev --prompt "Introduce yourself and list open issues"
-[ ] agencycli task add --project my-app --agent dev --title "First task" --prompt "..."
-[ ] agencycli daemon heartbeat --project my-app --agent dev --enable --interval 30m
+[ ] Edit teams/engineering/prompt.md  (coding standards, conventions)
+
+[ ] agencycli create role --team engineering --name developer
+[ ] Edit teams/engineering/roles/developer/prompt.md  (responsibilities)
+[ ] Edit teams/engineering/roles/developer/role.yaml  (skills, setup dirs)
+
+[ ] mkdir -p skills/<name> && write skill.yaml + prompt.md
+[ ] agencycli role skill add --team engineering --role developer --skill <name>
+
+[ ] mkdir -p workflows && write workflows/feature-dev.yaml
+[ ] mkdir -p project-blueprints && write project-blueprints/default.yaml
+
+[ ] agencycli create project --name "my-app" --blueprint default --repo /path/to/repo
+[ ] Edit projects/my-app/prompt.md  (tech stack, build commands, PR conventions)
+[ ] agencycli project apply --project my-app
+
 [ ] agencycli daemon start
+
+[ ] agencycli workflow run feature-dev --project my-app --input feature="First feature"
+[ ] agencycli workflow instances --project my-app
+[ ] agencycli inbox list
+```
+
+## Setup checklist — from a template
+
+```
+[ ] agencycli create agency --name "..." --template <url-or-file>
+[ ] Edit agency-prompt.md  (personalise global rules)
+[ ] agencycli project blueprints  (see what's available)
+[ ] agencycli create project --name "my-app" --blueprint default
+[ ] Edit projects/my-app/prompt.md  (project-specific context)
+[ ] agencycli project apply --project my-app
+[ ] agencycli daemon start
+[ ] agencycli workflow run <name> --project my-app --input ...
 ```
