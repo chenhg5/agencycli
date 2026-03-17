@@ -70,6 +70,7 @@ func init() {
 		newDaemonCmd(),
 		newCronCmd(),
 		newTemplateCmd(),
+		newWorkflowCmd(),
 		newSandboxCmd(),
 	)
 }

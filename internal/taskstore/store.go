@@ -84,4 +84,23 @@ type Store interface {
 	// the agent should be written. For non-filesystem backends this may return
 	// a temporary directory.
 	RunLogDir(project, agent string) (string, error)
+
+	// ── Workflows ─────────────────────────────────────────────────────────────
+
+	// GetWorkflow searches for a workflow manifest by name.
+	// Search order: projects/<project>/workflows/<name>.yaml, then workflows/<name>.yaml.
+	// Returns nil, nil if not found.
+	GetWorkflow(project, name string) (*entity.WorkflowManifest, error)
+
+	// ListWorkflows returns all workflow manifests visible to the project.
+	ListWorkflows(project string) ([]*entity.WorkflowManifest, error)
+
+	// SaveWorkflowInstance persists a workflow instance state.
+	SaveWorkflowInstance(project string, inst *entity.WorkflowInstance) error
+
+	// GetWorkflowInstance retrieves a workflow instance by ID.
+	GetWorkflowInstance(project, id string) (*entity.WorkflowInstance, error)
+
+	// ListWorkflowInstances returns all instances for a project, newest first.
+	ListWorkflowInstances(project string) ([]*entity.WorkflowInstance, error)
 }

@@ -36,6 +36,7 @@ var skeletonEntries = []string{
 	"agency-prompt.md",
 	"teams",
 	"skills",
+	"workflows",
 }
 
 // ── Pack ─────────────────────────────────────────────────────────────────────

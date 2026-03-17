@@ -10,6 +10,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -286,9 +287,10 @@ func newTaskShowCmd() *cobra.Command {
 
 func newTaskDoneCmd() *cobra.Command {
 	var (
-		taskID    string
-		status    string
-		errorMsg  string
+		taskID   string
+		status   string
+		errorMsg string
+		summary  string
 	)
 
 	cmd := &cobra.Command{
@@ -297,7 +299,10 @@ func newTaskDoneCmd() *cobra.Command {
 		Long: `Intended to be called BY the agent itself from inside its prompt:
 
   agencycli task done --id <task-id> --status success
-  agencycli task done --id <task-id> --status failed --error "reason"`,
+  agencycli task done --id <task-id> --status success --summary "PR #42 opened at https://..."
+  agencycli task done --id <task-id> --status failed --error "reason"
+
+The --summary value is passed to the next step via workflow routing ({{task.summary}}).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -323,6 +328,7 @@ func newTaskDoneCmd() *cobra.Command {
 			}
 
 			ts := taskstore.New(root)
+			s := store.NewFS(root)
 			t, err := ts.GetTask(project, agentName, taskID)
 			if err != nil {
 				return err
@@ -332,6 +338,9 @@ func newTaskDoneCmd() *cobra.Command {
 			t.Status = finalStatus
 			t.FinishedAt = &now
 			t.UpdatedAt = now
+			if summary != "" {
+				t.Summary = summary
+			}
 			if errorMsg != "" {
 				t.LastError = errorMsg
 			}
@@ -347,7 +356,15 @@ func newTaskDoneCmd() *cobra.Command {
 				}
 			}
 
+			// Trigger workflow routing (idempotent — no-op if not a workflow task).
+			if err := workflow.Route(root, project, t, ts, s); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: workflow routing failed: %v\n", err)
+			}
+
 			fmt.Printf("✓ Task %s marked %s\n", taskID, finalStatus)
+			if summary != "" {
+				fmt.Printf("  Summary: %s\n", summary)
+			}
 			return nil
 		},
 	}
@@ -355,6 +372,7 @@ func newTaskDoneCmd() *cobra.Command {
 	cmd.Flags().StringVar(&taskID, "id", "", "task ID")
 	cmd.Flags().StringVar(&status, "status", "", "success or failed")
 	cmd.Flags().StringVar(&errorMsg, "error", "", "error message (for failed status)")
+	cmd.Flags().StringVar(&summary, "summary", "", "what was accomplished (passed to next workflow step via {{task.summary}})")
 	return cmd
 }
 

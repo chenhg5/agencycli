@@ -8,6 +8,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/runner"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -147,6 +148,10 @@ This is a one-shot manual trigger. For recurring automated runs, use
 						fmt.Printf("  warning: trigger errors: %v\n", err)
 					}
 				}
+				// Workflow routing (idempotent).
+				if err := workflow.Route(root, project, task, ts, s); err != nil {
+					fmt.Printf("  warning: workflow routing: %v\n", err)
+				}
 
 			case entity.TaskStatusDoneFailed:
 				task.LastError = result.ErrorMsg
@@ -166,6 +171,10 @@ This is a one-shot manual trigger. For recurring automated runs, use
 				} else {
 					if err := ts.ArchiveTask(project, agentName, task); err != nil {
 						return err
+					}
+					// Workflow routing for failed terminal tasks.
+					if err := workflow.Route(root, project, task, ts, s); err != nil {
+						fmt.Printf("  warning: workflow routing: %v\n", err)
 					}
 				}
 

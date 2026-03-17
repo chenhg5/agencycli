@@ -44,6 +44,11 @@ func (s *FSStore) agentDir(project, agent string) string {
 	return filepath.Join(s.root, "projects", project, "agents", agent)
 }
 
+// projectDir returns <root>/projects/<project>.
+func (s *FSStore) projectDir(project string) string {
+	return filepath.Join(s.root, "projects", project)
+}
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 func (s *FSStore) AddTask(project, agent string, t *entity.Task) error {
@@ -443,6 +448,116 @@ func FormatDuration(d string) string {
 		return "not set"
 	}
 	return d
+}
+
+// ── Workflows ─────────────────────────────────────────────────────────────────
+
+func (s *FSStore) workflowRunsDir(project string) string {
+	return filepath.Join(s.projectDir(project), "workflow-runs")
+}
+
+func (s *FSStore) GetWorkflow(project, name string) (*entity.WorkflowManifest, error) {
+	// Search project-level first, then agency-level.
+	candidates := []string{
+		filepath.Join(s.projectDir(project), "workflows", name+".yaml"),
+		filepath.Join(s.root, "workflows", name+".yaml"),
+	}
+	for _, p := range candidates {
+		data, err := os.ReadFile(p)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		var wf entity.WorkflowManifest
+		return &wf, yaml.Unmarshal(data, &wf)
+	}
+	return nil, nil
+}
+
+func (s *FSStore) ListWorkflows(project string) ([]*entity.WorkflowManifest, error) {
+	seen := map[string]bool{}
+	var out []*entity.WorkflowManifest
+	dirs := []string{
+		filepath.Join(s.projectDir(project), "workflows"),
+		filepath.Join(s.root, "workflows"),
+	}
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				continue
+			}
+			var wf entity.WorkflowManifest
+			if err := yaml.Unmarshal(data, &wf); err != nil || wf.Name == "" {
+				continue
+			}
+			if seen[wf.Name] {
+				continue // project-level already added
+			}
+			seen[wf.Name] = true
+			out = append(out, &wf)
+		}
+	}
+	return out, nil
+}
+
+func (s *FSStore) SaveWorkflowInstance(project string, inst *entity.WorkflowInstance) error {
+	dir := s.workflowRunsDir(project)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return writeYAMLAtomic(filepath.Join(dir, inst.ID+".yaml"), inst)
+}
+
+func (s *FSStore) GetWorkflowInstance(project, id string) (*entity.WorkflowInstance, error) {
+	data, err := os.ReadFile(filepath.Join(s.workflowRunsDir(project), id+".yaml"))
+	if err != nil {
+		return nil, err
+	}
+	var inst entity.WorkflowInstance
+	return &inst, yaml.Unmarshal(data, &inst)
+}
+
+func (s *FSStore) ListWorkflowInstances(project string) ([]*entity.WorkflowInstance, error) {
+	dir := s.workflowRunsDir(project)
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []*entity.WorkflowInstance
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var inst entity.WorkflowInstance
+		if err := yaml.Unmarshal(data, &inst); err == nil {
+			out = append(out, &inst)
+		}
+	}
+	// Newest first.
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
 }
 
 // Compile-time assertion: FSStore must fully implement Store.
