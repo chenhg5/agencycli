@@ -34,6 +34,7 @@ RUN if [ "$CN_MIRROR" = "1" ]; then \
 # ── System packages ────────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git jq make unzip openssh-client ripgrep \
+    python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Node.js ────────────────────────────────────────────────────────────────────

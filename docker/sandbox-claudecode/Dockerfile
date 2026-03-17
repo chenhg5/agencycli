@@ -62,6 +62,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     openssh-client \
     ripgrep \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Node.js (required by Claude Code CLI) ─────────────────────────────────────
