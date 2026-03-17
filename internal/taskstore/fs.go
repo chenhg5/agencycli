@@ -450,6 +450,60 @@ func FormatDuration(d string) string {
 	return d
 }
 
+// ── Project config ────────────────────────────────────────────────────────────
+
+func (s *FSStore) GetProjectConfig(project string) (*entity.ProjectConfig, error) {
+	p := filepath.Join(s.projectDir(project), "project.yaml")
+	data, err := os.ReadFile(p)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var cfg entity.ProjectConfig
+	return &cfg, yaml.Unmarshal(data, &cfg)
+}
+
+func (s *FSStore) SaveProjectConfig(project string, cfg *entity.ProjectConfig) error {
+	dir := s.projectDir(project)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return writeYAMLAtomic(filepath.Join(dir, "project.yaml"), cfg)
+}
+
+func (s *FSStore) GetProjectBlueprint(name string) (*entity.ProjectConfig, error) {
+	p := filepath.Join(s.root, "project-blueprints", name+".yaml")
+	data, err := os.ReadFile(p)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var cfg entity.ProjectConfig
+	return &cfg, yaml.Unmarshal(data, &cfg)
+}
+
+func (s *FSStore) ListProjectBlueprints() ([]string, error) {
+	dir := filepath.Join(s.root, "project-blueprints")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".yaml") {
+			out = append(out, strings.TrimSuffix(e.Name(), ".yaml"))
+		}
+	}
+	return out, nil
+}
+
 // ── Workflows ─────────────────────────────────────────────────────────────────
 
 func (s *FSStore) workflowRunsDir(project string) string {

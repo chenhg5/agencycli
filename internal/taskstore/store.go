@@ -85,6 +85,22 @@ type Store interface {
 	// a temporary directory.
 	RunLogDir(project, agent string) (string, error)
 
+	// ── Project config ────────────────────────────────────────────────────────
+
+	// GetProjectConfig reads projects/<project>/project.yaml.
+	// Returns nil, nil when the file does not yet exist.
+	GetProjectConfig(project string) (*entity.ProjectConfig, error)
+
+	// SaveProjectConfig writes (or overwrites) projects/<project>/project.yaml.
+	SaveProjectConfig(project string, cfg *entity.ProjectConfig) error
+
+	// GetProjectBlueprint searches for a named blueprint in project-blueprints/.
+	// Returns nil, nil when not found.
+	GetProjectBlueprint(name string) (*entity.ProjectConfig, error)
+
+	// ListProjectBlueprints returns names of all available blueprints.
+	ListProjectBlueprints() ([]string, error)
+
 	// ── Workflows ─────────────────────────────────────────────────────────────
 
 	// GetWorkflow searches for a workflow manifest by name.

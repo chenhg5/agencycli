@@ -37,6 +37,7 @@ var skeletonEntries = []string{
 	"teams",
 	"skills",
 	"workflows",
+	"project-blueprints",
 }
 
 // ── Pack ─────────────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/scaffold"
 	"github.com/chenhg5/agencycli/internal/store"
 	tmpl "github.com/chenhg5/agencycli/internal/template"
+	"github.com/chenhg5/agencycli/internal/taskstore"
 	"github.com/spf13/cobra"
 )
 
@@ -271,15 +272,29 @@ Roles are referenced at hire time with --role.`,
 
 func newCreateProjectCmd() *cobra.Command {
 	var (
-		name string
-		desc string
-		repo string
+		name      string
+		desc      string
+		repo      string
+		blueprint string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "project",
-		Short: "Create a project",
-		Example: `  agencycli create project --name "my-api" --desc "REST API" --repo "../my-api"`,
+		Short: "Create a project (optionally from a blueprint)",
+		Long: `Creates a new project directory under projects/<name>/ and writes project.yaml.
+
+If --blueprint is provided, project.yaml is pre-populated from
+project-blueprints/<blueprint>.yaml — so agents, heartbeats and workflows
+are already declared.  Run 'agencycli project apply' afterwards to
+hire the agents and wire up their schedules.`,
+		Example: `  # blank project
+  agencycli create project --name "my-api" --desc "REST API" --repo "../my-api"
+
+  # from a blueprint (defines agents + heartbeats + workflows)
+  agencycli create project --name "my-api" --blueprint default
+
+  # list available blueprints in this agency
+  agencycli project blueprints`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -291,15 +306,57 @@ func newCreateProjectCmd() *cobra.Command {
 			}
 			s := store.NewFS(root)
 			sc := scaffold.New(s)
+			ts := taskstore.New(root)
 
 			p := &entity.Project{Name: name, Description: desc, Repo: repo}
 			if err := sc.CreateProject(name, p); err != nil {
 				return err
 			}
 
+			// Write project.yaml — either from a blueprint or as a skeleton.
+			var cfg *entity.ProjectConfig
+			if blueprint != "" {
+				cfg, err = ts.GetProjectBlueprint(blueprint)
+				if err != nil {
+					return fmt.Errorf("load blueprint %q: %w", blueprint, err)
+				}
+				if cfg == nil {
+					return fmt.Errorf("blueprint %q not found — run `agencycli project blueprints` to list available ones", blueprint)
+				}
+				// Replace placeholder name with the actual project name.
+				cfg.Name = name
+				if desc != "" {
+					cfg.Description = desc
+				}
+			} else {
+				cfg = &entity.ProjectConfig{
+					Name:        name,
+					Description: desc,
+					Agents:      []entity.AgentSpec{},
+				}
+			}
+
+			if err := ts.SaveProjectConfig(name, cfg); err != nil {
+				return fmt.Errorf("save project.yaml: %w", err)
+			}
+
 			fmt.Printf("✓ Project created: projects/%s\n", name)
-			fmt.Printf("  Edit the prompt: vim projects/%s/prompt.md\n", name)
-			fmt.Printf("  Hire an agent:   agencycli hire --project %q --team \"...\" --model \"claudecode\" --name \"dev\"\n", name)
+			if blueprint != "" {
+				fmt.Printf("  Blueprint : %s (%d agents, workflows: %s)\n",
+					blueprint, len(cfg.Agents), joinStrings(cfg.Workflows, "none"))
+				fmt.Printf("\nNext steps:\n")
+				fmt.Printf("  1. Review the config :  agencycli project show --project %s\n", name)
+				fmt.Printf("  2. Apply (hire+setup):  agencycli project apply --project %s\n", name)
+				fmt.Printf("  3. Start daemon       :  agencycli daemon start\n")
+				if len(cfg.Workflows) > 0 {
+					fmt.Printf("  4. Run a workflow     :  agencycli workflow run %s --project %s --input ...\n",
+						cfg.Workflows[0], name)
+				}
+			} else {
+				fmt.Printf("  Edit the prompt : vim projects/%s/prompt.md\n", name)
+				fmt.Printf("  Edit the config : vim projects/%s/project.yaml\n", name)
+				fmt.Printf("  Apply agents    : agencycli project apply --project %s\n", name)
+			}
 			return nil
 		},
 	}
@@ -307,8 +364,16 @@ func newCreateProjectCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&desc, "desc", "", "Short description")
 	cmd.Flags().StringVar(&repo, "repo", "", "Path to the project code repository")
+	cmd.Flags().StringVar(&blueprint, "blueprint", "", "Name of a project blueprint in project-blueprints/")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
+}
+
+func joinStrings(ss []string, empty string) string {
+	if len(ss) == 0 {
+		return empty
+	}
+	return strings.Join(ss, ", ")
 }
 
 // ── template apply helper ─────────────────────────────────────────────────────

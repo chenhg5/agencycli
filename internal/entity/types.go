@@ -293,6 +293,57 @@ type OnSuccessTrigger struct {
 	Prompt   string `yaml:"prompt"`
 }
 
+// ─────────────────────────────────────────────
+// Project configuration  (project.yaml)
+// ─────────────────────────────────────────────
+
+// ProjectConfig is the declarative definition of a project.
+// Stored at <agency>/projects/<project>/project.yaml.
+// It describes which agents exist, their roles, how they wake up, and which
+// workflows are relevant to the project.  Running `agencycli project apply`
+// reads this file and brings the live state into sync (hire agents, configure
+// heartbeats/crons).  It can also be kept in project-blueprints/<name>.yaml
+// inside a template so users can bootstrap a project in one step.
+type ProjectConfig struct {
+	Name        string      `yaml:"name"`
+	Description string      `yaml:"description,omitempty"`
+	Agents      []AgentSpec `yaml:"agents"`
+
+	// Workflows lists the workflow names this project uses.
+	// These are for documentation / `project apply` to show next steps.
+	// Start a workflow instance with: agencycli workflow run <name> --project <project>
+	Workflows []string `yaml:"workflows,omitempty"`
+}
+
+// AgentSpec is one agent definition inside ProjectConfig.
+type AgentSpec struct {
+	Name    string `yaml:"name"`
+	Role    string `yaml:"role,omitempty"`   // references teams/<team>/roles/<role>
+	Team    string `yaml:"team,omitempty"`   // team the role belongs to
+	Model   string `yaml:"model"`            // e.g. claudecode, codex, gemini
+	Sandbox bool   `yaml:"sandbox,omitempty"`
+
+	// Repos lists additional repository paths to mount/expose to the agent.
+	Repos []string `yaml:"repos,omitempty"`
+
+	// Heartbeat defines the autonomous wakeup schedule.
+	// If omitted the agent is purely reactive (only wakes when `run` is called
+	// manually or triggered by the workflow routing engine).
+	Heartbeat *HeartbeatConfig `yaml:"heartbeat,omitempty"`
+
+	// Crons adds scheduled tasks to the agent's queue on a crontab schedule.
+	Crons []AgentCronSpec `yaml:"crons,omitempty"`
+}
+
+// AgentCronSpec is an inline cron definition inside an AgentSpec.
+// It is converted into an entity.Cron when `project apply` is run.
+type AgentCronSpec struct {
+	ID       string `yaml:"id"`
+	Schedule string `yaml:"schedule"` // standard crontab, e.g. "0 9 * * 1-5"
+	Title    string `yaml:"title"`
+	Prompt   string `yaml:"prompt"`
+}
+
 // ConfirmationRequest holds information surfaced to the human inbox.
 type ConfirmationRequest struct {
 	Summary     string   `yaml:"summary"`
