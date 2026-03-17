@@ -1,0 +1,40 @@
+{
+  "name": "agencycli",
+  "version": "0.1.0",
+  "description": "AI agent organisation and context management — hire agents into teams, assign tasks, and automate workflows",
+  "keywords": [
+    "ai-agent",
+    "claude-code",
+    "codex",
+    "gemini",
+    "cursor",
+    "llm",
+    "workflow",
+    "context-management",
+    "agent-orchestration"
+  ],
+  "homepage": "https://github.com/chenhg5/agencycli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chenhg5/agencycli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chenhg5/agencycli/issues"
+  },
+  "license": "MIT",
+  "author": "chenhg5",
+  "bin": {
+    "agencycli": "run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "install.js",
+    "run.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}

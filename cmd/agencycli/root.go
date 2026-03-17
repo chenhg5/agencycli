@@ -53,6 +53,7 @@ func init() {
 	)
 
 	rootCmd.AddCommand(
+		newVersionCmd(),
 		newCreateCmd(),
 		newRoleCmd(),
 		newHireCmd(),

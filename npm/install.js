@@ -1,0 +1,216 @@
+#!/usr/bin/env node
+
+"use strict";
+
+const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const https = require("https");
+const http = require("http");
+
+const PACKAGE = require("./package.json");
+const VERSION = `v${PACKAGE.version}`;
+const NAME = "agencycli";
+
+const GITHUB_REPO = "chenhg5/agencycli";
+const GITEE_REPO  = "cg33/agencycli";
+
+const PLATFORM_MAP = {
+  darwin: "darwin",
+  linux:  "linux",
+  win32:  "windows",
+};
+
+const ARCH_MAP = {
+  x64:   "amd64",
+  arm64: "arm64",
+};
+
+function getPlatformInfo() {
+  const platform = PLATFORM_MAP[process.platform];
+  const arch     = ARCH_MAP[process.arch];
+  if (!platform || !arch) {
+    throw new Error(
+      `Unsupported platform: ${process.platform}/${process.arch}. ` +
+      `Supported: linux/darwin/windows × amd64/arm64`
+    );
+  }
+  const ext      = platform === "windows" ? ".zip" : ".tar.gz";
+  const filename = `${NAME}-${VERSION}-${platform}-${arch}${ext}`;
+  return { platform, arch, ext, filename };
+}
+
+function getDownloadURLs(filename) {
+  return [
+    `https://github.com/${GITHUB_REPO}/releases/download/${VERSION}/${filename}`,
+    `https://gitee.com/${GITEE_REPO}/releases/download/${VERSION}/${filename}`,
+  ];
+}
+
+function fetch(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (redirects <= 0) return reject(new Error("Too many redirects"));
+    const mod = url.startsWith("https") ? https : http;
+    mod
+      .get(url, { headers: { "User-Agent": "agencycli-npm-installer" } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return resolve(fetch(res.headers.location, redirects - 1));
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        }
+        const chunks = [];
+        res.on("data",  (c) => chunks.push(c));
+        res.on("end",   () => resolve(Buffer.concat(chunks)));
+        res.on("error", reject);
+      })
+      .on("error", reject);
+  });
+}
+
+async function download(urls) {
+  for (const url of urls) {
+    try {
+      console.log(`[agencycli] Downloading from ${url}`);
+      const data = await fetch(url);
+      console.log(`[agencycli] Downloaded ${(data.length / 1024 / 1024).toFixed(1)} MB`);
+      return data;
+    } catch (err) {
+      console.warn(`[agencycli] Failed: ${err.message}, trying next source…`);
+    }
+  }
+  throw new Error(
+    `[agencycli] Could not download binary from any source.\n` +
+    `  Tried: ${urls.join(", ")}\n` +
+    `  Manual download: https://github.com/${GITHUB_REPO}/releases`
+  );
+}
+
+function extractTarGz(buffer, destDir, binaryName) {
+  const tmpFile = path.join(destDir, "_tmp.tar.gz");
+  fs.writeFileSync(tmpFile, buffer);
+  try {
+    execSync(`tar xzf "${tmpFile}" -C "${destDir}"`, { stdio: "pipe" });
+  } finally {
+    fs.unlinkSync(tmpFile);
+  }
+  const extracted = fs.readdirSync(destDir).find(
+    (f) => f.startsWith(NAME) && !f.endsWith(".tar.gz")
+  );
+  if (extracted && extracted !== binaryName) {
+    fs.renameSync(path.join(destDir, extracted), path.join(destDir, binaryName));
+  }
+}
+
+function extractZip(buffer, destDir, binaryName) {
+  const tmpFile = path.join(destDir, "_tmp.zip");
+  fs.writeFileSync(tmpFile, buffer);
+  try {
+    try {
+      execSync(`unzip -o "${tmpFile}" -d "${destDir}"`, { stdio: "pipe" });
+    } catch {
+      execSync(
+        `powershell -Command "Expand-Archive -Force '${tmpFile}' '${destDir}'"`,
+        { stdio: "pipe" }
+      );
+    }
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch {}
+  }
+  const extracted = fs.readdirSync(destDir).find(
+    (f) => f.startsWith(NAME) && f.endsWith(".exe")
+  );
+  if (extracted && extracted !== binaryName) {
+    fs.renameSync(path.join(destDir, extracted), path.join(destDir, binaryName));
+  }
+}
+
+// parseVersion splits "1.2.3-beta.1" into { nums: [1,2,3], pre: "beta.1" }
+function parseVersion(v) {
+  v = v.replace(/^v/, "").trim();
+  const [base, ...rest] = v.split("-");
+  const nums = base.split(".").map(Number);
+  return { nums, pre: rest.join("-") };
+}
+
+// isNewerOrEqual returns true if installed >= expected
+function isNewerOrEqual(installed, expected) {
+  const a = parseVersion(installed);
+  const b = parseVersion(expected);
+  const len = Math.max(a.nums.length, b.nums.length);
+  for (let i = 0; i < len; i++) {
+    const av = a.nums[i] || 0;
+    const bv = b.nums[i] || 0;
+    if (av > bv) return true;
+    if (av < bv) return false;
+  }
+  if (!a.pre && b.pre) return true;
+  if (a.pre && !b.pre) return false;
+  return a.pre >= b.pre;
+}
+
+async function main() {
+  const { platform, arch, ext, filename } = getPlatformInfo();
+  console.log(`[agencycli] Platform: ${platform}/${arch}`);
+
+  const binDir = path.join(__dirname, "bin");
+  fs.mkdirSync(binDir, { recursive: true });
+
+  const binaryName = platform === "windows" ? `${NAME}.exe` : NAME;
+  const binaryPath = path.join(binDir, binaryName);
+
+  if (fs.existsSync(binaryPath)) {
+    try {
+      const out = execSync(`"${binaryPath}" version`, { encoding: "utf8", timeout: 5000 });
+      const expectedVer = VERSION.slice(1); // strip leading "v"
+      if (out.includes(expectedVer)) {
+        console.log(`[agencycli] Binary ${VERSION} already installed, skipping.`);
+        return;
+      }
+      const match = out.match(/(\d+\.\d+\.\d+[^\s]*)/);
+      if (match && isNewerOrEqual(match[1], expectedVer)) {
+        console.log(`[agencycli] Binary ${match[1]} is newer than ${VERSION}, skipping.`);
+        return;
+      }
+      console.log(`[agencycli] Existing binary is outdated, upgrading to ${VERSION}…`);
+      fs.unlinkSync(binaryPath);
+    } catch {
+      console.log(`[agencycli] Replacing existing binary with ${VERSION}…`);
+      fs.unlinkSync(binaryPath);
+    }
+  }
+
+  const urls = getDownloadURLs(filename);
+  const data = await download(urls);
+
+  if (ext === ".tar.gz") {
+    extractTarGz(data, binDir, binaryName);
+  } else {
+    extractZip(data, binDir, binaryName);
+  }
+
+  if (platform !== "windows") {
+    fs.chmodSync(binaryPath, 0o755);
+  }
+
+  if (platform === "darwin") {
+    try {
+      execSync(`xattr -d com.apple.quarantine "${binaryPath}"`, { stdio: "pipe" });
+      console.log(`[agencycli] Removed macOS quarantine attribute.`);
+    } catch {
+      // attribute may not exist — that's fine
+    }
+  }
+
+  console.log(`[agencycli] Installed to ${binaryPath}`);
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  console.error(
+    "[agencycli] Installation failed. Download manually:\n" +
+    `  https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}`
+  );
+  process.exit(1);
+});
