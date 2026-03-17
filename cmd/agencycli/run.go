@@ -115,6 +115,21 @@ This is a one-shot manual trigger. For recurring automated runs, use
 			task.RunLogPath = result.LogPath
 			finished := time.Now().UTC()
 			task.FinishedAt = &finished
+
+			// If the agent used `task confirm-request` internally it already
+			// set the task to awaiting_confirmation in the store; don't
+			// overwrite that with the runner's default done_success.
+			if result.Status == entity.TaskStatusDoneSuccess {
+				if fresh, ferr := ts.GetTask(project, agentName, task.ID); ferr == nil &&
+					fresh.Status == entity.TaskStatusAwaitingConfirmation {
+					// Agent routed to inbox via the CLI; honour that status and stop here.
+					task.Status = entity.TaskStatusAwaitingConfirmation
+					task.UpdatedAt = time.Now().UTC()
+					_ = ts.UpdateTask(project, agentName, task)
+					fmt.Printf("⏳ Task %s awaiting human confirmation (routed to inbox)\n", task.ID)
+					return nil
+				}
+			}
 			task.Status = result.Status
 
 			switch result.Status {
