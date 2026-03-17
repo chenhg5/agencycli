@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -173,6 +174,18 @@ The output format depends on --model:
 				}
 			}
 
+			// Automatically include the project's code repository as an
+			// additional working directory so the agent can read/write it
+			// without leaving its context directory (e.g. --add-dir in claude).
+			var addDirs []string
+			if projMeta, err2 := s.Project(project); err2 == nil && projMeta.Repo != "" {
+				repoAbs := projMeta.Repo
+				if !filepath.IsAbs(repoAbs) {
+					repoAbs = filepath.Join(root, repoAbs)
+				}
+				addDirs = []string{repoAbs}
+			}
+
 			meta := &entity.AgentMeta{
 				Name:        agentName,
 				Project:     project,
@@ -181,6 +194,7 @@ The output format depends on --model:
 				HiredAt:     time.Now().UTC(),
 				ContextHash: ctxbuild.LayerHashes(mc),
 				Sandbox:     sandboxCfg,
+				AddDirs:     addDirs,
 			}
 			if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
 				return fmt.Errorf("%s: save agent meta: %w", use, err)

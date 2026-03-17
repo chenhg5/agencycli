@@ -70,7 +70,14 @@ func (f *claudeCodeFormatter) writeSkills(skills []ctxbuild.SkillDef, outDir str
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return fmt.Errorf("claudecode: create skill dir %q: %w", sk.Name, err)
 		}
-		skillMD := buildSkillMD(sk)
+		// Copy any bundled files (scripts etc.) and resolve {{SKILL_DIR}}.
+		absSkillDir, err := deploySkillFiles(sk, skillDir)
+		if err != nil {
+			return fmt.Errorf("claudecode: %w", err)
+		}
+		resolved := sk
+		resolved.Prompt = resolveSkillDir(sk.Prompt, absSkillDir)
+		skillMD := buildSkillMD(resolved)
 		path := filepath.Join(skillDir, "SKILL.md")
 		if err := os.WriteFile(path, []byte(skillMD), 0o644); err != nil {
 			return fmt.Errorf("claudecode: write skill %q: %w", sk.Name, err)

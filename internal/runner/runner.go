@@ -103,7 +103,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
-	invoker := InvokerFor(model, meta.RunCommand)
+	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 	innerArgs := invoker.Args(promptFile, sessionID)
 
 	var (
@@ -237,7 +237,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
-	invoker := InvokerFor(model, meta.RunCommand)
+	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 
 	// Build the inner agent CLI arguments.
 	innerArgs := invoker.Args(promptFile, sessionID)

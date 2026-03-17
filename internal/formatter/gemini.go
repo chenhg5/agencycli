@@ -47,13 +47,19 @@ func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) erro
 		return fmt.Errorf("gemini: write GEMINI.md: %w", err)
 	}
 
-	// Skills → .gemini/skills/<name>/SKILL.md
+	// Skills → .gemini/skills/<name>/SKILL.md (+ any bundled files)
 	for _, sk := range mc.Skills {
 		skillDir := filepath.Join(outDir, ".gemini", "skills", sk.Name)
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return fmt.Errorf("gemini: create skill dir %q: %w", sk.Name, err)
 		}
-		skillMD := buildSkillMD(sk)
+		absSkillDir, err := deploySkillFiles(sk, skillDir)
+		if err != nil {
+			return fmt.Errorf("gemini: %w", err)
+		}
+		resolved := sk
+		resolved.Prompt = resolveSkillDir(sk.Prompt, absSkillDir)
+		skillMD := buildSkillMD(resolved)
 		if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillMD), 0o644); err != nil {
 			return fmt.Errorf("gemini: write skill %q: %w", sk.Name, err)
 		}

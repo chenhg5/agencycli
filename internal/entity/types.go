@@ -135,6 +135,11 @@ type AgentMeta struct {
 	// of its prompt content at hire time.
 	ContextHash map[string]string `yaml:"context_hash,omitempty"`
 
+	// AddDirs lists additional directories the agent should have access to
+	// beyond its own working directory (e.g. the project's code repository).
+	// For claudecode these become --add-dir flags on the claude CLI.
+	AddDirs []string `yaml:"add_dirs,omitempty"`
+
 	// RunCommand overrides the default agent CLI invocation command.
 	// Use {prompt_file} and {session_id} as placeholders.
 	// Example: "my-agent --input {prompt_file}"

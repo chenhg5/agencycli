@@ -26,17 +26,18 @@ type ModelInvoker interface {
 
 // InvokerFor returns the ModelInvoker for the given model.
 // If the model has a custom runCommand (from AgentMeta), it takes precedence.
-func InvokerFor(model entity.AgentModel, runCommand string) ModelInvoker {
+// addDirs lists additional directories to expose to the agent (model-specific flags).
+func InvokerFor(model entity.AgentModel, runCommand string, addDirs []string) ModelInvoker {
 	if runCommand != "" {
 		return &customInvoker{tmpl: runCommand}
 	}
 	switch entity.NormaliseModel(model) {
 	case entity.ModelClaudeCode:
-		return &claudeInvoker{}
+		return &claudeInvoker{addDirs: addDirs}
 	case entity.ModelCodex:
-		return &codexInvoker{}
+		return &codexInvoker{addDirs: addDirs}
 	case entity.ModelGemini:
-		return &geminiInvoker{}
+		return &geminiInvoker{addDirs: addDirs}
 	case entity.ModelOpenCode:
 		return &openCodeInvoker{}
 	case entity.ModelCursor:
@@ -48,7 +49,9 @@ func InvokerFor(model entity.AgentModel, runCommand string) ModelInvoker {
 
 // ── Claude Code ───────────────────────────────────────────────────────────────
 
-type claudeInvoker struct{}
+type claudeInvoker struct {
+	addDirs []string
+}
 
 func (c *claudeInvoker) Args(promptFile, sessionID string) []string {
 	// Use -p/--print for non-interactive mode; prompt arrives on stdin
@@ -65,6 +68,9 @@ func (c *claudeInvoker) Args(promptFile, sessionID string) []string {
 	}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
+	}
+	for _, dir := range c.addDirs {
+		args = append(args, "--add-dir", dir)
 	}
 	return args
 }
@@ -95,13 +101,20 @@ func (c *claudeInvoker) ParseSessionID(output string) string {
 
 // ── Codex ─────────────────────────────────────────────────────────────────────
 
-type codexInvoker struct{}
+type codexInvoker struct {
+	addDirs []string
+}
 
 func (c *codexInvoker) Args(promptFile, sessionID string) []string {
 	// `codex exec -` reads the prompt from stdin.
 	// --skip-git-repo-check allows running outside a git repo (agent workspace
 	// dirs are not git repos themselves; the project repo is mounted separately).
-	return []string{"codex", "exec", "--skip-git-repo-check", "-"}
+	args := []string{"codex", "exec", "--skip-git-repo-check"}
+	for _, dir := range c.addDirs {
+		args = append(args, "--add-dir", dir)
+	}
+	args = append(args, "-")
+	return args
 }
 
 func (c *codexInvoker) UseStdinPrompt() bool { return true }
@@ -110,7 +123,9 @@ func (c *codexInvoker) ParseSessionID(_ string) string { return "" }
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
-type geminiInvoker struct{}
+type geminiInvoker struct {
+	addDirs []string
+}
 
 func (g *geminiInvoker) Args(promptFile, sessionID string) []string {
 	// -p requires a string value to activate non-interactive/headless mode.
@@ -120,6 +135,9 @@ func (g *geminiInvoker) Args(promptFile, sessionID string) []string {
 	args := []string{"gemini", "-y", "--output-format", "stream-json", "-p", ""}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
+	}
+	for _, dir := range g.addDirs {
+		args = append(args, "--include-directories", dir)
 	}
 	return args
 }

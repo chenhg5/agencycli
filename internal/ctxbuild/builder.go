@@ -3,6 +3,8 @@ package ctxbuild
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/chenhg5/agencycli/internal/store"
@@ -82,10 +84,12 @@ func (b *Builder) Build(projectName, teamPath string) (*MergedContext, error) {
 				continue
 			}
 			skillPrompt, _ := b.store.SkillPrompt(skillName)
+			files := loadSkillFiles(b.store.SkillDir(skillName))
 			mc.Skills = append(mc.Skills, SkillDef{
 				Name:        skill.Name,
 				Description: skill.Description,
 				Prompt:      skillPrompt,
+				Files:       files,
 			})
 		}
 	}
@@ -120,7 +124,39 @@ func LayerHashes(mc *MergedContext) map[string]string {
 		hashes[l.Source] = ContentHash(l.Content)
 	}
 	for _, sk := range mc.Skills {
-		hashes["skill:"+sk.Name] = ContentHash(sk.Prompt)
+		// Include file contents in the hash so that script changes trigger sync.
+		combined := sk.Prompt
+		for _, f := range sk.Files {
+			combined += f.Name + string(f.Content)
+		}
+		hashes["skill:"+sk.Name] = ContentHash(combined)
 	}
 	return hashes
+}
+
+// loadSkillFiles scans skillDir and returns all non-documentation files
+// (i.e. everything except skill.yaml and prompt.md) as SkillFile entries.
+// Errors are silently ignored so a missing or empty directory is handled
+// gracefully (skills without bundled files are perfectly valid).
+func loadSkillFiles(skillDir string) []SkillFile {
+	entries, err := os.ReadDir(skillDir)
+	if err != nil {
+		return nil
+	}
+	var files []SkillFile
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if name == "skill.yaml" || name == "prompt.md" {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(skillDir, name))
+		if err != nil {
+			continue
+		}
+		files = append(files, SkillFile{Name: name, Content: content})
+	}
+	return files
 }

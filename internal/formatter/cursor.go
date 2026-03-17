@@ -28,6 +28,10 @@ import (
 type cursorFormatter struct{}
 
 func (f *cursorFormatter) Format(mc *ctxbuild.MergedContext, outDir string) error {
+	// Deploy skill files and resolve {{SKILL_DIR}} before rendering text.
+	resolved := *mc
+	resolved.Skills = resolveSkillsToDir(mc.Skills, outDir)
+	mc = &resolved
 	content := buildCursorRules(mc)
 
 	// 1. .cursorrules (legacy — broadest compatibility)

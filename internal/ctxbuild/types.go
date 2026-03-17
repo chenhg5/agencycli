@@ -28,10 +28,26 @@ type ContextLayer struct {
 	Content string
 }
 
+// SkillFile is a non-documentation file bundled with a skill (e.g. a shell
+// script). It is copied verbatim into the agent's skill directory at format
+// time so the agent can execute it without any host path dependency.
+type SkillFile struct {
+	// Name is the bare filename, e.g. "git-push-github.sh".
+	Name    string
+	Content []byte
+}
+
 // SkillDef is a resolved skill with its prompt content ready to embed.
+//
+// Prompt text may use the placeholder {{SKILL_DIR}} which formatters replace
+// with the absolute path of the deployed skill directory so agents can locate
+// bundled scripts regardless of where the agent workspace lives.
 type SkillDef struct {
 	Name        string
 	Description string
 	// Prompt is the content of the skill's prompt.md.
 	Prompt string
+	// Files holds any extra files found in the skill's source directory
+	// (everything except skill.yaml and prompt.md). Typically shell scripts.
+	Files []SkillFile
 }

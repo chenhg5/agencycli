@@ -22,6 +22,10 @@ func (f *singleFileFormatter) Format(mc *ctxbuild.MergedContext, outDir string) 
 		return fmt.Errorf("%s: create output dir: %w", f.filename, err)
 	}
 
+	// Deploy skill files and resolve {{SKILL_DIR}} before rendering text.
+	resolved := *mc
+	resolved.Skills = resolveSkillsToDir(mc.Skills, outDir)
+	mc = &resolved
 	content := buildSingleFileMD(mc, f.filename)
 	path := filepath.Join(outDir, f.filename)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {

@@ -66,6 +66,9 @@ type Store interface {
 	Skill(name string) (*entity.Skill, error)
 	SkillPrompt(name string) (string, error)
 	ListSkills() ([]*entity.Skill, error)
+	// SkillDir returns the absolute path of a skill's source directory.
+	// Used by ctxbuild to scan for bundled files (scripts, etc.).
+	SkillDir(name string) string
 
 	// ── Agents ────────────────────────────────────────────────────────────
 

@@ -250,6 +250,10 @@ func (s *fsStore) skillDir(name string) string {
 	return s.abs("skills", name)
 }
 
+func (s *fsStore) SkillDir(name string) string {
+	return s.skillDir(name)
+}
+
 func (s *fsStore) Skill(name string) (*entity.Skill, error) {
 	path := filepath.Join(s.skillDir(name), "skill.yaml")
 	var sk entity.Skill
