@@ -809,7 +809,7 @@ Deliverables:
 - `on_success` trigger evaluation (create tasks in other agents)
 - `task assign` command (re-assign to different agent)
 - cc-connect webhook integration for push notifications
-- Daemon HTTP endpoint (`localhost:7370`)
+- Scheduler HTTP endpoint (`localhost:7370`)
 
 ---
 
