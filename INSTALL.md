@@ -44,7 +44,7 @@ Agency                   ← global context shared by every agent
 
 **Agent playbooks** (`wakeup.md` files) define what an agent does when its task queue is empty — for example, scanning GitHub issues, reviewing open PRs, or sending status updates. Store them in `agent-playbooks/` and reference them from `project.yaml` via the `playbook:` field. `project apply` installs them automatically.
 
-**Task queues** drive all agent work. Tasks have priorities (0=critical … 3=low); the daemon always picks the highest-priority pending task first. The wakeup routine fires as a low-priority synthetic task when the queue is empty.
+**Task queues** drive all agent work. Tasks have priorities (0=critical … 3=low); the scheduler always picks the highest-priority pending task first. The wakeup routine fires as a low-priority synthetic task when the queue is empty.
 
 **Async inbox messaging** lets any participant (agent or human) send non-blocking messages to any other. Recipients see their unread messages automatically at the top of their wakeup prompt.
 
@@ -129,14 +129,14 @@ After editing, re-sync all agents:
 agencycli sync --project my-service
 ```
 
-### Step 7 — Start the daemon
+### Step 7 — Start the scheduler
 
 ```bash
-agencycli daemon start
+agencycli scheduler start
 ```
 
 Agents now wake up automatically on their heartbeat schedule:
-- If there are **pending tasks**, the daemon picks the highest-priority one and runs it.
+- If there are **pending tasks**, the scheduler picks the highest-priority one and runs it.
 - If the queue is **empty** and a `wakeup.md` is configured, the agent runs its playbook autonomously (scanning issues, reviewing PRs, etc.).
 - Any **unread inbox messages** are automatically prepended to the wakeup prompt so the agent sees them immediately.
 
@@ -279,7 +279,7 @@ Pick the highest-priority pending task and start work.
 ```
 
 Key patterns:
-- Unread messages are **auto-injected** at the top of the prompt by the daemon — no need to call `inbox messages` in the playbook
+- Unread messages are **auto-injected** at the top of the prompt by the scheduler — no need to call `inbox messages` in the playbook
 - To reply to a message: `agencycli inbox reply <msg-id> --from project/agent --body "..."`
 - To send a non-blocking message to another agent: `agencycli inbox send --from project/dev --to project/pm --subject "..." --body "..."`
 - To pause and wait for human confirmation: `agencycli task confirm-request --id $TASK_ID --summary "..." --action-item "..."`
@@ -342,10 +342,10 @@ Re-sync after editing:
 agencycli sync --project my-api
 ```
 
-### Step 8 — Start the daemon
+### Step 8 — Start the scheduler
 
 ```bash
-agencycli daemon start
+agencycli scheduler start
 ```
 
 ---
@@ -359,7 +359,7 @@ agencycli task add \
   --title "Fix login redirect" --type bug --priority 1 \
   --prompt "The redirect is broken on mobile Safari. Fix and open a PR."
 
-# Run manually (bypasses daemon scheduling)
+# Run manually (bypasses scheduler)
 agencycli run --project my-api --agent dev
 
 # Run a quick one-off prompt
@@ -437,7 +437,7 @@ The inbox task-confirmation list is also rendered to `.agencycli/inbox.md` at th
 Restrict when an agent can wake up:
 
 ```bash
-agencycli daemon heartbeat \
+agencycli scheduler heartbeat \
   --project my-api --agent dev \
   --enable --interval 30m \
   --active-hours "09:00-18:00" \
@@ -502,7 +502,7 @@ Run any command against a workspace outside your current directory:
 agencycli --dir /path/to/MyAgency list agents
 agencycli --dir /path/to/MyAgency task list --project my-api --agent dev
 agencycli --dir /path/to/MyAgency inbox list
-agencycli --dir /path/to/MyAgency daemon start
+agencycli --dir /path/to/MyAgency scheduler start
 ```
 
 ---
@@ -519,7 +519,7 @@ agencycli --dir /path/to/MyAgency daemon start
 | Tasks | `task add/list/show/done/retry/cancel/confirm-request/stop-all/tokens` |
 | Inbox (confirmations) | `inbox list/show/confirm/reject/comment/forward` |
 | Inbox (messaging) | `inbox send/messages/reply` |
-| Scheduling | `daemon start/stop/status/heartbeat`, `cron add/list/delete/enable/disable` |
+| Scheduling | `scheduler start/heartbeat` (`sched`, `s`), `cron add/list/delete/enable/disable` |
 | Templates | `template pack/info` |
 | Session | `session show/set/clear` |
 | Meta | `version` |
@@ -555,7 +555,7 @@ agencycli <command> <subcommand> --help
 [ ] Edit projects/my-app/prompt.md  (tech stack, build commands, PR conventions)
 [ ] agencycli project apply --project my-app
 
-[ ] agencycli daemon start
+[ ] agencycli scheduler start
 
 [ ] agencycli inbox list          # check for task confirmations
 [ ] agencycli inbox messages      # check for async messages from agents
@@ -571,7 +571,7 @@ agencycli <command> <subcommand> --help
 [ ] agencycli create project --name "my-app" --blueprint default
 [ ] Edit projects/my-app/prompt.md  (project-specific context)
 [ ] agencycli project apply --project my-app
-[ ] agencycli daemon start
+[ ] agencycli scheduler start
 [ ] agencycli inbox list
 [ ] agencycli inbox messages
 ```

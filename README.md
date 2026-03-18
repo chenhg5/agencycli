@@ -36,7 +36,7 @@ Agents work autonomously via a **heartbeat loop** — wake up, process all pendi
 ### Layer 2 — Task automation
 
 - Per-agent **task queues** with a 7-state lifecycle and priority ordering (0=critical … 3=low)
-- **Heartbeat daemon**: non-overlapping wakeup loop, session-preserving, with time-window scheduling (`active_hours`, `active_days`)
+- **Heartbeat scheduler**: non-overlapping wakeup loop, session-preserving, with time-window scheduling (`active_hours`, `active_days`)
 - **Wakeup routine**: when the task queue is empty, the agent runs `wakeup.md` as a synthetic task — enabling autonomous proactive work without manual task assignment
 - **Cron jobs**: add recurring tasks on a crontab schedule
 - **Human inbox**: agents route `awaiting_confirmation` tasks here via `task confirm-request`; you confirm/reject/forward
@@ -118,8 +118,8 @@ agencycli project show --project my-service
 # 5. Apply: hire all agents + configure heartbeats + install wakeup.md playbooks
 agencycli project apply --project my-service
 
-# 6. Start the daemon — agents now wake up on schedule and run their playbooks
-agencycli daemon start
+# 6. Start the scheduler — agents now wake up on schedule and run their playbooks
+agencycli scheduler start
 
 # 7. Monitor
 agencycli inbox list          # task confirmations awaiting your decision
@@ -150,8 +150,8 @@ mkdir -p project-blueprints
 agencycli create project --name "my-api" --blueprint default
 agencycli project apply  --project my-api
 
-# 6. Start daemon
-agencycli daemon start
+# 6. Start scheduler
+agencycli scheduler start
 ```
 
 ---
@@ -312,7 +312,7 @@ agencycli task confirm-request --id <id> --summary "PR ready" \
   --action-item "Confirm merge"
 ```
 
-**Task priority:** 0=critical, 1=high, 2=normal (default), 3=low. The daemon always picks the highest-priority pending task first.
+**Task priority:** 0=critical, 1=high, 2=normal (default), 3=low. The scheduler always picks the highest-priority pending task first.
 
 **Task lifecycle:**
 ```
@@ -365,28 +365,28 @@ agencycli inbox reply <msg-id> --from cc-connect/pm --body "..."
 
 Agents receive unread messages automatically at the top of their wakeup prompt — no need to poll in `wakeup.md`. Messages are marked as read after a successful wakeup run.
 
-### `daemon` — heartbeat scheduler
+### `scheduler` — heartbeat scheduler
 
 The heartbeat is a **non-overlapping wakeup loop**: after each cycle completes all pending tasks, the agent sleeps for `interval`, then wakes again. When the queue is empty, the **wakeup routine** fires instead.
 
 ```bash
 # Configure heartbeat for one agent
-agencycli daemon heartbeat --project P --agent A \
+agencycli scheduler heartbeat --project P --agent A \
   --enable --interval 30m \
   --active-hours "09:00-18:00" \  # only wake in this window (local time)
   --active-days  "weekdays"       # Mon–Fri only (or Mon,Wed,Fri / weekends)
 
 # Set a wakeup routine (runs when queue is empty)
-agencycli daemon heartbeat --project P --agent A \
+agencycli scheduler heartbeat --project P --agent A \
   --wakeup-prompt-file /path/to/wakeup.md
 
-# Start daemon (all enabled agents)
-agencycli daemon start
-agencycli daemon stop
-agencycli daemon status
+# Start scheduler (all enabled agents)
+agencycli scheduler start
+agencycli scheduler stop
+agencycli scheduler status
 ```
 
-Overnight ranges like `22:00-06:00` are supported. Outside the active window the daemon shows `⏸ outside active window — next wakeup in Xh`.
+Overnight ranges like `22:00-06:00` are supported. Outside the active window the scheduler shows `⏸ outside active window — next wakeup in Xh`.
 
 ### `cron` — scheduled tasks
 
@@ -400,7 +400,7 @@ agencycli cron enable <cron-id>  --project P --agent A
 agencycli cron disable <cron-id> --project P --agent A
 ```
 
-Crons enqueue a new task each time the schedule fires. The daemon checks for due crons on every heartbeat wakeup.
+Crons enqueue a new task each time the schedule fires. The scheduler checks for due crons on every heartbeat wakeup.
 
 ### `template` — share agencies
 
@@ -452,7 +452,7 @@ All commands work against a workspace outside the current directory:
 ```bash
 agencycli --dir /path/to/MyAgency inbox list
 agencycli --dir /path/to/MyAgency task list --project my-api --agent dev
-agencycli --dir /path/to/MyAgency daemon start
+agencycli --dir /path/to/MyAgency scheduler start
 ```
 
 ---
@@ -488,7 +488,7 @@ agent-playbooks/
   qa-reviewer.md ← QA autonomous routine: scan open PRs, review, request merge confirmation
 ```
 
-The daemon auto-injects any **unread inbox messages** at the top of the wakeup prompt before running the routine. No explicit polling needed in `wakeup.md`.
+The scheduler auto-injects any **unread inbox messages** at the top of the wakeup prompt before running the routine. No explicit polling needed in `wakeup.md`.
 
 ---
 
@@ -536,7 +536,7 @@ docker build --build-arg CN_MIRROR=1 -t agencycli/sandbox-claudecode docker/sand
 - [x] Async messaging: `inbox send / messages / reply` (non-blocking, any participant)
 - [x] `run` / `exec`
 - [x] Session continuity across heartbeat cycles
-- [x] Heartbeat daemon with active-hours / active-days windows
+- [x] Heartbeat scheduler with active-hours / active-days windows
 - [x] Wakeup routine (`wakeup.md`) — runs when task queue is empty
 - [x] Unread message injection into wakeup prompt (auto)
 - [x] Cron scheduling (`cron add/list/delete/enable/disable`)

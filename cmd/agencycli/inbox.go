@@ -42,12 +42,19 @@ Use 'inbox confirm' or 'inbox reject' to resolve them.`,
 // ── inbox list ────────────────────────────────────────────────────────────────
 
 func newInboxListCmd() *cobra.Command {
-	var jsonOut bool
+	var (
+		to      string
+		jsonOut bool
+	)
 
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all items awaiting confirmation",
+		Long: `List confirmation-request items in the inbox.
+
+By default shows all items (human inbox).
+Use --to to filter by recipient (e.g. --to cc-connect/pm shows only items routed to pm).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -59,6 +66,16 @@ func newInboxListCmd() *cobra.Command {
 				return err
 			}
 
+			if to != "" {
+				filtered := items[:0]
+				for _, item := range items {
+					if item.Recipient() == to {
+						filtered = append(filtered, item)
+					}
+				}
+				items = filtered
+			}
+
 			if jsonOut {
 				if items == nil {
 					items = []*entity.InboxItem{}
@@ -67,18 +84,28 @@ func newInboxListCmd() *cobra.Command {
 			}
 
 			if len(items) == 0 {
-				fmt.Println("Inbox is empty.")
+				if to != "" {
+					fmt.Printf("Inbox is empty for %s.\n", to)
+				} else {
+					fmt.Println("Inbox is empty.")
+				}
 				return nil
 			}
 
-			fmt.Printf("Inbox — %d item(s) awaiting confirmation\n\n", len(items))
+			header := fmt.Sprintf("Inbox — %d item(s) awaiting confirmation", len(items))
+			if to != "" {
+				header += fmt.Sprintf(" (to: %s)", to)
+			}
+			fmt.Println(header)
+			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "TASK ID\tPROJECT/AGENT\tTITLE")
-			fmt.Fprintln(w, "───────\t─────────────\t─────")
+			fmt.Fprintln(w, "TASK ID\tFROM\tTO\tTITLE")
+			fmt.Fprintln(w, "───────\t────\t──\t─────")
 			for _, item := range items {
-				fmt.Fprintf(w, "%s\t%s/%s\t%s\n",
+				fmt.Fprintf(w, "%s\t%s/%s\t%s\t%s\n",
 					item.TaskID,
 					item.Project, item.Agent,
+					item.Recipient(),
 					item.Title,
 				)
 			}
@@ -87,6 +114,7 @@ func newInboxListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&to, "to", "", "filter by recipient: 'human' or 'project/agent' (e.g. cc-connect/pm)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	return cmd
 }
@@ -626,6 +654,7 @@ does not block any task.`,
 func newInboxMessagesCmd() *cobra.Command {
 	var (
 		recipient string
+		from      string
 		all       bool
 		mark      bool
 		jsonOut   bool
@@ -638,6 +667,7 @@ func newInboxMessagesCmd() *cobra.Command {
 
 By default shows only unread messages for 'human'.
 Use --recipient to inspect an agent's mailbox.
+Use --from to filter by sender (e.g. --from cc-connect/pm).
 Use --all to show all messages including already-read ones.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -658,6 +688,16 @@ Use --all to show all messages including already-read ones.`,
 				return err
 			}
 
+			if from != "" {
+				filtered := msgs[:0]
+				for _, m := range msgs {
+					if m.From == from {
+						filtered = append(filtered, m)
+					}
+				}
+				msgs = filtered
+			}
+
 			if jsonOut {
 				if msgs == nil {
 					msgs = []*entity.Message{}
@@ -666,7 +706,9 @@ Use --all to show all messages including already-read ones.`,
 			}
 
 			if len(msgs) == 0 {
-				if all {
+				if from != "" {
+					fmt.Printf("No messages for %s from %s.\n", recipient, from)
+				} else if all {
 					fmt.Printf("No messages for %s.\n", recipient)
 				} else {
 					fmt.Printf("No unread messages for %s.\n", recipient)
@@ -701,6 +743,7 @@ Use --all to show all messages including already-read ones.`,
 	}
 
 	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox to inspect: 'human' (default) or 'project/agent'")
+	cmd.Flags().StringVar(&from, "from", "", "filter by sender: 'human' or 'project/agent' (e.g. cc-connect/pm)")
 	cmd.Flags().BoolVar(&all, "all", false, "show all messages including already-read ones")
 	cmd.Flags().BoolVar(&mark, "mark-read", false, "mark displayed messages as read after listing")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")

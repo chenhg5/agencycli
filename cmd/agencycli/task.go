@@ -397,17 +397,22 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 		summary     string
 		actionHint  string
 		actionItems []string
+		to          string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "confirm-request",
-		Short: "Route a task to the human inbox for confirmation",
-		Long: `Intended to be called BY the agent when it needs human input:
+		Short: "Route a task to an inbox for confirmation",
+		Long: `Intended to be called BY the agent when it needs input from a human or another agent:
 
   agencycli task confirm-request --id <task-id> --summary "PR #42 is ready for your review" \
     --action-item "Open https://github.com/org/repo/pull/42" \
     --action-item "Review the diff and approve or request changes" \
-    --action-item "Reply with: approved / needs-changes: <reason>"`,
+    --action-item "Reply with: approved / needs-changes: <reason>"
+
+Use --to to route to a specific agent instead of the default human inbox:
+
+  agencycli task confirm-request --id <task-id> --to cc-connect/pm --summary "PR ready"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -440,10 +445,15 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 				return err
 			}
 
+			recipient := to
+			if recipient == "" {
+				recipient = "human"
+			}
 			item := &entity.InboxItem{
 				TaskID:      taskID,
 				Project:     project,
 				Agent:       agentName,
+				To:          recipient,
 				Title:       t.Title,
 				Summary:     summary,
 				ActionHint:  actionHint,
@@ -454,7 +464,7 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("✓ Task %s routed to human inbox\n", taskID)
+			fmt.Printf("✓ Task %s routed to %s inbox\n", taskID, recipient)
 			fmt.Printf("  Summary: %s\n", summary)
 			if len(actionItems) > 0 {
 				fmt.Printf("  Action items (%d):\n", len(actionItems))
@@ -467,8 +477,9 @@ func newTaskConfirmRequestCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&taskID, "id", "", "task ID")
-	cmd.Flags().StringVar(&summary, "summary", "", "one-line summary for the human")
+	cmd.Flags().StringVar(&summary, "summary", "", "one-line summary for the recipient")
 	cmd.Flags().StringVar(&actionHint, "action-hint", "", "additional context / background")
+	cmd.Flags().StringVar(&to, "to", "", "recipient: 'human' (default) or 'project/agent' (e.g. cc-connect/pm)")
 	cmd.Flags().StringArrayVar(&actionItems, "action-item", nil, "a specific action for the human (repeatable)")
 	return cmd
 }

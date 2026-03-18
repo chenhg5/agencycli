@@ -109,7 +109,7 @@ pending ──────────► in_progress ────────�
 
 | From | To | Trigger |
 |------|----|---------|
-| `pending` | `in_progress` | Agent picks up task (manual `run` or daemon wakeup) |
+| `pending` | `in_progress` | Agent picks up task (manual `run` or scheduler wakeup) |
 | `pending` | `cancelled` | Human or PM cancels |
 | `in_progress` | `done_success` | Agent reports success |
 | `in_progress` | `done_failed` | Agent reports failure / max retries exceeded |
@@ -125,11 +125,11 @@ pending ──────────► in_progress ────────�
 
 | Transition | Driver |
 |------------|--------|
-| `pending` → `in_progress` | `agencycli run` command or daemon scheduler |
+| `pending` → `in_progress` | `agencycli run` command or scheduler |
 | `in_progress` → `done_*` | Agent exit code / output parser |
 | `in_progress` → `awaiting_confirmation` | Agent writes a special sentinel in its output |
 | `awaiting_confirmation` → * | Human via `agencycli inbox confirm/reject` |
-| `blocked` → `in_progress` | Dependency watcher (daemon) or manual `agencycli task unblock` |
+| `blocked` → `in_progress` | Dependency watcher (scheduler) or manual `agencycli task unblock` |
 
 ---
 
@@ -368,7 +368,7 @@ pm-agent: triage task
         ▼ (pm decides: P1 bug, assign to dev-claude)
 dev-claude: task status=pending
         │
-        ▼ (daemon wakes dev-claude)
+        ▼ (scheduler wakes dev-claude)
 dev-claude: status=in_progress
         │
         ▼ (dev-claude opens PR)
@@ -488,17 +488,17 @@ agencycli run --project cc-connect --agent qa-reviewer --cron cron-qa-daily
 agencycli run --project cc-connect --agent qa-reviewer --dry-run
 ```
 
-### 6.5 `agencycli daemon` (background scheduler)
+### 6.5 `agencycli scheduler` (heartbeat scheduler)
 
 ```bash
-# Start the scheduler daemon (blocks, or use & / systemd)
-agencycli daemon start
+# Start the scheduler (blocks, or use & / systemd)
+agencycli scheduler start
 
 # Status
-agencycli daemon status
+agencycli scheduler status
 
 # Stop
-agencycli daemon stop
+agencycli scheduler stop
 ```
 
 ---
@@ -599,7 +599,7 @@ The human runs `agencycli inbox` or simply opens `inbox.md` in their editor/IDE.
 
 ### Phase 2 — Push Notifications (via cc-connect)
 
-cc-connect has a driver layer capable of pushing to Feishu/Telegram. We expose a webhook endpoint in `agencycli daemon`:
+cc-connect has a driver layer capable of pushing to Feishu/Telegram. We expose a webhook endpoint in `agencycli scheduler`:
 
 ```
 POST http://localhost:7370/webhook/inbox
@@ -786,7 +786,7 @@ Deliverables:
 - `cmd/agencycli/run.go` — `run` command (manual trigger)
 - `cmd/agencycli/inbox.go` — `inbox list/show/confirm/reject/comment`
 - `cmd/agencycli/session.go` — `session set/reset/show`
-- `cmd/agencycli/daemon.go` — `daemon start/stop/status` (heartbeat loop, no cron yet)
+- `cmd/agencycli/scheduler.go` — `scheduler start/heartbeat` (heartbeat loop, no cron yet)
 - Inbox auto-generates `inbox.md`
 - Heartbeat state tracked in `heartbeat.yaml` with PID-based overlap prevention
 
@@ -796,7 +796,7 @@ Deliverables:
 
 Deliverables:
 - `internal/cronstore/` — read/write `crons.yaml`
-- Extend daemon with robfig/cron engine (cron fires → enqueues task)
+- Extend scheduler with robfig/cron engine (cron fires → enqueues task)
 - `cmd/agencycli/cron.go` — `cron add/list/enable/disable/run`
 - Run log rotation
 

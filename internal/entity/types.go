@@ -446,19 +446,31 @@ func randomAlpha(n int) string {
 	return string(b)
 }
 
-// InboxItem is an entry in the human inbox.
+// InboxItem is an entry in the confirmation inbox.
 // Stored at <workspace>/.agencycli/inbox.yaml.
 type InboxItem struct {
 	TaskID      string   `yaml:"task_id"`
 	Project     string   `yaml:"project"`
 	Agent       string   `yaml:"agent"`
+	// To is the intended recipient of this confirmation request.
+	// "human" (default when empty) or "project/agent" (e.g. "cc-connect/pm").
+	To          string   `yaml:"to,omitempty"`
 	Title       string   `yaml:"title"`
 	Summary     string   `yaml:"summary"`
 	ActionHint  string   `yaml:"action_hint,omitempty"`
-	ActionItems []string `yaml:"action_items,omitempty"` // checklist for the human
-	ForwardedTo string   `yaml:"forwarded_to,omitempty"` // set when human forwards to an agent
+	ActionItems []string `yaml:"action_items,omitempty"` // checklist for the recipient
+	ForwardedTo string   `yaml:"forwarded_to,omitempty"` // set when recipient forwards to another agent
 	ForwardNote string   `yaml:"forward_note,omitempty"`
 	LogPath     string   `yaml:"log_path,omitempty"`
+}
+
+// Recipient returns the effective recipient of the inbox item.
+// Defaults to "human" when To is empty (backward compatible).
+func (i *InboxItem) Recipient() string {
+	if i.To == "" {
+		return "human"
+	}
+	return i.To
 }
 
 // ─────────────────────────────────────────────
@@ -501,7 +513,7 @@ type HeartbeatConfig struct {
 	// Example: "@wakeup.md" reads the prompt from <agent-dir>/wakeup.md.
 	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
 
-	// Runtime state (mutated by daemon / runner).
+	// Runtime state (mutated by scheduler / runner).
 	PID               int        `yaml:"pid,omitempty"`
 	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
 	LastWakeupStatus  string     `yaml:"last_wakeup_status,omitempty"` // running | done | failed

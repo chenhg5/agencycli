@@ -11,7 +11,7 @@ import "github.com/chenhg5/agencycli/internal/entity"
 
 // Store is the single access point for all workflow persistence.
 // Implementations must be safe for concurrent use from multiple goroutines
-// (the daemon runs one heartbeat goroutine per agent).
+// (the scheduler runs one heartbeat goroutine per agent).
 type Store interface {
 	// ── Tasks ────────────────────────────────────────────────────────────────
 

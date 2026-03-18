@@ -28,7 +28,7 @@ The agent's configured CLI is invoked inside the agent's working directory.
 Task state is updated automatically based on the exit code and output.
 
 This is a one-shot manual trigger. For recurring automated runs, use
-'agencycli daemon start' to activate the heartbeat scheduler.`,
+'agencycli scheduler start' to activate the heartbeat scheduler.`,
 		Example: `  # Run the next pending task
   agencycli run --project cc-connect --agent qa-reviewer
 

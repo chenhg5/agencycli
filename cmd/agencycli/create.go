@@ -346,7 +346,7 @@ hire the agents and wire up their schedules.`,
 				fmt.Printf("\nNext steps:\n")
 				fmt.Printf("  1. Review the config :  agencycli project show --project %s\n", name)
 				fmt.Printf("  2. Apply (hire+setup):  agencycli project apply --project %s\n", name)
-				fmt.Printf("  3. Start daemon      :  agencycli daemon start\n")
+				fmt.Printf("  3. Start scheduler   :  agencycli scheduler start\n")
 			} else {
 				fmt.Printf("  Edit the prompt : vim projects/%s/prompt.md\n", name)
 				fmt.Printf("  Edit the config : vim projects/%s/project.yaml\n", name)

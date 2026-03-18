@@ -67,7 +67,7 @@ func init() {
 		newExecCmd(),
 		newInboxCmd(),
 		newSessionCmd(),
-		newDaemonCmd(),
+		newSchedulerCmd(),
 		newCronCmd(),
 		newTemplateCmd(),
 		newProjectCmd(),

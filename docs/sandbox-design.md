@@ -16,7 +16,7 @@ Running AI agents (`claude`, `codex`, `gemini` …) directly on your host machin
 | **Root/sudo availability** | On many dev machines the agent can install packages, modify system files |
 | **Permission prompts** | Agents like Claude Code require `--dangerously-skip-permissions` to run headlessly, which is unsafe on a shared or production host |
 
-For agencycli's **daemon-driven headless execution** (heartbeat loop), the agent must run fully autonomously — you can't manually answer permission prompts. That makes sandboxing a requirement, not an optional nicety.
+For agencycli's **scheduler-driven headless execution** (heartbeat loop), the agent must run fully autonomously — you can't manually answer permission prompts. That makes sandboxing a requirement, not an optional nicety.
 
 ---
 
@@ -39,7 +39,7 @@ docker sandbox run claude ~/my-project -- "Fix the login bug"
 Claude Code launches with `--dangerously-skip-permissions` inside the sandbox by default, which is safe because the VM is isolated.
 
 **Status**: Experimental, Docker Desktop required.  
-**Best for**: One-shot interactive sessions; not yet ideal for headless daemon loops.
+**Best for**: One-shot interactive sessions; not yet ideal for headless scheduler loops.
 
 ---
 
@@ -356,7 +356,7 @@ For the next release, add **Docker sandbox as opt-in**:
 agencycli hire --project cc-connect --team qa --model claudecode \
   --name qa-reviewer --sandbox docker
 
-# Then the daemon/run command automatically uses docker run
+# Then the scheduler/run command automatically uses docker run
 agencycli run --project cc-connect --agent qa-reviewer
 ```
 
