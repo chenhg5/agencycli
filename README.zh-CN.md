@@ -2,7 +2,7 @@
 
 <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
 
-<br>
+<br/>
 
 [![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
 [![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
