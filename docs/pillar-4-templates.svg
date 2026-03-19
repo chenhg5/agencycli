@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="195" viewBox="0 0 900 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="195" fill="#0d1117" rx="10"/>
+  <rect x="0.5" y="0.5" width="899" height="194" fill="none" stroke="#30363d" stroke-width="1" rx="10"/>
+  <rect x="0" y="0" width="4" height="195" fill="#f97316" rx="2"/>
+
+  <!-- pack command -->
+  <text x="24" y="36" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="36" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli template pack --name tech-agency-v1</text>
+  <text x="38" y="54" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#6e7681">  bundling:  5 teams &#xB7; 18 roles &#xB7; 12 skills &#xB7; 3 playbooks</text>
+  <text x="38" y="72" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#6e7681">  output:    </text>
+  <text x="126" y="72" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#f97316">./tech-agency-v1.tar.gz</text>
+
+  <!-- create command -->
+  <text x="24" y="96" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="96" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli create agency --name "AcmeCorp" \</text>
+  <text x="38" y="114" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">             --template ./tech-agency-v1.tar.gz</text>
+  <text x="38" y="132" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#34d399">  &#x2713; agency created from template in 1.2s</text>
+
+  <!-- scheduler start -->
+  <text x="24" y="156" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="156" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli scheduler start</text>
+  <text x="38" y="174" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#34d399">  &#x2713; 14 agents running &#xB7; heartbeat enabled</text>
+</svg>

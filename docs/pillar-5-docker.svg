@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="215" viewBox="0 0 900 215" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="215" fill="#0d1117" rx="10"/>
+  <rect x="0.5" y="0.5" width="899" height="214" fill="none" stroke="#30363d" stroke-width="1" rx="10"/>
+  <rect x="0" y="0" width="4" height="215" fill="#f87171" rx="2"/>
+
+  <!-- hire command -->
+  <text x="24" y="34" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="34" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli hire --project api-service --team eng --role engineer --sandbox docker</text>
+
+  <!-- container outer box -->
+  <rect x="24" y="46" width="852" height="152" fill="#0d1117" stroke="#f87171" stroke-width="1.5" rx="6"/>
+  <!-- container title bar -->
+  <rect x="24" y="46" width="852" height="26" fill="#1a0f0f" rx="6"/>
+  <rect x="24" y="60" width="852" height="12" fill="#1a0f0f"/>
+  <text x="36" y="63" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" fill="#f87171" font-weight="600">docker container</text>
+
+  <!-- row separator -->
+  <line x1="36" y1="72" x2="864" y2="72" stroke="#21262d" stroke-width="1"/>
+
+  <!-- mount row 1: workspace -->
+  <text x="44" y="92" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#a78bfa">projects/api-service/agents/engineer/</text>
+  <text x="338" y="92" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  rw</text>
+  <text x="376" y="92" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">   &#x2190; agent workspace (files, tasks, inbox)</text>
+
+  <!-- mount row 2: agencycli binary -->
+  <text x="44" y="114" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#a78bfa">/usr/local/bin/agencycli</text>
+  <text x="232" y="114" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">            exec</text>
+  <text x="310" y="114" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">  &#x2190; inbox send, task done, sync</text>
+
+  <!-- mount row 3: credentials -->
+  <text x="44" y="136" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#60a5fa">~/.claude/  ~/.config/gh/  ~/.ssh/</text>
+  <text x="300" y="136" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">        ro</text>
+  <text x="358" y="136" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">    &#x2190; credentials (read-only)</text>
+
+  <!-- mount row 4: env vars -->
+  <text x="44" y="158" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#f59e0b">ANTHROPIC_API_KEY  GITHUB_TOKEN  ...</text>
+  <text x="330" y="158" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">      env</text>
+  <text x="390" y="158" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">  &#x2190; forwarded env vars</text>
+
+  <!-- bottom note -->
+  <line x1="36" y1="168" x2="864" y2="168" stroke="#21262d" stroke-width="1"/>
+  <text x="44" y="185" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="10.5" fill="#6e7681">no accidental host damage &#xB7; no credential leaks &#xB7; no runaway processes</text>
+</svg>

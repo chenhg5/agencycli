@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="200" viewBox="0 0 900 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="200" fill="#0d1117" rx="10"/>
+  <rect x="0.5" y="0.5" width="899" height="199" fill="none" stroke="#30363d" stroke-width="1" rx="10"/>
+  <rect x="0" y="0" width="4" height="200" fill="#60a5fa" rx="2"/>
+
+  <!-- ======= TERMINAL LOGS (left) ======= -->
+  <!-- line 1: sleeping (dim) -->
+  <text x="24" y="38" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">[09:02:00]</text>
+  <text x="107" y="38" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#6e7681">api-service/pm</text>
+  <text x="260" y="38" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">sleeping 28m &#x2192; next wakeup 09:30:00</text>
+
+  <!-- line 2: waking up (blue) -->
+  <text x="24" y="62" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#60a5fa">[09:06:00]</text>
+  <text x="107" y="62" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">api-service/engineer</text>
+  <text x="296" y="62" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#60a5fa">waking up</text>
+  <text x="375" y="62" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#6e7681">&#x2014; inbox: 2 msgs, tasks: 1 pending</text>
+
+  <!-- line 3: running wakeup routine (green) -->
+  <text x="24" y="86" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#60a5fa">[09:06:14]</text>
+  <text x="107" y="86" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">api-service/qa</text>
+  <text x="254" y="86" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#34d399">running wakeup.md</text>
+  <text x="398" y="86" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#6e7681">&#x2014; scanning open PRs...</text>
+
+  <!-- line 4: cycle done -->
+  <text x="24" y="110" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">[09:08:40]</text>
+  <text x="107" y="110" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#8b949e">api-service/engineer</text>
+  <text x="296" y="110" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">cycle done &#x2014; sleeping 22m &#x2192; 09:30:00</text>
+
+  <!-- line 5: wakeup routine task -->
+  <text x="24" y="134" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#60a5fa">[09:10:00]</text>
+  <text x="107" y="134" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">mobile-app/pm</text>
+  <text x="254" y="134" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#f59e0b">wakeup routine</text>
+  <text x="365" y="134" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#6e7681">&#x2014; drafting weekly summary...</text>
+
+  <!-- ======= DIVIDER ======= -->
+  <line x1="545" y1="20" x2="545" y2="180" stroke="#21262d" stroke-width="1"/>
+
+  <!-- ======= SCHEDULE CONFIG (right) ======= -->
+  <text x="563" y="38" font-family="'SF Mono',Menlo,monospace" font-size="10.5" fill="#4b5563"># role.yaml</text>
+  <text x="563" y="58" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">schedule:</text>
+  <text x="563" y="76" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  interval:       <tspan fill="#a78bfa">30m</tspan></text>
+  <text x="563" y="94" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  active_days:    <tspan fill="#a78bfa">["mon-fri"]</tspan></text>
+  <text x="563" y="112" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  time_window:    <tspan fill="#a78bfa">"09:00-18:00"</tspan></text>
+  <text x="563" y="130" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  startup_jitter: <tspan fill="#a78bfa">2m</tspan></text>
+  <text x="563" y="148" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  wakeup_routine: <tspan fill="#34d399">wakeup.md</tspan></text>
+</svg>

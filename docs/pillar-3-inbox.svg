@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="230" viewBox="0 0 900 230" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="230" fill="#0d1117" rx="10"/>
+  <rect x="0.5" y="0.5" width="899" height="229" fill="none" stroke="#30363d" stroke-width="1" rx="10"/>
+  <rect x="0" y="0" width="4" height="230" fill="#34d399" rx="2"/>
+
+  <!-- command prompt -->
+  <text x="24" y="36" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="36" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli inbox list --agent pm</text>
+
+  <!-- table header bg -->
+  <rect x="24" y="44" width="852" height="22" fill="#161b22" rx="3"/>
+  <text x="36" y="59" font-family="'SF Mono',Menlo,monospace" font-size="10" fill="#60a5fa">  ID    FROM            TO              TYPE              MESSAGE</text>
+  <text x="756" y="59" font-family="'SF Mono',Menlo,monospace" font-size="10" fill="#60a5fa">STATUS</text>
+
+  <!-- row 1: human to pm, unread -->
+  <text x="36" y="82" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  001   human</text>
+  <text x="148" y="82" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">&#x2192; pm</text>
+  <text x="230" y="82" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">           message</text>
+  <text x="374" y="82" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#c9d1d9">         "prioritise issue #42"</text>
+  <rect x="744" y="71" width="48" height="17" fill="#1e3a2f" rx="8"/>
+  <text x="768" y="83" font-family="'SF Mono',Menlo,monospace" font-size="9" fill="#34d399" text-anchor="middle">unread</text>
+
+  <!-- row 2: pm to engineer, read -->
+  <text x="36" y="106" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  002   pm</text>
+  <text x="122" y="106" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">     &#x2192; engineer</text>
+  <text x="246" y="106" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">      message</text>
+  <text x="374" y="106" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#6e7681">         "new task: implement auth endpoint"</text>
+  <rect x="752" y="95" width="34" height="17" fill="#1a1f2e" rx="8"/>
+  <text x="769" y="107" font-family="'SF Mono',Menlo,monospace" font-size="9" fill="#8b949e" text-anchor="middle">read</text>
+
+  <!-- row 3: confirm-request blocking -->
+  <rect x="24" y="113" width="852" height="24" fill="#1a1406" rx="2"/>
+  <text x="36" y="129" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  003   engineer</text>
+  <text x="159" y="129" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">&#x2192; human</text>
+  <rect x="242" y="116" width="120" height="17" fill="#292105" stroke="#f59e0b" stroke-width="1" rx="3"/>
+  <text x="302" y="128" font-family="'SF Mono',Menlo,monospace" font-size="9" fill="#f59e0b" text-anchor="middle">confirm-request</text>
+  <text x="374" y="129" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#c9d1d9">  "PR #205 ready for merge, LGTM?"</text>
+  <rect x="740" y="116" width="64" height="17" fill="#292105" stroke="#f59e0b" stroke-width="1" rx="8"/>
+  <text x="772" y="128" font-family="'SF Mono',Menlo,monospace" font-size="9" fill="#f59e0b" text-anchor="middle">blocking</text>
+
+  <!-- row 4: qa to pm, unread -->
+  <text x="36" y="154" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">  004   qa</text>
+  <text x="115" y="154" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">      &#x2192; pm, human</text>
+  <text x="253" y="154" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#8b949e">     message</text>
+  <text x="374" y="154" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#c9d1d9">         "weekly test summary ready"</text>
+  <rect x="744" y="143" width="48" height="17" fill="#1e3a2f" rx="8"/>
+  <text x="768" y="155" font-family="'SF Mono',Menlo,monospace" font-size="9" fill="#34d399" text-anchor="middle">unread</text>
+
+  <!-- confirm command -->
+  <line x1="24" y1="166" x2="876" y2="166" stroke="#21262d" stroke-width="1"/>
+  <text x="24" y="184" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#4b5563">$</text>
+  <text x="38" y="184" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">agencycli inbox confirm 003</text>
+  <text x="38" y="204" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#34d399">  &#x2713; confirmed &#x2014; engineer task unblocked</text>
+</svg>

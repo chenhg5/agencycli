@@ -49,86 +49,51 @@
 
 ### 1 — 上下文网格：角色 × 项目
 
-上下文不是扁平的，而是从两个维度组合而来：
+上下文不是扁平的，而是从两个维度组合而来。每个智能体在 `hire` 时自动合并完整上下文链：`机构上下文 → 团队上下文 → 角色上下文 → 项目上下文`。修改一个角色的 prompt，所有该角色的智能体在下次 `sync` 后都会更新。
 
-```
-             ← 横向：你是谁（角色）→
-              engineer    pm    qa-reviewer    writer
-              ─────────────────────────────────────
-纵向：     api-service │  ●        ●              
-项目轴     mobile-app  │  ●                   ●   
-           data-pipeline│  ●        ●              
-```
-
-每个智能体在 `hire` 时自动合并完整上下文链：`机构上下文 → 团队上下文 → 角色上下文 → 项目上下文`。修改一个角色的 prompt，所有该角色的智能体在下次 `sync` 后都会更新。
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-1-context.svg" alt="Context grid" width="900"/>
+</p>
 
 ### 2 — 自主心跳 + 唤醒流程
 
-智能体不只是被动等待任务。配置心跳后，它们会按计划自动醒来、清空任务队列；当队列为空时，执行**唤醒流程**（`wakeup.md`），主动发现新工作：
+智能体不只是被动等待任务。配置心跳后，它们会按计划自动醒来、清空任务队列；当队列为空时，执行**唤醒流程**（`wakeup.md`），主动发现新工作。时间窗口、工作日限制、Cron 定时——全部可配置。调度器重启时自动抖动，避免所有智能体同时唤醒。
 
-```
-[heartbeat cc-connect/pm]  sleeping 28m → next at 09:30:00
-[heartbeat cc-connect/qa]  waking up — checking crons, running pending tasks
-[heartbeat cc-connect/qa]  ▶ wakeup routine  (扫描 open PR…)
-[heartbeat cc-connect/qa]  wakeup cycle done — sleeping 24m → next at 09:27:00
-```
-
-时间窗口、工作日限制、Cron 定时——全部可配置。调度器重启时自动抖动，避免所有智能体同时唤醒。
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-2-heartbeat.svg" alt="Heartbeat scheduler" width="900"/>
+</p>
 
 ### 3 — Inbox：智能体互相通信
 
-每个参与者（智能体或人类）都有一个收件箱，通信异步非阻塞：
+每个参与者（智能体或人类）都有一个收件箱，通信异步非阻塞。未读消息在每次唤醒时自动注入提示词顶部。`confirm-request` 创建阻塞门控：任务暂停，直到你确认。
 
-```
-Human  →  PM 智能体：   "优先处理 issue #42"
-PM     →  Dev 智能体：  "新任务已就绪，补充上下文：..."
-Dev    →  Human：       confirm-request — "PR #205 待合并"  ← 阻塞直到你决定
-QA     →  PM + Human：  "本周评审汇总"  （群发）
-PM     →  Dev + QA：    inbox fwd <msg-id> --note "仅供参考"
-```
-
-未读消息在每次唤醒时自动注入提示词顶部——无需在 `wakeup.md` 中写轮询逻辑。
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-3-inbox.svg" alt="Inbox messaging" width="900"/>
+</p>
 
 ### 4 — 模板：打包复用整支团队
 
-把整个机构配置——团队、角色、技能、行动手册、项目蓝图——打包成一个 `.tar.gz`，分享给任何人，一条命令应用到新项目：
+把整个机构配置——团队、角色、技能、行动手册、项目蓝图——打包成一个 `.tar.gz`，分享给任何人，一条命令应用到新项目。
 
-```bash
-agencycli create agency --name "AcmeCorp" \
-  --template https://yourcdn.com/tech-agency.tar.gz
-
-agencycli project apply --project my-new-service
-agencycli scheduler start
-# 完成，智能体开始运转。
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-4-templates.svg" alt="Templates" width="900"/>
+</p>
 
 ### 5 — Docker 沙箱：默认安全隔离
 
-智能体可以在隔离的 Docker 容器中运行。不会意外破坏宿主机，不会泄露凭据给不可信代码，不会产生失控进程。每个任务都在全新容器中执行，任务结束后容器销毁，只有挂载的工作区目录会保留变更。
+智能体在隔离的 Docker 容器中运行。不会意外破坏宿主机，不会泄露凭据，不会产生失控进程。工作区和 `agencycli` 二进制读写挂载，凭据目录只读挂载。
 
-```bash
-agencycli hire --project my-api --team engineering --role developer \
-  --model claudecode --name dev --sandbox docker
-```
-
-自动挂载的内容：
-- 智能体工作目录和项目仓库（读写）
-- `agencycli` 二进制文件（供智能体调用 `task done`、`inbox send` 等命令）
-- 凭据目录（`~/.claude`、`~/.config/gh`、`~/.ssh`、`~/.codex` 等，只读）
-- 常见 API Key 以环境变量方式注入
-
-智能体对自己的工作区有完整权限，对宿主机的其余部分则完全隔离。
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-5-docker.svg" alt="Docker sandbox" width="900"/>
+</p>
 
 ### 6 — Skills：可复用的打包能力
 
-技能是 Markdown + 可选脚本，部署到智能体工作目录。无内置技能——只定义你真正需要的，绑定到团队或角色，`sync` 时自动分发。
+技能是 `SKILL.md`（YAML frontmatter + Markdown prompt）加可选脚本，部署到每个绑定了该技能的智能体工作目录。定义一次，绑定到角色，`sync` 时自动分发。
 
-```
-skills/github-push-relay/
-  skill.yaml
-  prompt.md              # {{SKILL_DIR}}/push.sh 解析为实际路径
-  push.sh                # 附带脚本，chmod+x 保留
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillar-6-skills.svg" alt="Skills" width="900"/>
+</p>
 
 ## 安装
 

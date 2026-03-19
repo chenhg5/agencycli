@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="225" viewBox="0 0 900 225" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="900" height="225" fill="#0d1117" rx="10"/>
+  <rect x="0.5" y="0.5" width="899" height="224" fill="none" stroke="#30363d" stroke-width="1" rx="10"/>
+  <rect x="0" y="0" width="4" height="225" fill="#4ade80" rx="2"/>
+
+  <!-- file tree -->
+  <text x="24" y="36" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#c9d1d9">skills/github-pr-review/</text>
+  <text x="24" y="56" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#8b949e">  +-- SKILL.md</text>
+  <text x="163" y="56" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">     prompt + metadata (YAML frontmatter)</text>
+  <text x="24" y="76" font-family="'SF Mono',Menlo,monospace" font-size="11.5" fill="#8b949e">  \-- review.sh</text>
+  <text x="163" y="76" font-family="'SF Mono',Menlo,monospace" font-size="11" fill="#4b5563">    helper script (chmod+x preserved, ref: $SKILL_DIR)</text>
+
+  <!-- horizontal divider -->
+  <line x1="24" y1="90" x2="876" y2="90" stroke="#21262d" stroke-width="1"/>
+
+  <!-- SKILL.md label -->
+  <text x="24" y="108" font-family="'SF Mono',Menlo,monospace" font-size="10.5" fill="#4b5563">--- SKILL.md -------------------------------------------------------------------</text>
+
+  <!-- frontmatter -->
+  <text x="24" y="128" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#f59e0b">---</text>
+  <text x="24" y="148" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#60a5fa">name</text>
+  <text x="80" y="148" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#c9d1d9">: github-pr-review</text>
+  <text x="24" y="168" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#60a5fa">description</text>
+  <text x="138" y="168" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#c9d1d9">: Review GitHub PRs and post inline comments</text>
+  <text x="24" y="188" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#f59e0b">---</text>
+
+  <!-- heading -->
+  <text x="24" y="210" font-family="'SF Mono',Menlo,monospace" font-size="12" fill="#4ade80">## Skill: GitHub PR Review</text>
+</svg>
