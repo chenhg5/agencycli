@@ -4,7 +4,7 @@
 
 <br/>
 
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
 [![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Works with](https://img.shields.io/badge/%E6%94%AF%E6%8C%81-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#支持任意-ai-编程-agent)
@@ -122,7 +122,7 @@ Follow https://raw.githubusercontent.com/chenhg5/agencycli/refs/heads/main/INSTA
 ### 手动安装
 
 ```bash
-npm install -g @agencycli/agentctl      # npm，无需安装 Go
+npm install -g @agencycli/agencycli      # npm，无需安装 Go
 
 go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 
