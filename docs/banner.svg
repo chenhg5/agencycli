@@ -1,77 +1,137 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="900" height="200" viewBox="0 0 900 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="900" y2="200" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0e0c1b"/>
-      <stop offset="100%" stop-color="#0d1117"/>
-    </linearGradient>
-    <linearGradient id="titleGrad" x1="0" y1="0" x2="540" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#a78bfa"/>
-      <stop offset="55%" stop-color="#60a5fa"/>
-      <stop offset="100%" stop-color="#34d399"/>
-    </linearGradient>
-    <linearGradient id="accentBar" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#a78bfa"/>
-      <stop offset="100%" stop-color="#3b82f6"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Background -->
-  <rect width="900" height="200" fill="url(#bgGrad)" rx="14"/>
-
-  <!-- Border -->
-  <rect x="0.5" y="0.5" width="899" height="199" fill="none" stroke="#21262d" stroke-width="1" rx="14"/>
-
-  <!-- Dot grid (right half) -->
-  <g fill="#1e2530">
-    <circle cx="545" cy="32"  r="1.3"/> <circle cx="575" cy="32"  r="1.3"/> <circle cx="605" cy="32"  r="1.3"/> <circle cx="635" cy="32"  r="1.3"/> <circle cx="665" cy="32"  r="1.3"/> <circle cx="695" cy="32"  r="1.3"/> <circle cx="725" cy="32"  r="1.3"/> <circle cx="755" cy="32"  r="1.3"/> <circle cx="785" cy="32"  r="1.3"/> <circle cx="815" cy="32"  r="1.3"/> <circle cx="845" cy="32"  r="1.3"/> <circle cx="875" cy="32"  r="1.3"/>
-    <circle cx="545" cy="62"  r="1.3"/> <circle cx="575" cy="62"  r="1.3"/> <circle cx="605" cy="62"  r="1.3"/> <circle cx="635" cy="62"  r="1.3"/> <circle cx="665" cy="62"  r="1.3"/> <circle cx="695" cy="62"  r="1.3"/> <circle cx="725" cy="62"  r="1.3"/> <circle cx="755" cy="62"  r="1.3"/> <circle cx="785" cy="62"  r="1.3"/> <circle cx="815" cy="62"  r="1.3"/> <circle cx="845" cy="62"  r="1.3"/> <circle cx="875" cy="62"  r="1.3"/>
-    <circle cx="545" cy="92"  r="1.3"/> <circle cx="575" cy="92"  r="1.3"/> <circle cx="605" cy="92"  r="1.3"/> <circle cx="635" cy="92"  r="1.3"/> <circle cx="665" cy="92"  r="1.3"/> <circle cx="695" cy="92"  r="1.3"/> <circle cx="725" cy="92"  r="1.3"/> <circle cx="755" cy="92"  r="1.3"/> <circle cx="785" cy="92"  r="1.3"/> <circle cx="815" cy="92"  r="1.3"/> <circle cx="845" cy="92"  r="1.3"/> <circle cx="875" cy="92"  r="1.3"/>
-    <circle cx="545" cy="122" r="1.3"/> <circle cx="575" cy="122" r="1.3"/> <circle cx="605" cy="122" r="1.3"/> <circle cx="635" cy="122" r="1.3"/> <circle cx="665" cy="122" r="1.3"/> <circle cx="695" cy="122" r="1.3"/> <circle cx="725" cy="122" r="1.3"/> <circle cx="755" cy="122" r="1.3"/> <circle cx="785" cy="122" r="1.3"/> <circle cx="815" cy="122" r="1.3"/> <circle cx="845" cy="122" r="1.3"/> <circle cx="875" cy="122" r="1.3"/>
-    <circle cx="545" cy="152" r="1.3"/> <circle cx="575" cy="152" r="1.3"/> <circle cx="605" cy="152" r="1.3"/> <circle cx="635" cy="152" r="1.3"/> <circle cx="665" cy="152" r="1.3"/> <circle cx="695" cy="152" r="1.3"/> <circle cx="725" cy="152" r="1.3"/> <circle cx="755" cy="152" r="1.3"/> <circle cx="785" cy="152" r="1.3"/> <circle cx="815" cy="152" r="1.3"/> <circle cx="845" cy="152" r="1.3"/> <circle cx="875" cy="152" r="1.3"/>
-    <circle cx="545" cy="172" r="1.3"/> <circle cx="575" cy="172" r="1.3"/> <circle cx="605" cy="172" r="1.3"/> <circle cx="635" cy="172" r="1.3"/> <circle cx="665" cy="172" r="1.3"/> <circle cx="695" cy="172" r="1.3"/> <circle cx="725" cy="172" r="1.3"/> <circle cx="755" cy="172" r="1.3"/> <circle cx="785" cy="172" r="1.3"/> <circle cx="815" cy="172" r="1.3"/> <circle cx="845" cy="172" r="1.3"/> <circle cx="875" cy="172" r="1.3"/>
+<svg width="900" height="200" xmlns="http://www.w3.org/2000/svg" fill="none">
+ <defs>
+  <linearGradient y2="1" x2="1" y1="0" x1="0" id="bgGrad">
+   <stop stop-color="#0e0c1b" offset="0%"/>
+   <stop stop-color="#0d1117" offset="100%"/>
+  </linearGradient>
+  <linearGradient y2="-0.78378" x2="1.4356" y1="-0.78378" x1="-0.20682" id="titleGrad">
+   <stop stop-color="#a78bfa" offset="0%"/>
+   <stop stop-color="#60a5fa" offset="55%"/>
+   <stop stop-color="#34d399" offset="100%"/>
+  </linearGradient>
+  <linearGradient y2="0.5" x2="-12" y1="-0.42593" x1="-12" id="accentBar">
+   <stop stop-color="#a78bfa" offset="0%"/>
+   <stop stop-color="#3b82f6" offset="100%"/>
+  </linearGradient>
+ </defs>
+ <!-- Background -->
+ <!-- Border -->
+ <!-- Dot grid (right half) -->
+ <!-- Left accent bar -->
+ <!-- Title -->
+ <!-- Subtitle -->
+ <!-- Divider -->
+ <!-- Terminal window dots -->
+ <!-- Terminal lines -->
+ <!-- Cursor -->
+ <g>
+  <title>Layer 1</title>
+  <rect id="svg_1" rx="14" fill="url(#bgGrad)" height="200" width="900"/>
+  <rect id="svg_2" rx="14" stroke="#21262d" fill="none" height="199" width="899" y="0.5" x="0.5"/>
+  <g id="svg_3" fill="#1e2530">
+   <circle id="svg_4" r="1.3" cy="32" cx="545"/>
+   <circle id="svg_5" r="1.3" cy="32" cx="575"/>
+   <circle id="svg_6" r="1.3" cy="32" cx="605"/>
+   <circle id="svg_7" r="1.3" cy="32" cx="635"/>
+   <circle id="svg_8" r="1.3" cy="32" cx="665"/>
+   <circle id="svg_9" r="1.3" cy="32" cx="695"/>
+   <circle id="svg_10" r="1.3" cy="32" cx="725"/>
+   <circle id="svg_11" r="1.3" cy="32" cx="755"/>
+   <circle id="svg_12" r="1.3" cy="32" cx="785"/>
+   <circle id="svg_13" r="1.3" cy="32" cx="815"/>
+   <circle id="svg_14" r="1.3" cy="32" cx="845"/>
+   <circle id="svg_15" r="1.3" cy="32" cx="875"/>
+   <circle id="svg_16" r="1.3" cy="62" cx="545"/>
+   <circle id="svg_17" r="1.3" cy="62" cx="575"/>
+   <circle id="svg_18" r="1.3" cy="62" cx="605"/>
+   <circle id="svg_19" r="1.3" cy="62" cx="635"/>
+   <circle id="svg_20" r="1.3" cy="62" cx="665"/>
+   <circle id="svg_21" r="1.3" cy="62" cx="695"/>
+   <circle id="svg_22" r="1.3" cy="62" cx="725"/>
+   <circle id="svg_23" r="1.3" cy="62" cx="755"/>
+   <circle id="svg_24" r="1.3" cy="62" cx="785"/>
+   <circle id="svg_25" r="1.3" cy="62" cx="815"/>
+   <circle id="svg_26" r="1.3" cy="62" cx="845"/>
+   <circle id="svg_27" r="1.3" cy="62" cx="875"/>
+   <circle id="svg_28" r="1.3" cy="92" cx="545"/>
+   <circle id="svg_29" r="1.3" cy="92" cx="575"/>
+   <circle id="svg_30" r="1.3" cy="92" cx="605"/>
+   <circle id="svg_31" r="1.3" cy="92" cx="635"/>
+   <circle id="svg_32" r="1.3" cy="92" cx="665"/>
+   <circle id="svg_33" r="1.3" cy="92" cx="695"/>
+   <circle id="svg_34" r="1.3" cy="92" cx="725"/>
+   <circle id="svg_35" r="1.3" cy="92" cx="755"/>
+   <circle id="svg_36" r="1.3" cy="92" cx="785"/>
+   <circle id="svg_37" r="1.3" cy="92" cx="815"/>
+   <circle id="svg_38" r="1.3" cy="92" cx="845"/>
+   <circle id="svg_39" r="1.3" cy="92" cx="875"/>
+   <circle id="svg_40" r="1.3" cy="122" cx="545"/>
+   <circle id="svg_41" r="1.3" cy="122" cx="575"/>
+   <circle id="svg_42" r="1.3" cy="122" cx="605"/>
+   <circle id="svg_43" r="1.3" cy="122" cx="635"/>
+   <circle id="svg_44" r="1.3" cy="122" cx="665"/>
+   <circle id="svg_45" r="1.3" cy="122" cx="695"/>
+   <circle id="svg_46" r="1.3" cy="122" cx="725"/>
+   <circle id="svg_47" r="1.3" cy="122" cx="755"/>
+   <circle id="svg_48" r="1.3" cy="122" cx="785"/>
+   <circle id="svg_49" r="1.3" cy="122" cx="815"/>
+   <circle id="svg_50" r="1.3" cy="122" cx="845"/>
+   <circle id="svg_51" r="1.3" cy="122" cx="875"/>
+   <circle id="svg_52" r="1.3" cy="152" cx="545"/>
+   <circle id="svg_53" r="1.3" cy="152" cx="575"/>
+   <circle id="svg_54" r="1.3" cy="152" cx="605"/>
+   <circle id="svg_55" r="1.3" cy="152" cx="635"/>
+   <circle id="svg_56" r="1.3" cy="152" cx="665"/>
+   <circle id="svg_57" r="1.3" cy="152" cx="695"/>
+   <circle id="svg_58" r="1.3" cy="152" cx="725"/>
+   <circle id="svg_59" r="1.3" cy="152" cx="755"/>
+   <circle id="svg_60" r="1.3" cy="152" cx="785"/>
+   <circle id="svg_61" r="1.3" cy="152" cx="815"/>
+   <circle id="svg_62" r="1.3" cy="152" cx="845"/>
+   <circle id="svg_63" r="1.3" cy="152" cx="875"/>
+   <circle id="svg_64" r="1.3" cy="172" cx="545"/>
+   <circle id="svg_65" r="1.3" cy="172" cx="575"/>
+   <circle id="svg_66" r="1.3" cy="172" cx="605"/>
+   <circle id="svg_67" r="1.3" cy="172" cx="635"/>
+   <circle id="svg_68" r="1.3" cy="172" cx="665"/>
+   <circle id="svg_69" r="1.3" cy="172" cx="695"/>
+   <circle id="svg_70" r="1.3" cy="172" cx="725"/>
+   <circle id="svg_71" r="1.3" cy="172" cx="755"/>
+   <circle id="svg_72" r="1.3" cy="172" cx="785"/>
+   <circle id="svg_73" r="1.3" cy="172" cx="815"/>
+   <circle id="svg_74" r="1.3" cy="172" cx="845"/>
+   <circle id="svg_75" r="1.3" cy="172" cx="875"/>
   </g>
-
-  <!-- Left accent bar -->
-  <rect x="48" y="46" width="4" height="108" fill="url(#accentBar)" rx="2"/>
-
-  <!-- Title -->
-  <text x="68" y="117"
-    font-family="'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace"
-    font-size="64" font-weight="700" letter-spacing="-2"
-    fill="url(#titleGrad)">agencycli</text>
-
-  <!-- Subtitle -->
-  <text x="70" y="148"
-    font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif"
-    font-size="15" fill="#6e7681" letter-spacing="0.4">Build &#xB7; Deploy &#xB7; Run self-managing AI agent teams</text>
-
-  <!-- Divider -->
-  <line x1="516" y1="28" x2="516" y2="172" stroke="#21262d" stroke-width="1"/>
-
-  <!-- Terminal window dots -->
-  <circle cx="546" cy="44" r="5" fill="#ff5f57"/>
-  <circle cx="566" cy="44" r="5" fill="#febc2e"/>
-  <circle cx="586" cy="44" r="5" fill="#28c840"/>
-  <text x="856" y="49" text-anchor="end"
-    font-family="'SF Mono',monospace" font-size="11" fill="#484f58">agencycli overview</text>
-
-  <!-- Terminal lines -->
-  <text x="536" y="74" font-family="'SF Mono','Fira Code',monospace" font-size="12" fill="#6e7681">$ agencycli scheduler start</text>
-
-  <text x="536" y="96" font-family="'SF Mono','Fira Code',monospace" font-size="12">
-    <tspan fill="#484f58">[heartbeat] </tspan><tspan fill="#3fb950">&gt; pm    </tspan><tspan fill="#8b949e">waking up, draining queue...</tspan>
+  <rect id="svg_76" rx="2" fill="url(#accentBar)" height="108" width="4" y="46" x="48"/>
+  <text id="svg_77" fill="url(#titleGrad)" letter-spacing="-2" font-weight="700" font-size="64" font-family="'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace" y="102" x="67">agencycli</text>
+  <text id="svg_78" letter-spacing="0.4" fill="#6e7681" font-size="15" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif" y="146" x="70">Build · Deploy · Run self-managing AI agent teams</text>
+  <line id="svg_79" stroke="#21262d" y2="172" x2="516" y1="28" x1="516"/>
+  <circle id="svg_80" fill="#ff5f57" r="5" cy="44" cx="546"/>
+  <circle id="svg_81" fill="#febc2e" r="5" cy="44" cx="566"/>
+  <circle id="svg_82" fill="#28c840" r="5" cy="44" cx="586"/>
+  <text id="svg_83" fill="#484f58" font-size="11" font-family="'SF Mono',monospace" text-anchor="end" y="49" x="856">agencycli overview</text>
+  <text id="svg_84" fill="#6e7681" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="74" x="536">$ agencycli scheduler start</text>
+  <text id="svg_85" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="96" x="536">
+   <tspan id="svg_86" fill="#484f58">[heartbeat]</tspan>
+   <tspan id="svg_87" fill="#3fb950">&gt; pm</tspan>
+   <tspan id="svg_88" fill="#8b949e">waking up, draining queue...</tspan>
   </text>
-  <text x="536" y="114" font-family="'SF Mono','Fira Code',monospace" font-size="12">
-    <tspan fill="#484f58">[heartbeat] </tspan><tspan fill="#58a6ff">* dev    </tspan><tspan fill="#8b949e">sleeping 28m -&gt; 09:30:00</tspan>
+  <text id="svg_89" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="114" x="536">
+   <tspan id="svg_90" fill="#484f58">[heartbeat]</tspan>
+   <tspan id="svg_91" fill="#58a6ff">* dev</tspan>
+   <tspan id="svg_92" fill="#8b949e">sleeping 28m -&gt; 09:30:00</tspan>
   </text>
-  <text x="536" y="132" font-family="'SF Mono','Fira Code',monospace" font-size="12">
-    <tspan fill="#484f58">[heartbeat] </tspan><tspan fill="#d29922">! qa     </tspan><tspan fill="#8b949e">1 confirm-request pending</tspan>
+  <text id="svg_93" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="132" x="536">
+   <tspan id="svg_94" fill="#484f58">[heartbeat]</tspan>
+   <tspan id="svg_95" fill="#d29922">! qa</tspan>
+   <tspan id="svg_96" fill="#8b949e">1 confirm-request pending</tspan>
   </text>
-  <text x="536" y="150" font-family="'SF Mono','Fira Code',monospace" font-size="12">
-    <tspan fill="#484f58">[inbox]     </tspan><tspan fill="#a78bfa">~ 3 unread</tspan><tspan fill="#8b949e"> from pm, dev, qa</tspan>
+  <text id="svg_97" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="150" x="536">
+   <tspan id="svg_98" fill="#484f58">[inbox]</tspan>
+   <tspan id="svg_99" fill="#a78bfa">~ 3 unread</tspan>
+   <tspan id="svg_100" fill="#8b949e">from pm, dev, qa</tspan>
   </text>
-
-  <!-- Cursor -->
-  <text x="536" y="168" font-family="'SF Mono','Fira Code',monospace" font-size="12" fill="#6e7681">$ <tspan fill="#58a6ff">|</tspan></text>
+  <text id="svg_101" fill="#6e7681" font-size="12" font-family="'SF Mono','Fira Code',monospace" y="168" x="536">$
+   <tspan id="svg_102" fill="#58a6ff">|</tspan></text>
+ </g>
 </svg>
