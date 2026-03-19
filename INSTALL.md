@@ -234,7 +234,7 @@ $EDITOR teams/engineering/roles/developer/prompt.md
 #        Always open a PR for changes. Never push directly to main."
 ```
 
-> **Looking for inspiration?** [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) is a community library of 100+ production-ready role definitions covering engineering, QA, design, product, marketing, sales, DevOps, security, and more. Each file can be used directly as a `prompt.md` — browse the relevant division, pick a role, and adapt it to your agency. This saves significant time compared to writing role prompts from scratch.
+> **Looking for inspiration?** [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) is a community collection of role definitions covering engineering, QA, design, product, marketing, sales, and more. Browse it for ideas and reference when writing your own `prompt.md`.
 
 **Edit `teams/<team>/roles/<role>/role.yaml`** to bind skills and configure workspace setup:
 
