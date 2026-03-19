@@ -47,47 +47,21 @@ The killer feature: **agents can hire, message, and coordinate with each other.*
 
 ## Six design pillars
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/pillars.svg" alt="Six design pillars" width="900"/>
+</p>
+
 ### 1 — Context grid: role × project
 
-Context is not flat. It composes from two axes:
-
-```
-             ← horizontal: what you are (Role) →
-              engineer    pm    qa-reviewer    writer
-              ─────────────────────────────────────
-vertical:  api-service │  ●        ●              
-project    mobile-app  │  ●                   ●   
-axis       data-pipeline│  ●        ●              
-```
-
-Every agent gets: `agency context → team context → role context → project context` — merged automatically at `hire` time. Change a role prompt once; every agent with that role gets it on the next `sync`.
+Context composes from two axes — role (horizontal) and project (vertical). Every agent gets `agency → team → role → project` context merged automatically at `hire` time. Change a role prompt once; every agent with that role gets it on the next `sync`.
 
 ### 2 — Autonomous heartbeat + wakeup routine
 
-Agents don't just sit and wait for tasks. Configure a heartbeat and they wake up on a schedule, drain their task queue, then — when the queue is empty — execute a **wakeup routine** (`wakeup.md`) to proactively find new work:
-
-```
-[heartbeat cc-connect/pm]  sleeping 28m → next at 09:30:00
-[heartbeat cc-connect/qa]  waking up — checking crons, running pending tasks
-[heartbeat cc-connect/qa]  ▶ wakeup routine  (scanning open PRs…)
-[heartbeat cc-connect/qa]  wakeup cycle done — sleeping 24m → next at 09:27:00
-```
-
-Time windows, active days, cron schedules — all configurable. Startup jitter prevents thundering herd when the scheduler restarts.
+Agents wake up on a schedule, drain their task queue, then — when the queue is empty — execute a **wakeup routine** (`wakeup.md`) to proactively find new work. Time windows, active days, cron schedules — all configurable. Startup jitter prevents thundering herd when the scheduler restarts.
 
 ### 3 — Inbox: agents talk to each other
 
-Every participant (agent or human) has an inbox. Communication is non-blocking and asynchronous:
-
-```
-Human  →  PM agent:     "prioritise issue #42"
-PM     →  Dev agent:    "new task ready, extra context: ..."
-Dev    →  Human:        confirm-request — "PR #205 ready for merge"  ← blocks until you decide
-QA     →  PM + Human:   "weekly review summary"  (group send)
-PM     →  Dev + QA:     inbox fwd <msg-id> --note "FYI"
-```
-
-Unread messages are auto-injected at the top of every wakeup prompt — no polling code needed in your playbooks.
+Every participant (agent or human) has an inbox. Messages are non-blocking and async — unread messages are auto-injected at the top of every wakeup prompt. `confirm-request` creates a blocking gate: the task pauses until you decide.
 
 ### 4 — Templates: package and reuse entire teams
 
@@ -96,39 +70,20 @@ Bundle your whole agency setup — teams, roles, skills, agent playbooks, projec
 ```bash
 agencycli create agency --name "AcmeCorp" \
   --template https://yourcdn.com/tech-agency.tar.gz
-
-agencycli project apply --project my-new-service
-agencycli scheduler start
-# Done. Agents are running.
+agencycli scheduler start   # done. agents are running.
 ```
 
 ### 5 — Docker sandbox: safe by default
 
-Agents can be run inside isolated Docker containers. No accidental host damage, no credential leaks to untrusted code, no runaway processes. Each task gets a fresh container; when it exits, nothing persists outside the mounted workspace.
+Agents run inside isolated Docker containers. No accidental host damage, no credential leaks, no runaway processes. The workspace and `agencycli` binary are mounted read-write; credentials are mounted read-only.
 
 ```bash
-agencycli hire --project my-api --team engineering --role developer \
-  --model claudecode --name dev --sandbox docker
+agencycli hire ... --sandbox docker
 ```
-
-What gets mounted automatically:
-- Agent working directory and project repo (read/write)
-- `agencycli` binary (so agents can call `task done`, `inbox send`, etc.)
-- Credentials (`~/.claude`, `~/.config/gh`, `~/.ssh`, `~/.codex`, …) read-only
-- Well-known API keys forwarded as environment variables
-
-The agent gets full access to its workspace and nothing else.
 
 ### 6 — Skills: reusable, bundled capabilities
 
-Skills are Markdown + optional scripts deployed into agent working directories. No built-ins — define only what your agents actually need, attach them to teams or roles, and they propagate automatically on `sync`.
-
-```
-skills/github-push-relay/
-  skill.yaml
-  prompt.md              # {{SKILL_DIR}}/push.sh resolves to the actual path
-  push.sh                # bundled script, chmod+x preserved
-```
+Skills are a `SKILL.md` (YAML frontmatter + Markdown prompt) plus optional scripts, deployed into every agent that has the skill bound. Define once, attach to a role, propagate automatically on `sync`.
 
 ## Install
 
