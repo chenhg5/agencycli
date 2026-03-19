@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="agencycli" width="900" />
+<img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
 
 <br/>
 
@@ -19,14 +19,6 @@ One CLI. No server. Agents that plan, execute, and talk to each other — while 
 [**中文文档**](README.zh-CN.md) · [Quick Start](#quick-start) · [Install](#install) · [Commands](docs/commands.md) · [Workspace Layout](docs/workspace-layout.md)
 
 </div>
-
-<br/>
-
-```bash
-npm install -g @agencycli/agentctl
-```
-
----
 
 ## What is this?
 

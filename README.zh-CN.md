@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="agencycli" width="900" />
+<img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
 
 <br/>
 
@@ -19,14 +19,6 @@
 [**English**](README.md) · [快速开始](#快速开始) · [安装](#安装) · [命令参考](docs/commands.md) · [工作区结构](docs/workspace-layout.md)
 
 </div>
-
-<br/>
-
-```bash
-npm install -g @agencycli/agentctl
-```
-
----
 
 ## 这是什么？
 
