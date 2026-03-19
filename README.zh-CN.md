@@ -9,7 +9,7 @@
 > 一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
 
 ```bash
-npm install -g @agencycli/agentctl
+npm install -g @agencycli/agencycli
 ```
 
 ---

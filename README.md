@@ -9,7 +9,7 @@
 > One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
 
 ```bash
-npm install -g @agencycli/agentctl
+npm install -g @agencycli/agencycli
 ```
 
 ---

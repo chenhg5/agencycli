@@ -11,7 +11,7 @@ A complete walkthrough for installing agencycli and building your first AI agent
 ### npm (recommended — no Go required)
 
 ```bash
-npm install -g @agencycli/agentctl
+npm install -g @agencycli/agencycli
 agencycli version
 ```
 
