@@ -2,7 +2,39 @@
 
 A complete walkthrough for installing agencycli and building your first AI agent team from scratch.
 
-> **AI agent note:** If you are an AI agent following this guide on behalf of a user, use interactive prompts (AskUserQuestion or equivalent) to ask about: agent model choice, project repo paths, API keys, heartbeat intervals, and active hours. Never guess these values.
+---
+
+## ⚠ For AI agents reading this guide
+
+If you are an AI agent (Claude Code, Codex, Cursor, etc.) following this guide on behalf of a user, **stop before Step 3 and read this section carefully.**
+
+### Building an agency is a design decision, not a mechanical task
+
+An agency's structure — teams, roles, and workflows — directly shapes how every agent thinks and behaves. Getting it wrong means re-hiring agents and rewriting prompts later. **Do not invent a structure. Collaborate with the user first.**
+
+Before creating any team, role, or project, have a conversation with the user to understand:
+
+1. **What is the user trying to build or operate?**
+   What is the product/codebase/business? What are the main workstreams?
+
+2. **Who are the "people" in this team?**
+   What functions do they need — engineering, QA, product, writing, ops, research, other?
+
+3. **What does each role actually do?**
+   Responsibilities, tools they use, rules they must follow, things they must never do.
+
+4. **How should agents communicate?**
+   Who reports to whom? Who makes decisions? Who needs to be CC'd on what?
+
+5. **What does "done" look like for each agent?**
+   How does an agent know its work is complete? Does it need human sign-off before it finishes a task?
+
+6. **What are the active hours and cadence?**
+   When should agents be running? How often should they check in?
+
+Only after you have clear answers to these questions should you proceed to create teams, roles, and projects. Use `AskUserQuestion` (or equivalent interactive input) for anything you are not sure about — **never guess**.
+
+> **Practical tip:** Consider drafting a short summary of the proposed agency structure (team names, role names, responsibilities) and asking the user to confirm it before executing any commands. A one-paragraph confirmation now saves a full re-setup later.
 
 ---
 
