@@ -1,13 +1,11 @@
-<div align="center">
-
 <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
 
-<br/>
+<br/><br/>
 
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
-[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Works with](https://img.shields.io/badge/支持-Claude%20·%20Codex%20·%20Gemini%20·%20Cursor-8a2be2)](#支持任意-ai-编程-agent)
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Works with](https://img.shields.io/badge/%E6%94%AF%E6%8C%81-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#支持任意-ai-编程-agent)
 
 <br/>
 
@@ -16,9 +14,7 @@
 
 <br/>
 
-[**English**](README.md) · [快速开始](#快速开始) · [安装](#安装) · [命令参考](docs/commands.md) · [工作区结构](docs/workspace-layout.md)
-
-</div>
+[**English**](README.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [安装](#安装) &nbsp;·&nbsp; [命令参考](docs/commands.md) &nbsp;·&nbsp; [工作区结构](docs/workspace-layout.md)
 
 ## 这是什么？
 
