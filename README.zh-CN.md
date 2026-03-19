@@ -1,22 +1,22 @@
-<div align="center">
-
+<p align="center">
 <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
+</p>
 
-<br/>
-
+<p align="center">
 [![npm](https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
 [![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Works with](https://img.shields.io/badge/%E6%94%AF%E6%8C%81-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#支持任意-ai-编程-agent)
+</p>
 
-
+<p align="center">
 **几分钟内搭建一支自运转的 AI 智能体团队。**  
 一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+</p>
 
-
+<p align="center">
 [**English**](README.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [安装](#安装) &nbsp;·&nbsp; [命令参考](docs/commands.md) &nbsp;·&nbsp; [工作区结构](docs/workspace-layout.md)
-
-</div>
+</p>
 
 ## 这是什么？
 
