@@ -1,15 +1,29 @@
-# agencycli
+<div align="center">
 
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
-[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go)](https://go.dev/)
+<img src="docs/banner.svg" alt="agencycli" width="900" />
+
+<br/>
+
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Works with](https://img.shields.io/badge/works%20with-Claude%20·%20Codex%20·%20Gemini%20·%20Cursor-8a2be2)](#works-with-any-ai-coding-agent)
 
-> **Spin up a self-managing AI agent team in minutes.**  
-> One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
+<br/>
+
+**Spin up a self-managing AI agent team in minutes.**  
+One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
+
+<br/>
+
+[**中文文档**](README.zh-CN.md) · [Quick Start](#quick-start) · [Install](#install) · [Commands](docs/commands.md) · [Workspace Layout](docs/workspace-layout.md)
+
+</div>
+
+<br/>
 
 ```bash
-npm install -g @agencycli/agencycli
+npm install -g @agencycli/agentctl
 ```
 
 ---

@@ -1,15 +1,29 @@
-# agencycli
+<div align="center">
 
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
-[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go)](https://go.dev/)
+<img src="docs/banner.svg" alt="agencycli" width="900" />
+
+<br/>
+
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Works with](https://img.shields.io/badge/支持-Claude%20·%20Codex%20·%20Gemini%20·%20Cursor-8a2be2)](#支持任意-ai-编程-agent)
 
-> **几分钟内搭建一支自运转的 AI 智能体团队。**  
-> 一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+<br/>
+
+**几分钟内搭建一支自运转的 AI 智能体团队。**  
+一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+
+<br/>
+
+[**English**](README.md) · [快速开始](#快速开始) · [安装](#安装) · [命令参考](docs/commands.md) · [工作区结构](docs/workspace-layout.md)
+
+</div>
+
+<br/>
 
 ```bash
-npm install -g @agencycli/agencycli
+npm install -g @agencycli/agentctl
 ```
 
 ---
