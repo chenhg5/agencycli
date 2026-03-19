@@ -51,6 +51,49 @@ Code lives at: {{.Repo}}
 (Add any project-specific context, architecture notes, or conventions here)
 `
 
+// gitignoreTmpl is the default .gitignore for a new agency workspace.
+const gitignoreTmpl = `# ── agencycli runtime state ──────────────────────────────────────────────────
+
+# Human inbox (generated summary + runtime queue)
+.agencycli/inbox.md
+.agencycli/inbox.yaml
+.agencycli/messages.yaml
+
+# Agent runtime state (PID, session IDs, last wakeup times)
+projects/*/agents/*/heartbeat.yaml
+
+# Async message queues
+projects/*/agents/*/messages.yaml
+
+# Task history (runtime, can be large)
+projects/*/agents/*/tasks_archive.yaml
+
+# Execution logs
+projects/*/agents/*/runs/
+*.log
+
+# Fired agents
+projects/*/agents/.fired/
+
+# Wakeup prompt temp files
+projects/*/agents/*/.wakeup-*.md
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Environment / secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+`
+
 // skillPromptTmpl is the default template for a skill's prompt.md.
 const skillPromptTmpl = `# Skill: {{.Name}}
 

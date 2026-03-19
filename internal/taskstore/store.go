@@ -86,6 +86,22 @@ type Store interface {
 	// MarkMessagesRead marks all unread messages for a recipient as read.
 	MarkMessagesRead(recipient string) error
 
+	// ListAllMessages returns every message for a recipient including archived ones.
+	ListAllMessages(recipient string) ([]*entity.Message, error)
+
+	// MarkMessageRead marks a single message as read by ID.
+	// Returns an error if the message is not found.
+	MarkMessageRead(recipient, msgID string) error
+
+	// ArchiveMessage marks a single message as archived by ID.
+	// Archived messages are hidden from normal listing unless --all is used.
+	// Returns an error if the message is not found.
+	ArchiveMessage(recipient, msgID string) error
+
+	// DeleteMessage permanently removes a single message by ID.
+	// Returns an error if the message is not found.
+	DeleteMessage(recipient, msgID string) error
+
 	// ── Discovery ────────────────────────────────────────────────────────────
 
 	// ListProjects returns the names of all projects in the workspace.

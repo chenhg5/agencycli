@@ -52,6 +52,13 @@ func InitAgency(root string, a *entity.Agency) error {
 		}
 	}
 
+	if err := writeTemplateOnce(
+		filepath.Join(root, ".gitignore"),
+		gitignoreTmpl, nil,
+	); err != nil {
+		return fmt.Errorf("scaffold: gitignore: %w", err)
+	}
+
 	return nil
 }
 

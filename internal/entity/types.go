@@ -413,14 +413,15 @@ func NewTaskID() string {
 //   human:  <agency>/.agencycli/messages.yaml
 //   agent:  <agency>/projects/<project>/agents/<agent>/messages.yaml
 type Message struct {
-	ID      string     `yaml:"id"`
-	From    string     `yaml:"from"`              // "human" or "project/agent"
-	To      string     `yaml:"to"`                // "human" or "project/agent"
-	Subject string     `yaml:"subject,omitempty"`
-	Body    string     `yaml:"body"`
-	ReplyTo string     `yaml:"reply_to,omitempty"` // ID of message being replied to
-	SentAt  time.Time  `yaml:"sent_at"`
-	ReadAt  *time.Time `yaml:"read_at,omitempty"`  // nil = unread
+	ID         string     `yaml:"id"`
+	From       string     `yaml:"from"`               // "human" or "project/agent"
+	To         string     `yaml:"to"`                 // "human" or "project/agent"
+	Subject    string     `yaml:"subject,omitempty"`
+	Body       string     `yaml:"body"`
+	ReplyTo    string     `yaml:"reply_to,omitempty"` // ID of message being replied to
+	SentAt     time.Time  `yaml:"sent_at"`
+	ReadAt     *time.Time `yaml:"read_at,omitempty"`     // nil = unread
+	ArchivedAt *time.Time `yaml:"archived_at,omitempty"` // nil = not archived
 }
 
 // NewMessageID returns a unique message ID.

@@ -35,6 +35,10 @@ Use 'inbox confirm' or 'inbox reject' to resolve them.`,
 		newInboxSendCmd(),
 		newInboxMessagesCmd(),
 		newInboxReplyCmd(),
+		newInboxFwdCmd(),
+		newInboxReadCmd(),
+		newInboxArchiveCmd(),
+		newInboxDeleteCmd(),
 	)
 	return cmd
 }
@@ -585,7 +589,7 @@ func newInboxCommentCmd() *cobra.Command {
 
 func newInboxSendCmd() *cobra.Command {
 	var (
-		to      string
+		to      []string
 		subject string
 		body    string
 		replyTo string
@@ -594,17 +598,21 @@ func newInboxSendCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "send",
-		Short: "Send an async message to an agent or human",
+		Short: "Send an async message to one or more recipients",
 		Long: `Send a non-blocking async message to any participant.
+Supports group send by repeating --to.
 
 Recipient format:
   --to human                 → agency owner's inbox
   --to cc-connect/pm         → project cc-connect, agent pm
   --to cc-connect/dev-claude → project cc-connect, agent dev-claude
 
-The recipient will see the message on their next wakeup (agents) or in
-'inbox messages' (human).  Unlike 'task confirm-request', sending a message
-does not block any task.`,
+Examples:
+  # Single recipient
+  agencycli inbox send --to cc-connect/pm --body "..."
+
+  # Group send (repeat --to)
+  agencycli inbox send --to cc-connect/pm --to cc-connect/dev-claude --to human --body "..."`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -613,34 +621,40 @@ does not block any task.`,
 			if body == "" {
 				return fmt.Errorf("--body is required")
 			}
+			if len(to) == 0 {
+				return fmt.Errorf("--to is required")
+			}
 			sender := from
 			if sender == "" {
 				sender = "human"
 			}
-			msg := &entity.Message{
-				ID:      entity.NewMessageID(),
-				From:    sender,
-				To:      to,
-				Subject: subject,
-				Body:    body,
-				ReplyTo: replyTo,
-				SentAt:  time.Now().UTC(),
-			}
 			ts := taskstore.New(root)
-			if err := ts.SendMessage(msg); err != nil {
-				return fmt.Errorf("send message: %w", err)
+			sentAt := time.Now().UTC()
+			for _, recipient := range to {
+				msg := &entity.Message{
+					ID:      entity.NewMessageID(),
+					From:    sender,
+					To:      recipient,
+					Subject: subject,
+					Body:    body,
+					ReplyTo: replyTo,
+					SentAt:  sentAt,
+				}
+				if err := ts.SendMessage(msg); err != nil {
+					return fmt.Errorf("send to %s: %w", recipient, err)
+				}
+				fmt.Printf("✓ Message sent  [%s]\n", msg.ID)
+				fmt.Printf("  To      : %s\n", msg.To)
+				if msg.Subject != "" {
+					fmt.Printf("  Subject : %s\n", msg.Subject)
+				}
 			}
-			fmt.Printf("✓ Message sent  [%s]\n", msg.ID)
-			fmt.Printf("  To      : %s\n", msg.To)
-			if msg.Subject != "" {
-				fmt.Printf("  Subject : %s\n", msg.Subject)
-			}
-			fmt.Printf("  From    : %s\n", msg.From)
+			fmt.Printf("  From    : %s\n", sender)
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&to, "to", "", "recipient: 'human' or 'project/agent'")
+	cmd.Flags().StringArrayVar(&to, "to", nil, "recipient: 'human' or 'project/agent' (repeatable for group send)")
 	cmd.Flags().StringVar(&subject, "subject", "", "optional subject line")
 	cmd.Flags().StringVar(&body, "body", "", "message body")
 	cmd.Flags().StringVar(&replyTo, "reply-to", "", "ID of message being replied to")
@@ -656,6 +670,7 @@ func newInboxMessagesCmd() *cobra.Command {
 		recipient string
 		from      string
 		all       bool
+		archived  bool
 		mark      bool
 		jsonOut   bool
 	)
@@ -668,7 +683,8 @@ func newInboxMessagesCmd() *cobra.Command {
 By default shows only unread messages for 'human'.
 Use --recipient to inspect an agent's mailbox.
 Use --from to filter by sender (e.g. --from cc-connect/pm).
-Use --all to show all messages including already-read ones.`,
+Use --all to show all messages including already-read ones.
+Use --archived to show archived messages.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -679,7 +695,17 @@ Use --all to show all messages including already-read ones.`,
 			}
 			ts := taskstore.New(root)
 			var msgs []*entity.Message
-			if all {
+			if archived {
+				allMsgs, e := ts.ListAllMessages(recipient)
+				if e != nil {
+					return e
+				}
+				for _, m := range allMsgs {
+					if m.ArchivedAt != nil {
+						msgs = append(msgs, m)
+					}
+				}
+			} else if all {
 				msgs, err = ts.ListMessages(recipient)
 			} else {
 				msgs, err = ts.ListUnreadMessages(recipient)
@@ -745,6 +771,7 @@ Use --all to show all messages including already-read ones.`,
 	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox to inspect: 'human' (default) or 'project/agent'")
 	cmd.Flags().StringVar(&from, "from", "", "filter by sender: 'human' or 'project/agent' (e.g. cc-connect/pm)")
 	cmd.Flags().BoolVar(&all, "all", false, "show all messages including already-read ones")
+	cmd.Flags().BoolVar(&archived, "archived", false, "show only archived messages")
 	cmd.Flags().BoolVar(&mark, "mark-read", false, "mark displayed messages as read after listing")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	return cmd
@@ -826,6 +853,209 @@ func newInboxReplyCmd() *cobra.Command {
 	cmd.Flags().StringVar(&body, "body", "", "reply body")
 	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human')")
 	_ = cmd.MarkFlagRequired("body")
+	return cmd
+}
+
+// ── inbox fwd ─────────────────────────────────────────────────────────────────
+
+func newInboxFwdCmd() *cobra.Command {
+	var (
+		to        []string
+		note      string
+		from      string
+		recipient string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "fwd <msg-id>",
+		Aliases: []string{"forward-message", "forward-msg"},
+		Short:   "Forward a message to one or more recipients",
+		Args:    cobra.ExactArgs(1),
+		Long: `Forward an async message to one or more recipients.
+The forwarded message includes the original content and an optional note.
+Supports group forward by repeating --to.
+
+  agencycli inbox fwd msg-20260317-abc123 --to cc-connect/dev-claude --note "FYI"
+  agencycli inbox fwd msg-20260317-abc123 --to cc-connect/pm --to cc-connect/qa-reviewer`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if len(to) == 0 {
+				return fmt.Errorf("--to is required")
+			}
+			msgID := args[0]
+			if recipient == "" {
+				recipient = "human"
+			}
+			sender := from
+			if sender == "" {
+				sender = "human"
+			}
+
+			// Find the original message across all mailboxes.
+			ts := taskstore.New(root)
+			var original *entity.Message
+			searchBoxes := []string{recipient}
+			// If recipient not specified (human), also search agent mailboxes.
+			projects, _ := ts.ListProjects()
+			for _, proj := range projects {
+				agents, _ := ts.ListAgents(proj)
+				for _, ag := range agents {
+					searchBoxes = append(searchBoxes, proj+"/"+ag)
+				}
+			}
+			for _, box := range searchBoxes {
+				all, _ := ts.ListAllMessages(box)
+				for _, m := range all {
+					if m.ID == msgID {
+						original = m
+						break
+					}
+				}
+				if original != nil {
+					break
+				}
+			}
+			if original == nil {
+				return fmt.Errorf("message %q not found", msgID)
+			}
+
+			// Build forwarded body.
+			fwdBody := fmt.Sprintf("---------- Forwarded message ----------\n"+
+				"From    : %s\n"+
+				"Subject : %s\n\n"+
+				"%s",
+				original.From,
+				original.Subject,
+				original.Body,
+			)
+			if note != "" {
+				fwdBody = note + "\n\n" + fwdBody
+			}
+
+			subject := original.Subject
+			if subject != "" && !strings.HasPrefix(subject, "Fwd: ") {
+				subject = "Fwd: " + subject
+			}
+
+			sentAt := time.Now().UTC()
+			for _, r := range to {
+				msg := &entity.Message{
+					ID:      entity.NewMessageID(),
+					From:    sender,
+					To:      r,
+					Subject: subject,
+					Body:    fwdBody,
+					ReplyTo: msgID,
+					SentAt:  sentAt,
+				}
+				if err := ts.SendMessage(msg); err != nil {
+					return fmt.Errorf("forward to %s: %w", r, err)
+				}
+				fmt.Printf("✓ Forwarded [%s] → %s\n", msg.ID, r)
+			}
+			fmt.Printf("  Original: %s\n", msgID)
+			fmt.Printf("  From    : %s\n", sender)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringArrayVar(&to, "to", nil, "recipient(s): 'human' or 'project/agent' (repeatable)")
+	cmd.Flags().StringVar(&note, "note", "", "optional note prepended to the forwarded message")
+	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human')")
+	cmd.Flags().StringVar(&recipient, "recipient", "", "your mailbox where the original message lives (default: human)")
+	_ = cmd.MarkFlagRequired("to")
+	return cmd
+}
+
+// ── inbox read ────────────────────────────────────────────────────────────────
+
+func newInboxReadCmd() *cobra.Command {
+	var recipient string
+
+	cmd := &cobra.Command{
+		Use:   "read <msg-id>",
+		Short: "Mark a message as read",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if recipient == "" {
+				recipient = "human"
+			}
+			ts := taskstore.New(root)
+			if err := ts.MarkMessageRead(recipient, args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Message %s marked as read\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox: 'human' (default) or 'project/agent'")
+	return cmd
+}
+
+// ── inbox archive ─────────────────────────────────────────────────────────────
+
+func newInboxArchiveCmd() *cobra.Command {
+	var recipient string
+
+	cmd := &cobra.Command{
+		Use:   "archive <msg-id>",
+		Short: "Archive a message (hidden from normal listing)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if recipient == "" {
+				recipient = "human"
+			}
+			ts := taskstore.New(root)
+			if err := ts.ArchiveMessage(recipient, args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Message %s archived\n", args[0])
+			fmt.Printf("  View archived messages: agencycli inbox messages --archived\n")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox: 'human' (default) or 'project/agent'")
+	return cmd
+}
+
+// ── inbox delete ──────────────────────────────────────────────────────────────
+
+func newInboxDeleteCmd() *cobra.Command {
+	var recipient string
+
+	cmd := &cobra.Command{
+		Use:     "delete <msg-id>",
+		Aliases: []string{"rm"},
+		Short:   "Permanently delete a message",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if recipient == "" {
+				recipient = "human"
+			}
+			ts := taskstore.New(root)
+			if err := ts.DeleteMessage(recipient, args[0]); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Message %s deleted\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox: 'human' (default) or 'project/agent'")
 	return cmd
 }
 

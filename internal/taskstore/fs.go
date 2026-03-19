@@ -535,23 +535,21 @@ func (s *FSStore) SendMessage(msg *entity.Message) error {
 }
 
 func (s *FSStore) ListMessages(recipient string) ([]*entity.Message, error) {
-	path := s.messagesPath(recipient)
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
+	all, err := s.loadAllMessages(recipient)
 	if err != nil {
 		return nil, err
 	}
 	var msgs []*entity.Message
-	if err := yaml.Unmarshal(data, &msgs); err != nil {
-		return nil, err
+	for _, m := range all {
+		if m.ArchivedAt == nil {
+			msgs = append(msgs, m)
+		}
 	}
 	return msgs, nil
 }
 
 func (s *FSStore) ListUnreadMessages(recipient string) ([]*entity.Message, error) {
-	all, err := s.ListMessages(recipient)
+	all, err := s.ListMessages(recipient) // already excludes archived
 	if err != nil {
 		return nil, err
 	}
@@ -582,6 +580,82 @@ func (s *FSStore) MarkMessagesRead(recipient string) error {
 	}
 	path := s.messagesPath(recipient)
 	return writeYAMLAtomic(path, msgs)
+}
+
+func (s *FSStore) MarkMessageRead(recipient, msgID string) error {
+	msgs, err := s.loadAllMessages(recipient)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	for _, m := range msgs {
+		if m.ID == msgID {
+			if m.ReadAt == nil {
+				m.ReadAt = &now
+			}
+			return writeYAMLAtomic(s.messagesPath(recipient), msgs)
+		}
+	}
+	return fmt.Errorf("message %q not found", msgID)
+}
+
+func (s *FSStore) ArchiveMessage(recipient, msgID string) error {
+	msgs, err := s.loadAllMessages(recipient)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	for _, m := range msgs {
+		if m.ID == msgID {
+			m.ArchivedAt = &now
+			if m.ReadAt == nil {
+				m.ReadAt = &now // archive implies read
+			}
+			return writeYAMLAtomic(s.messagesPath(recipient), msgs)
+		}
+	}
+	return fmt.Errorf("message %q not found", msgID)
+}
+
+func (s *FSStore) DeleteMessage(recipient, msgID string) error {
+	msgs, err := s.loadAllMessages(recipient)
+	if err != nil {
+		return err
+	}
+	filtered := msgs[:0]
+	found := false
+	for _, m := range msgs {
+		if m.ID == msgID {
+			found = true
+			continue
+		}
+		filtered = append(filtered, m)
+	}
+	if !found {
+		return fmt.Errorf("message %q not found", msgID)
+	}
+	return writeYAMLAtomic(s.messagesPath(recipient), filtered)
+}
+
+func (s *FSStore) ListAllMessages(recipient string) ([]*entity.Message, error) {
+	return s.loadAllMessages(recipient)
+}
+
+// loadAllMessages reads all messages including archived ones.
+func (s *FSStore) loadAllMessages(recipient string) ([]*entity.Message, error) {
+	path := s.messagesPath(recipient)
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var msgs []*entity.Message
+	if err := yaml.Unmarshal(data, &msgs); err != nil {
+		return nil, err
+	}
+	return msgs, nil
 }
 
 // Compile-time assertion: FSStore must fully implement Store.
