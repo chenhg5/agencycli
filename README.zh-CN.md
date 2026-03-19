@@ -1,21 +1,42 @@
 <p align="center">
-<img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900"/>
 </p>
 
 <p align="center">
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
-[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Works with](https://img.shields.io/badge/%E6%94%AF%E6%8C%81-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#支持任意-ai-编程-agent)
+  <a href="https://www.npmjs.com/package/@agencycli/agencycli">
+    <img src="https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square" alt="npm"/>
+  </a>
+  <a href="https://github.com/chenhg5/agencycli/releases">
+    <img src="https://img.shields.io/github/v/release/chenhg5/agencycli?style=flat-square&logo=github" alt="Release"/>
+  </a>
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square" alt="Go"/>
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"/>
+  </a>
+  <a href="https://goreportcard.com/report/github.com/chenhg5/agencycli">
+    <img src="https://goreportcard.com/badge/github.com/chenhg5/agencycli?style=flat-square" alt="Go Report Card"/>
+  </a>
 </p>
 
 <p align="center">
-**几分钟内搭建一支自运转的 AI 智能体团队。**  
-一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+  <a href="#支持任意-ai-编程-agent">
+    <img src="https://img.shields.io/badge/%E6%94%AF%E6%8C%81-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square" alt="支持"/>
+  </a>
 </p>
 
 <p align="center">
-[**English**](README.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [安装](#安装) &nbsp;·&nbsp; [命令参考](docs/commands.md) &nbsp;·&nbsp; [工作区结构](docs/workspace-layout.md)
+  <strong>几分钟内搭建一支自运转的 AI 智能体团队。</strong><br/>
+  一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+</p>
+
+<p align="center">
+  <a href="./README.md">English</a> &nbsp;|&nbsp;
+  <a href="#快速开始">快速开始</a> &nbsp;|&nbsp;
+  <a href="#安装">安装</a> &nbsp;|&nbsp;
+  <a href="docs/commands.md">命令参考</a> &nbsp;|&nbsp;
+  <a href="docs/workspace-layout.md">工作区结构</a>
 </p>
 
 ## 这是什么？

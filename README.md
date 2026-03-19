@@ -1,21 +1,42 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
+  <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900"/>
 </p>
 
 <p align="center">
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
-[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Works with](https://img.shields.io/badge/works%20with-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#works-with-any-ai-coding-agent)
+  <a href="https://www.npmjs.com/package/@agencycli/agencycli">
+    <img src="https://img.shields.io/npm/v/%40agencycli%2Fagencycli?color=cb3837&logo=npm&label=npm&style=flat-square" alt="npm"/>
+  </a>
+  <a href="https://github.com/chenhg5/agencycli/releases">
+    <img src="https://img.shields.io/github/v/release/chenhg5/agencycli?style=flat-square&logo=github" alt="Release"/>
+  </a>
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square" alt="Go"/>
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"/>
+  </a>
+  <a href="https://goreportcard.com/report/github.com/chenhg5/agencycli">
+    <img src="https://goreportcard.com/badge/github.com/chenhg5/agencycli?style=flat-square" alt="Go Report Card"/>
+  </a>
 </p>
 
 <p align="center">
-**Spin up a self-managing AI agent team in minutes.**  
-One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
+  <a href="#works-with-any-ai-coding-agent">
+    <img src="https://img.shields.io/badge/works%20with-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square" alt="Works with"/>
+  </a>
 </p>
 
 <p align="center">
-[**中文文档**](README.zh-CN.md) &nbsp;·&nbsp; [Quick Start](#quick-start) &nbsp;·&nbsp; [Install](#install) &nbsp;·&nbsp; [Commands](docs/commands.md) &nbsp;·&nbsp; [Workspace Layout](docs/workspace-layout.md)
+  <strong>Spin up a self-managing AI agent team in minutes.</strong><br/>
+  One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
+</p>
+
+<p align="center">
+  <a href="./README.zh-CN.md">中文文档</a> &nbsp;|&nbsp;
+  <a href="#quick-start">Quick Start</a> &nbsp;|&nbsp;
+  <a href="#install">Install</a> &nbsp;|&nbsp;
+  <a href="docs/commands.md">Commands</a> &nbsp;|&nbsp;
+  <a href="docs/workspace-layout.md">Workspace Layout</a>
 </p>
 
 ## What is this?
