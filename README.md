@@ -1,9 +1,14 @@
 # agencycli
 
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Works with](https://img.shields.io/badge/works%20with-Claude%20·%20Codex%20·%20Gemini%20·%20Cursor-8a2be2)](#works-with-any-ai-coding-agent)
+
 > **Spin up a self-managing AI agent team in minutes.**  
 > One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
 
-```
+```bash
 npm install -g @agencycli/agentctl
 ```
 
@@ -17,7 +22,26 @@ The killer feature: **agents can hire, message, and coordinate with each other.*
 
 ---
 
-## Four design pillars
+## Works with any AI coding agent
+
+agencycli is a runtime layer, not an SDK. Agents are whatever CLI tool you already use:
+
+| Agent runtime | `--model` |
+|---|---|
+| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
+| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
+| [Cursor](https://www.cursor.com/) | `cursor` |
+| [Qoder](https://qoder.ai) | `qoder` |
+| [OpenCode](https://opencode.ai) | `opencode` |
+| [iFlow](https://iflow.ai) | `iflow` |
+| Any CLI tool | `generic-cli` |
+
+Mix models freely — your PM can run on Claude, your dev agents on Codex, your writer on Gemini. Each gets its context in the exact format its runtime expects.
+
+---
+
+## Five design pillars
 
 ### 1 — Context grid: role × project
 
@@ -45,7 +69,7 @@ Agents don't just sit and wait for tasks. Configure a heartbeat and they wake up
 [heartbeat cc-connect/qa]  wakeup cycle done — sleeping 24m → next at 09:27:00
 ```
 
-Time windows, active days, cron schedules — all configurable. Agents outside their window show `⏸ outside active window — next wakeup in Xh`.
+Time windows, active days, cron schedules — all configurable. Startup jitter prevents thundering herd when the scheduler restarts.
 
 ### 3 — Inbox: agents talk to each other
 
@@ -55,8 +79,8 @@ Every participant (agent or human) has an inbox. Communication is non-blocking a
 Human  →  PM agent:     "prioritise issue #42"
 PM     →  Dev agent:    "new task ready, extra context: ..."
 Dev    →  Human:        confirm-request — "PR #205 ready for merge"  ← blocks until you decide
-QA     →  PM + Human:   "weekly review summary (group send)"
-PM     →  Dev + QA:     inbox fwd <msg-id> --to dev --to qa --note "FYI"
+QA     →  PM + Human:   "weekly review summary"  (group send)
+PM     →  Dev + QA:     inbox fwd <msg-id> --note "FYI"
 ```
 
 Unread messages are auto-injected at the top of every wakeup prompt — no polling code needed in your playbooks.
@@ -74,16 +98,35 @@ agencycli scheduler start
 # Done. Agents are running.
 ```
 
+### 5 — Skills: reusable, bundled capabilities
+
+Skills are Markdown + optional scripts deployed into agent working directories. No built-ins — define only what your agents actually need, attach them to teams or roles, and they propagate automatically on `sync`.
+
+```
+skills/github-push-relay/
+  skill.yaml
+  prompt.md              # {{SKILL_DIR}}/push.sh resolves to the actual path
+  push.sh                # bundled script, chmod+x preserved
+```
+
 ---
 
 ## Install
 
-```bash
-# npm (no Go required)
-npm install -g @agencycli/agentctl
+### Install & Configure via AI Agent (Recommended)
 
-# Go
-go install github.com/chenhg5/agencycli/cmd/agencycli@latest
+The easiest way — send this to Claude Code or any AI coding agent, and it will handle the entire installation and configuration for you:
+
+```
+Follow https://raw.githubusercontent.com/chenhg5/agencycli/refs/heads/main/INSTALL.md to install and configure agencycli.
+```
+
+### Manual install
+
+```bash
+npm install -g @agencycli/agentctl      # npm, no Go required
+
+go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 
 # From source
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
@@ -113,23 +156,11 @@ agencycli task list --project my-service --agent pm
 
 ---
 
-## Supported AI models
-
-| `--model`     | Context file(s) |
-|---------------|-----------------|
-| `claudecode`  | `CLAUDE.md` + `@import` layers + `.claude/skills/` |
-| `codex`       | `AGENTS.md` (skills inlined) |
-| `cursor`      | `.cursorrules` + `.cursor/rules/agencycli.mdc` |
-| `gemini`      | `GEMINI.md` + `@import` layers + `.gemini/skills/` |
-| `qoder` / `opencode` / `iflow` | single merged file |
-| `generic-cli` | `context.md` plain text |
-
----
-
 ## At a glance
 
 ```
 agencycli
+├── overview                                # dashboard: agents, teams, skills, inbox
 ├── create agency / team / role / project   # scaffold your org
 ├── hire / fire / sync                      # manage agents
 ├── task add / list / done / confirm-request# task queue (7-state lifecycle)
@@ -148,7 +179,7 @@ agencycli
 
 ## Why not LangGraph / CrewAI / AutoGen?
 
-Those are frameworks — you write Python to wire agents together. **agencycli is infrastructure** — you write Markdown and YAML. Agents are whatever CLI tool you already use (Claude Code, Codex, Gemini CLI…). No SDK, no lock-in, no server to run.
+Those are frameworks — you write Python to wire agents together. **agencycli is infrastructure** — you write Markdown and YAML. Agents are whatever CLI tool you already use. No SDK, no lock-in, no server to run.
 
 | | agencycli | Framework-based |
 |--|-----------|-----------------|
@@ -157,23 +188,6 @@ Those are frameworks — you write Python to wire agents together. **agencycli i
 | Multi-model | Any CLI, mix freely | Usually one SDK |
 | Context management | Layered, auto-merged | Manual prompt assembly |
 | Server required | No | Often yes |
-
----
-
-## Roadmap
-
-- [x] Context grid (agency → team → role → project)
-- [x] Heartbeat scheduler with active-hours / active-days windows
-- [x] Wakeup routines (`wakeup.md`) — proactive autonomous work
-- [x] Async inbox messaging between any participants
-- [x] Task confirm-request — agents escalate to humans
-- [x] Cron scheduling
-- [x] Docker sandbox (credentials auto-mounted)
-- [x] Template pack/apply
-- [x] Project blueprints
-- [ ] `depends_on` task dependency resolution
-- [ ] E2B / Daytona sandbox provider
-- [ ] Run log rotation
 
 ---
 

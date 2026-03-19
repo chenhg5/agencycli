@@ -1,9 +1,14 @@
 # agencycli
 
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Works with](https://img.shields.io/badge/支持-Claude%20·%20Codex%20·%20Gemini%20·%20Cursor-8a2be2)](#支持任意-ai-编程-agent)
+
 > **几分钟内搭建一支自运转的 AI 智能体团队。**  
 > 一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
 
-```
+```bash
 npm install -g @agencycli/agentctl
 ```
 
@@ -17,7 +22,26 @@ npm install -g @agencycli/agentctl
 
 ---
 
-## 四大设计支柱
+## 支持任意 AI 编程 Agent
+
+agencycli 是运行时基础设施，而非 SDK。智能体就是你已经在用的 CLI 工具：
+
+| Agent 运行时 | `--model` |
+|---|---|
+| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
+| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
+| [Cursor](https://www.cursor.com/) | `cursor` |
+| [Qoder](https://qoder.ai) | `qoder` |
+| [OpenCode](https://opencode.ai) | `opencode` |
+| [iFlow](https://iflow.ai) | `iflow` |
+| 任意 CLI 工具 | `generic-cli` |
+
+多模型自由混用——PM 用 Claude，Dev 用 Codex，Writer 用 Gemini。每个智能体都会收到其运行时所需格式的上下文。
+
+---
+
+## 五大设计支柱
 
 ### 1 — 上下文网格：角色 × 项目
 
@@ -45,7 +69,7 @@ npm install -g @agencycli/agentctl
 [heartbeat cc-connect/qa]  wakeup cycle done — sleeping 24m → next at 09:27:00
 ```
 
-时间窗口、工作日限制、Cron 定时——全部可配置。非活动时段显示 `⏸ outside active window — next wakeup in Xh`。
+时间窗口、工作日限制、Cron 定时——全部可配置。调度器重启时自动抖动，避免所有智能体同时唤醒。
 
 ### 3 — Inbox：智能体互相通信
 
@@ -55,15 +79,15 @@ npm install -g @agencycli/agentctl
 Human  →  PM 智能体：   "优先处理 issue #42"
 PM     →  Dev 智能体：  "新任务已就绪，补充上下文：..."
 Dev    →  Human：       confirm-request — "PR #205 待合并"  ← 阻塞直到你决定
-QA     →  PM + Human：  "本周评审汇总（群发）"
-PM     →  Dev + QA：    inbox fwd <msg-id> --to dev --to qa --note "仅供参考"
+QA     →  PM + Human：  "本周评审汇总"  （群发）
+PM     →  Dev + QA：    inbox fwd <msg-id> --note "仅供参考"
 ```
 
 未读消息在每次唤醒时自动注入提示词顶部——无需在 `wakeup.md` 中写轮询逻辑。
 
 ### 4 — 模板：打包复用整支团队
 
-把整个机构配置——团队、角色、技能、智能体行动手册、项目蓝图——打包成一个 `.tar.gz`，分享给任何人，一条命令应用到新项目：
+把整个机构配置——团队、角色、技能、行动手册、项目蓝图——打包成一个 `.tar.gz`，分享给任何人，一条命令应用到新项目：
 
 ```bash
 agencycli create agency --name "AcmeCorp" \
@@ -74,16 +98,35 @@ agencycli scheduler start
 # 完成，智能体开始运转。
 ```
 
+### 5 — Skills：可复用的打包能力
+
+技能是 Markdown + 可选脚本，部署到智能体工作目录。无内置技能——只定义你真正需要的，绑定到团队或角色，`sync` 时自动分发。
+
+```
+skills/github-push-relay/
+  skill.yaml
+  prompt.md              # {{SKILL_DIR}}/push.sh 解析为实际路径
+  push.sh                # 附带脚本，chmod+x 保留
+```
+
 ---
 
 ## 安装
 
-```bash
-# npm（无需安装 Go）
-npm install -g @agencycli/agentctl
+### 通过 AI Agent 安装并配置（推荐）
 
-# Go
-go install github.com/chenhg5/agencycli/cmd/agencycli@latest
+最简单的方式——把下面这句话发给 Claude Code 或任意 AI 编程 Agent，它会帮你完成全部安装和配置：
+
+```
+Follow https://raw.githubusercontent.com/chenhg5/agencycli/refs/heads/main/INSTALL.md to install and configure agencycli.
+```
+
+### 手动安装
+
+```bash
+npm install -g @agencycli/agentctl      # npm，无需安装 Go
+
+go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 
 # 从源码构建
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
@@ -113,23 +156,11 @@ agencycli task list --project my-service --agent pm
 
 ---
 
-## 支持的 AI 模型
-
-| `--model`     | 上下文文件格式 |
-|---------------|----------------|
-| `claudecode`  | `CLAUDE.md` + `@import` 层 + `.claude/skills/` |
-| `codex`       | `AGENTS.md`（技能内联） |
-| `cursor`      | `.cursorrules` + `.cursor/rules/agencycli.mdc` |
-| `gemini`      | `GEMINI.md` + `@import` 层 + `.gemini/skills/` |
-| `qoder` / `opencode` / `iflow` | 单文件合并 |
-| `generic-cli` | `context.md` 纯文本 |
-
----
-
 ## 命令总览
 
 ```
 agencycli
+├── overview                                # 仪表盘：智能体、团队、技能、收件箱一览
 ├── create agency / team / role / project   # 搭建组织架构
 ├── hire / fire / sync                      # 管理智能体
 ├── task add / list / done / confirm-request# 任务队列（7 状态流转）
@@ -148,7 +179,7 @@ agencycli
 
 ## 为什么不用 LangGraph / CrewAI / AutoGen？
 
-那些是框架——你用 Python 代码来串联智能体。**agencycli 是基础设施**——你用 Markdown 和 YAML 来描述。智能体就是你已经在用的 CLI 工具（Claude Code、Codex、Gemini CLI……）。无 SDK，无绑定，无需运行服务器。
+那些是框架——你用 Python 代码来串联智能体。**agencycli 是基础设施**——你用 Markdown 和 YAML 来描述。智能体就是你已经在用的 CLI 工具。无 SDK，无绑定，无需运行服务器。
 
 | | agencycli | 框架方案 |
 |--|-----------|---------|
@@ -157,23 +188,6 @@ agencycli
 | 多模型支持 | 任意 CLI，混用自由 | 通常绑定一个 SDK |
 | 上下文管理 | 分层自动合并 | 手动拼接 prompt |
 | 是否需要服务器 | 否 | 通常需要 |
-
----
-
-## Roadmap
-
-- [x] 上下文网格（agency → team → role → project）
-- [x] 心跳调度器（active-hours / active-days 时间窗口）
-- [x] 唤醒流程（`wakeup.md`）——主动自主工作
-- [x] 任意参与者间的异步 Inbox 消息通信
-- [x] task confirm-request——智能体向人类升级决策
-- [x] Cron 定时任务
-- [x] Docker 沙箱（凭据自动挂载）
-- [x] 模板打包/应用
-- [x] 项目蓝图
-- [ ] `depends_on` 任务依赖解析
-- [ ] E2B / Daytona 沙箱提供商
-- [ ] 运行日志轮转
 
 ---
 

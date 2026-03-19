@@ -73,6 +73,7 @@ func init() {
 		newTemplateCmd(),
 		newProjectCmd(),
 		newSandboxCmd(),
+		newOverviewCmd(),
 	)
 }
 
