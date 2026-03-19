@@ -2,19 +2,16 @@
 
 <img src="https://raw.githubusercontent.com/chenhg5/agencycli/main/docs/banner.svg" alt="agencycli" width="900" />
 
-<br/><br/>
 
-[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agentctl)
+[![npm](https://img.shields.io/npm/v/%40agencycli%2Fagentctl?color=cb3837&logo=npm&label=npm&style=flat-square)](https://www.npmjs.com/package/@agencycli/agencycli)
 [![Go](https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Works with](https://img.shields.io/badge/works%20with-Claude%20%C2%B7%20Codex%20%C2%B7%20Gemini%20%C2%B7%20Cursor-8a2be2?style=flat-square)](#works-with-any-ai-coding-agent)
 
-<br/>
 
 **Spin up a self-managing AI agent team in minutes.**  
 One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
 
-<br/>
 
 [**中文文档**](README.zh-CN.md) &nbsp;·&nbsp; [Quick Start](#quick-start) &nbsp;·&nbsp; [Install](#install) &nbsp;·&nbsp; [Commands](docs/commands.md) &nbsp;·&nbsp; [Workspace Layout](docs/workspace-layout.md)
 
