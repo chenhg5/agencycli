@@ -99,9 +99,39 @@ $EDITOR teams/engineering/prompt.md
 
 ---
 
-### Step 3 — Create skills
+### Step 3 — Add skills to agents
 
-Skills are reusable capability definitions (Markdown instructions + optional scripts) deployed into each agent's working directory. There are no built-in skills — define only what you need.
+Skills are reusable capability definitions (Markdown instructions + optional scripts) deployed into each agent's working directory.
+
+#### Built-in skills (ship with agencycli)
+
+agencycli comes with two skills in the `skills/` directory that every agency should use:
+
+| Skill | Purpose |
+|-------|---------|
+| `agency-messaging` | **Required for inter-agent communication.** Teaches agents how to discover each other and exchange async inbox messages. Without this skill, agents won't know how to talk to each other or to you. |
+| `agencycli-usage` | Teaches agents how to operate agencycli — add tasks, mark tasks done, send confirmations, etc. Recommended for all agents. |
+
+**Bind both skills to every role** so all agents can communicate and self-manage tasks:
+
+```yaml
+# teams/engineering/roles/developer/role.yaml
+skills:
+  - agency-messaging    # ← must-have: enables inter-agent messaging
+  - agencycli-usage     # ← recommended: agents know how to use agencycli
+  - github-pr-review    # your custom skills below
+```
+
+Or via command line:
+
+```bash
+agencycli role skill add --team engineering --role developer --skill agency-messaging
+agencycli role skill add --team engineering --role developer --skill agencycli-usage
+```
+
+> **Why `agency-messaging` matters:** Agents need to know how to send messages to the PM, reply to the human, or notify teammates. Without this skill injected into their context, they have no instructions for doing so and will not attempt it.
+
+#### Define your own skills
 
 ```bash
 mkdir -p skills/github-pr-review
@@ -487,8 +517,10 @@ agencycli sync --force                        # force regenerate everything
 
 [ ] agencycli create role --team engineering --name developer
 [ ] Edit teams/engineering/roles/developer/prompt.md   ← responsibilities, behaviour
-[ ] Edit teams/engineering/roles/developer/role.yaml   ← skills: [my-skill], setup dirs
-[ ]   (or: agencycli role skill add --team engineering --role developer --skill my-skill)
+[ ] Edit teams/engineering/roles/developer/role.yaml   ← skills: [...], setup dirs
+[ ]   agencycli role skill add --team engineering --role developer --skill agency-messaging  ← required
+[ ]   agencycli role skill add --team engineering --role developer --skill agencycli-usage   ← recommended
+[ ]   agencycli role skill add --team engineering --role developer --skill <your-skill>      ← custom
 
 [ ] agencycli create project --name "my-app" --repo /path/to/repo
 [ ] Edit projects/my-app/prompt.md     ← tech stack, build commands, PR conventions
