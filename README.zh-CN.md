@@ -41,7 +41,7 @@ agencycli 是运行时基础设施，而非 SDK。智能体就是你已经在用
 
 ---
 
-## 五大设计支柱
+## 六大设计支柱
 
 ### 1 — 上下文网格：角色 × 项目
 
@@ -98,7 +98,24 @@ agencycli scheduler start
 # 完成，智能体开始运转。
 ```
 
-### 5 — Skills：可复用的打包能力
+### 5 — Docker 沙箱：默认安全隔离
+
+智能体可以在隔离的 Docker 容器中运行。不会意外破坏宿主机，不会泄露凭据给不可信代码，不会产生失控进程。每个任务都在全新容器中执行，任务结束后容器销毁，只有挂载的工作区目录会保留变更。
+
+```bash
+agencycli hire --project my-api --team engineering --role developer \
+  --model claudecode --name dev --sandbox docker
+```
+
+自动挂载的内容：
+- 智能体工作目录和项目仓库（读写）
+- `agencycli` 二进制文件（供智能体调用 `task done`、`inbox send` 等命令）
+- 凭据目录（`~/.claude`、`~/.config/gh`、`~/.ssh`、`~/.codex` 等，只读）
+- 常见 API Key 以环境变量方式注入
+
+智能体对自己的工作区有完整权限，对宿主机的其余部分则完全隔离。
+
+### 6 — Skills：可复用的打包能力
 
 技能是 Markdown + 可选脚本，部署到智能体工作目录。无内置技能——只定义你真正需要的，绑定到团队或角色，`sync` 时自动分发。
 

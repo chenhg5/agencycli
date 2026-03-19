@@ -41,7 +41,7 @@ Mix models freely — your PM can run on Claude, your dev agents on Codex, your 
 
 ---
 
-## Five design pillars
+## Six design pillars
 
 ### 1 — Context grid: role × project
 
@@ -98,7 +98,24 @@ agencycli scheduler start
 # Done. Agents are running.
 ```
 
-### 5 — Skills: reusable, bundled capabilities
+### 5 — Docker sandbox: safe by default
+
+Agents can be run inside isolated Docker containers. No accidental host damage, no credential leaks to untrusted code, no runaway processes. Each task gets a fresh container; when it exits, nothing persists outside the mounted workspace.
+
+```bash
+agencycli hire --project my-api --team engineering --role developer \
+  --model claudecode --name dev --sandbox docker
+```
+
+What gets mounted automatically:
+- Agent working directory and project repo (read/write)
+- `agencycli` binary (so agents can call `task done`, `inbox send`, etc.)
+- Credentials (`~/.claude`, `~/.config/gh`, `~/.ssh`, `~/.codex`, …) read-only
+- Well-known API keys forwarded as environment variables
+
+The agent gets full access to its workspace and nothing else.
+
+### 6 — Skills: reusable, bundled capabilities
 
 Skills are Markdown + optional scripts deployed into agent working directories. No built-ins — define only what your agents actually need, attach them to teams or roles, and they propagate automatically on `sync`.
 
