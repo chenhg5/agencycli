@@ -319,46 +319,27 @@ func (s *fsStore) SkillDir(name string) string {
 }
 
 func (s *fsStore) Skill(name string) (*entity.Skill, error) {
-	// Preferred: single SKILL.md with YAML frontmatter.
 	skillMD := filepath.Join(s.skillDir(name), "SKILL.md")
-	if _, err := os.Stat(skillMD); err == nil {
-		sk, _, err := parseSkillMD(skillMD)
-		if err != nil {
-			return nil, fmt.Errorf("store: read skill %q: %w", name, err)
-		}
-		if sk.Name == "" {
-			sk.Name = name
-		}
-		return sk, nil
-	}
-	// Fallback: legacy skill.yaml + prompt.md layout.
-	path := filepath.Join(s.skillDir(name), "skill.yaml")
-	var sk entity.Skill
-	if err := readYAML(path, &sk); err != nil {
+	sk, _, err := parseSkillMD(skillMD)
+	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("store: skill %q not found", name)
 		}
 		return nil, fmt.Errorf("store: read skill %q: %w", name, err)
 	}
-	return &sk, nil
+	if sk.Name == "" {
+		sk.Name = name
+	}
+	return sk, nil
 }
 
 func (s *fsStore) SkillPrompt(name string) (string, error) {
-	// Preferred: body of SKILL.md (everything after the frontmatter).
 	skillMD := filepath.Join(s.skillDir(name), "SKILL.md")
-	if _, err := os.Stat(skillMD); err == nil {
-		_, body, err := parseSkillMD(skillMD)
-		if err != nil {
-			return "", fmt.Errorf("store: read skill prompt %q: %w", name, err)
-		}
-		return body, nil
-	}
-	// Fallback: legacy prompt.md.
-	content, err := readText(filepath.Join(s.skillDir(name), "prompt.md"))
+	_, body, err := parseSkillMD(skillMD)
 	if err != nil {
 		return "", fmt.Errorf("store: read skill prompt %q: %w", name, err)
 	}
-	return content, nil
+	return body, nil
 }
 
 // parseSkillMD reads a SKILL.md file and splits it into the YAML frontmatter
