@@ -161,8 +161,9 @@ func LayerHashes(mc *MergedContext) map[string]string {
 	return hashes
 }
 
-// loadSkillFiles scans skillDir and returns all non-documentation files
-// (i.e. everything except skill.yaml and prompt.md) as SkillFile entries.
+// loadSkillFiles scans skillDir and returns all bundled non-definition files
+// as SkillFile entries. Definition files (SKILL.md, skill.yaml, prompt.md) are
+// excluded because they are consumed by the store layer, not deployed to agents.
 // Errors are silently ignored so a missing or empty directory is handled
 // gracefully (skills without bundled files are perfectly valid).
 func loadSkillFiles(skillDir string) []SkillFile {
@@ -176,7 +177,7 @@ func loadSkillFiles(skillDir string) []SkillFile {
 			continue
 		}
 		name := e.Name()
-		if name == "skill.yaml" || name == "prompt.md" {
+		if name == "SKILL.md" || name == "skill.yaml" || name == "prompt.md" {
 			continue
 		}
 		content, err := os.ReadFile(filepath.Join(skillDir, name))

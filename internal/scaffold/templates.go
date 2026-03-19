@@ -94,12 +94,21 @@ Thumbs.db
 !.env.example
 `
 
-// skillPromptTmpl is the default template for a skill's prompt.md.
-const skillPromptTmpl = `# Skill: {{.Name}}
+// skillMDTmpl is the default template for a skill's SKILL.md.
+// The YAML frontmatter at the top carries the skill metadata; the Markdown
+// body below is injected into every agent that has this skill bound.
+const skillMDTmpl = `---
+name: {{.Name}}
+{{- if .Description}}
+description: {{.Description}}
+{{- end}}
+---
+
+# Skill: {{.Name}}
 
 {{if .Description}}{{.Description}}
 
-{{end}}## How to use
+{{end}}## How to use this skill
 
-(Describe how and when to use this skill)
+(Describe how and when to use this skill, and what the agent should do)
 `

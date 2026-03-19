@@ -45,9 +45,9 @@ type SkillFile struct {
 type SkillDef struct {
 	Name        string
 	Description string
-	// Prompt is the content of the skill's prompt.md.
+	// Prompt is the Markdown body of the skill's SKILL.md (after frontmatter).
 	Prompt string
 	// Files holds any extra files found in the skill's source directory
-	// (everything except skill.yaml and prompt.md). Typically shell scripts.
+	// (everything except SKILL.md, skill.yaml, and prompt.md). Typically shell scripts.
 	Files []SkillFile
 }

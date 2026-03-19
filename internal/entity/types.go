@@ -114,8 +114,10 @@ type Project struct {
 }
 
 // Skill is a reusable capability definition.
-// The executable behaviour is described in prompt.md.
-// Stored at <root>/skills/<name>/skill.yaml.
+// The skill is defined in a single SKILL.md file whose YAML frontmatter
+// carries the metadata and whose Markdown body is injected into agents.
+// Stored at <root>/skills/<name>/SKILL.md.
+// Legacy layout (skill.yaml + prompt.md) is still recognised as a fallback.
 type Skill struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`

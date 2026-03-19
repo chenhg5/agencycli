@@ -185,14 +185,13 @@ agencycli role skill add --team engineering --role developer --skill agencycli-u
 mkdir -p skills/github-pr-review
 ```
 
-**`skills/github-pr-review/skill.yaml`**
-```yaml
+**`skills/github-pr-review/SKILL.md`**
+```markdown
+---
 name: github-pr-review
 description: Review GitHub pull requests and post inline comments
-```
+---
 
-**`skills/github-pr-review/prompt.md`**
-```markdown
 ## Skill: GitHub PR Review
 
 When asked to review a PR:
@@ -203,7 +202,7 @@ When asked to review a PR:
 5. Approve or request changes: `gh pr review <number> --approve` / `--request-changes`
 ```
 
-You can bundle scripts alongside `prompt.md`. Reference them with `{{SKILL_DIR}}`:
+You can bundle scripts alongside `SKILL.md`. Reference them with `{{SKILL_DIR}}`:
 
 ```markdown
 Run `{{SKILL_DIR}}/lint.sh` before reviewing to check for obvious issues.
@@ -568,7 +567,7 @@ agencycli sync --force                        # force regenerate everything
 [ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/prompt.md  -o skills/agency-messaging/prompt.md
 [ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/skill.yaml  -o skills/agencycli-usage/skill.yaml
 [ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/prompt.md   -o skills/agencycli-usage/prompt.md
-[ ] (optional) mkdir -p skills/my-skill && write skill.yaml + prompt.md
+[ ] (optional) mkdir -p skills/my-skill && write SKILL.md (frontmatter + body)
 
 [ ] agencycli create role --team engineering --name developer
 [ ] Edit teams/engineering/roles/developer/prompt.md   ← responsibilities, behaviour

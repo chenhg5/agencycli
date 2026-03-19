@@ -319,6 +319,19 @@ func (s *fsStore) SkillDir(name string) string {
 }
 
 func (s *fsStore) Skill(name string) (*entity.Skill, error) {
+	// Preferred: single SKILL.md with YAML frontmatter.
+	skillMD := filepath.Join(s.skillDir(name), "SKILL.md")
+	if _, err := os.Stat(skillMD); err == nil {
+		sk, _, err := parseSkillMD(skillMD)
+		if err != nil {
+			return nil, fmt.Errorf("store: read skill %q: %w", name, err)
+		}
+		if sk.Name == "" {
+			sk.Name = name
+		}
+		return sk, nil
+	}
+	// Fallback: legacy skill.yaml + prompt.md layout.
 	path := filepath.Join(s.skillDir(name), "skill.yaml")
 	var sk entity.Skill
 	if err := readYAML(path, &sk); err != nil {
@@ -331,11 +344,51 @@ func (s *fsStore) Skill(name string) (*entity.Skill, error) {
 }
 
 func (s *fsStore) SkillPrompt(name string) (string, error) {
+	// Preferred: body of SKILL.md (everything after the frontmatter).
+	skillMD := filepath.Join(s.skillDir(name), "SKILL.md")
+	if _, err := os.Stat(skillMD); err == nil {
+		_, body, err := parseSkillMD(skillMD)
+		if err != nil {
+			return "", fmt.Errorf("store: read skill prompt %q: %w", name, err)
+		}
+		return body, nil
+	}
+	// Fallback: legacy prompt.md.
 	content, err := readText(filepath.Join(s.skillDir(name), "prompt.md"))
 	if err != nil {
 		return "", fmt.Errorf("store: read skill prompt %q: %w", name, err)
 	}
 	return content, nil
+}
+
+// parseSkillMD reads a SKILL.md file and splits it into the YAML frontmatter
+// (parsed into entity.Skill) and the Markdown body that follows.
+// Frontmatter is optional — if the file does not start with "---" the entire
+// content is treated as the body and an empty Skill is returned.
+func parseSkillMD(path string) (*entity.Skill, string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", err
+	}
+	content := string(raw)
+	var sk entity.Skill
+
+	if !strings.HasPrefix(content, "---") {
+		return &sk, content, nil
+	}
+	// Find the closing "---" delimiter.
+	rest := content[3:] // skip opening ---
+	idx := strings.Index(rest, "\n---")
+	if idx == -1 {
+		// Malformed frontmatter — treat entire file as body.
+		return &sk, content, nil
+	}
+	frontmatter := rest[:idx]
+	body := strings.TrimPrefix(rest[idx+4:], "\n") // skip closing ---\n
+	if err := yaml.Unmarshal([]byte(frontmatter), &sk); err != nil {
+		return nil, "", fmt.Errorf("parse frontmatter: %w", err)
+	}
+	return &sk, body, nil
 }
 
 func (s *fsStore) ListSkills() ([]*entity.Skill, error) {
