@@ -103,14 +103,30 @@ $EDITOR teams/engineering/prompt.md
 
 Skills are reusable capability definitions (Markdown instructions + optional scripts) deployed into each agent's working directory.
 
-#### Built-in skills (ship with agencycli)
+#### Built-in skills (provided by agencycli)
 
-agencycli comes with two skills in the `skills/` directory that every agency should use:
+agencycli ships two ready-made skills on GitHub that every agency should use. Download them into your workspace first:
+
+```bash
+# agency-messaging — teaches agents how to discover each other and exchange inbox messages
+mkdir -p skills/agency-messaging
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/skill.yaml \
+  -o skills/agency-messaging/skill.yaml
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/prompt.md \
+  -o skills/agency-messaging/prompt.md
+
+# agencycli-usage — teaches agents how to operate agencycli (add tasks, mark done, etc.)
+mkdir -p skills/agencycli-usage
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/skill.yaml \
+  -o skills/agencycli-usage/skill.yaml
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/prompt.md \
+  -o skills/agencycli-usage/prompt.md
+```
 
 | Skill | Purpose |
 |-------|---------|
-| `agency-messaging` | **Required for inter-agent communication.** Teaches agents how to discover each other and exchange async inbox messages. Without this skill, agents won't know how to talk to each other or to you. |
-| `agencycli-usage` | Teaches agents how to operate agencycli — add tasks, mark tasks done, send confirmations, etc. Recommended for all agents. |
+| `agency-messaging` | **Required for inter-agent communication.** Without this skill, agents won't know how to send messages to each other or to you. |
+| `agencycli-usage` | Teaches agents how to operate agencycli — add tasks, mark done, send confirmations, etc. Recommended for all agents. |
 
 **Bind both skills to every role** so all agents can communicate and self-manage tasks:
 
@@ -513,7 +529,12 @@ agencycli sync --force                        # force regenerate everything
 [ ] agencycli create team --name "engineering"
 [ ] Edit teams/engineering/prompt.md   ← coding standards, conventions
 
-[ ] mkdir -p skills/my-skill && write skill.yaml + prompt.md
+[ ] Download built-in skills:
+[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/skill.yaml -o skills/agency-messaging/skill.yaml
+[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/prompt.md  -o skills/agency-messaging/prompt.md
+[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/skill.yaml  -o skills/agencycli-usage/skill.yaml
+[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/prompt.md   -o skills/agencycli-usage/prompt.md
+[ ] (optional) mkdir -p skills/my-skill && write skill.yaml + prompt.md
 
 [ ] agencycli create role --team engineering --name developer
 [ ] Edit teams/engineering/roles/developer/prompt.md   ← responsibilities, behaviour
