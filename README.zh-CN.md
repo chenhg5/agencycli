@@ -24,27 +24,6 @@
 
 核心亮点：**智能体可以雇用、互发消息、彼此协调。** PM 智能体可以给 Dev 智能体创建任务，Dev 智能体在合并 PR 前可以向人类请求确认，QA 智能体每 30 分钟自动醒来扫描 PR——全程无需人工干预。
 
----
-
-## 支持任意 AI 编程 Agent
-
-agencycli 是运行时基础设施，而非 SDK。智能体就是你已经在用的 CLI 工具：
-
-| Agent 运行时 | `--model` |
-|---|---|
-| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
-| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
-| [Cursor](https://www.cursor.com/) | `cursor` |
-| [Qoder](https://qoder.ai) | `qoder` |
-| [OpenCode](https://opencode.ai) | `opencode` |
-| [iFlow](https://iflow.ai) | `iflow` |
-| 任意 CLI 工具 | `generic-cli` |
-
-多模型自由混用——PM 用 Claude，Dev 用 Codex，Writer 用 Gemini。每个智能体都会收到其运行时所需格式的上下文。
-
----
-
 ## 六大设计支柱
 
 ### 1 — 上下文网格：角色 × 项目
@@ -130,8 +109,6 @@ skills/github-push-relay/
   push.sh                # 附带脚本，chmod+x 保留
 ```
 
----
-
 ## 安装
 
 ### 通过 AI Agent 安装并配置（推荐）
@@ -153,8 +130,6 @@ go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
 ```
 
----
-
 ## 快速开始
 
 ```bash
@@ -175,7 +150,22 @@ agencycli inbox messages          # 来自智能体的异步消息
 agencycli task list --project my-service --agent pm
 ```
 
----
+## 支持大多数 AI Agent
+
+agencycli 是运行时基础设施，而非 SDK。智能体就是你已经在用的 CLI 工具：
+
+| Agent 运行时 | `--model` |
+|---|---|
+| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
+| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
+| [Cursor](https://www.cursor.com/) | `cursor` |
+| [Qoder](https://qoder.ai) | `qoder` |
+| [OpenCode](https://opencode.ai) | `opencode` |
+| [iFlow](https://iflow.ai) | `iflow` |
+| 任意 CLI 工具 | `generic-cli` |
+
+多模型自由混用——PM 用 Claude，Dev 用 Codex，Writer 用 Gemini。每个智能体都会收到其运行时所需格式的上下文。
 
 ## 命令总览
 
@@ -196,8 +186,6 @@ agencycli
 → **[工作区结构说明](docs/workspace-layout.md)**  
 → **[Docker 沙箱](docs/sandbox-design.md)**
 
----
-
 ## 为什么不用 LangGraph / CrewAI / AutoGen？
 
 那些是框架——你用 Python 代码来串联智能体。**agencycli 是基础设施**——你用 Markdown 和 YAML 来描述。智能体就是你已经在用的 CLI 工具。无 SDK，无绑定，无需运行服务器。
@@ -209,8 +197,6 @@ agencycli
 | 多模型支持 | 任意 CLI，混用自由 | 通常绑定一个 SDK |
 | 上下文管理 | 分层自动合并 | 手动拼接 prompt |
 | 是否需要服务器 | 否 | 通常需要 |
-
----
 
 ## 许可证
 

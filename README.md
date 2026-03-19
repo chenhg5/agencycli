@@ -24,27 +24,6 @@ One CLI. No server. Agents that plan, execute, and talk to each other — while 
 
 The killer feature: **agents can hire, message, and coordinate with each other.** Your PM agent can create a task for the dev agent, the dev agent can ask a human for confirmation before merging, and the QA agent wakes up every 30 minutes to scan for open PRs — all without you lifting a finger.
 
----
-
-## Works with any AI coding agent
-
-agencycli is a runtime layer, not an SDK. Agents are whatever CLI tool you already use:
-
-| Agent runtime | `--model` |
-|---|---|
-| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
-| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
-| [Cursor](https://www.cursor.com/) | `cursor` |
-| [Qoder](https://qoder.ai) | `qoder` |
-| [OpenCode](https://opencode.ai) | `opencode` |
-| [iFlow](https://iflow.ai) | `iflow` |
-| Any CLI tool | `generic-cli` |
-
-Mix models freely — your PM can run on Claude, your dev agents on Codex, your writer on Gemini. Each gets its context in the exact format its runtime expects.
-
----
-
 ## Six design pillars
 
 ### 1 — Context grid: role × project
@@ -130,8 +109,6 @@ skills/github-push-relay/
   push.sh                # bundled script, chmod+x preserved
 ```
 
----
-
 ## Install
 
 ### Install & Configure via AI Agent (Recommended)
@@ -153,8 +130,6 @@ go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
 ```
 
----
-
 ## Quick start
 
 ```bash
@@ -175,7 +150,22 @@ agencycli inbox messages          # async messages from agents
 agencycli task list --project my-service --agent pm
 ```
 
----
+## Works with any AI coding agent
+
+agencycli is a runtime layer, not an SDK. Agents are whatever CLI tool you already use:
+
+| Agent runtime | `--model` |
+|---|---|
+| [Claude Code](https://docs.anthropic.com/claude-code) | `claudecode` |
+| [OpenAI Codex](https://github.com/openai/codex) | `codex` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` |
+| [Cursor](https://www.cursor.com/) | `cursor` |
+| [Qoder](https://qoder.ai) | `qoder` |
+| [OpenCode](https://opencode.ai) | `opencode` |
+| [iFlow](https://iflow.ai) | `iflow` |
+| Any CLI tool | `generic-cli` |
+
+Mix models freely — your PM can run on Claude, your dev agents on Codex, your writer on Gemini. Each gets its context in the exact format its runtime expects.
 
 ## At a glance
 
@@ -196,8 +186,6 @@ agencycli
 → **[Workspace layout](docs/workspace-layout.md)**  
 → **[Docker sandbox](docs/sandbox-design.md)**
 
----
-
 ## Why not LangGraph / CrewAI / AutoGen?
 
 Those are frameworks — you write Python to wire agents together. **agencycli is infrastructure** — you write Markdown and YAML. Agents are whatever CLI tool you already use. No SDK, no lock-in, no server to run.
@@ -209,8 +197,6 @@ Those are frameworks — you write Python to wire agents together. **agencycli i
 | Multi-model | Any CLI, mix freely | Usually one SDK |
 | Context management | Layered, auto-merged | Manual prompt assembly |
 | Server required | No | Often yes |
-
----
 
 ## License
 
