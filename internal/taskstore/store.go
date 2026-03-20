@@ -110,6 +110,12 @@ type Store interface {
 	// ListAgents returns the names of all agents under a project.
 	ListAgents(project string) ([]string, error)
 
+	// FindTaskByID searches all projects and agents for a task with the given ID.
+	// It checks both active and archived tasks.
+	// Returns the owning project name, agent name, and task on success,
+	// or ("", "", nil, error) when not found.
+	FindTaskByID(id string) (project, agent string, task *entity.Task, err error)
+
 	// ── Run logs ─────────────────────────────────────────────────────────────
 
 	// RunLogDir returns (and creates) the directory where execution logs for

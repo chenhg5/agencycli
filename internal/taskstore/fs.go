@@ -374,6 +374,26 @@ func (s *FSStore) ListProjects() ([]string, error) {
 	return names, nil
 }
 
+func (s *FSStore) FindTaskByID(id string) (string, string, *entity.Task, error) {
+	projects, err := s.ListProjects()
+	if err != nil {
+		return "", "", nil, err
+	}
+	for _, proj := range projects {
+		agents, err := s.ListAgents(proj)
+		if err != nil {
+			continue
+		}
+		for _, ag := range agents {
+			t, err := s.GetTask(proj, ag, id)
+			if err == nil && t != nil {
+				return proj, ag, t, nil
+			}
+		}
+	}
+	return "", "", nil, fmt.Errorf("task %q not found in any project/agent", id)
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 // writeYAMLAtomic marshals v to YAML and writes it atomically using a temp file.

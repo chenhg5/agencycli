@@ -26,6 +26,7 @@ func newTaskCmd() *cobra.Command {
 		newTaskAddCmd(),
 		newTaskListCmd(),
 		newTaskShowCmd(),
+		newTaskFindCmd(),
 		newTaskDoneCmd(),
 		newTaskConfirmRequestCmd(),
 		newTaskRetryCmd(),
@@ -299,6 +300,80 @@ func newTaskShowCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&project, "project", "", "project name")
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
+	return cmd
+}
+
+// ── task find ─────────────────────────────────────────────────────────────────
+
+func newTaskFindCmd() *cobra.Command {
+	var taskID string
+
+	cmd := &cobra.Command{
+		Use:   "find",
+		Short: "Find a task by ID (searches all projects and agents)",
+		Long: `Find a task anywhere in the workspace by its ID.
+
+Searches active and archived tasks across every project and agent.
+Useful when you have a task ID but don't know which agent owns it.
+
+Example:
+  agencycli task find --id task_abc123`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if taskID == "" {
+				return fmt.Errorf("--id is required")
+			}
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+
+			ts := taskstore.New(root)
+			proj, ag, t, err := ts.FindTaskByID(taskID)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Project  : %s\n", proj)
+			fmt.Printf("Agent    : %s\n", ag)
+			fmt.Printf("ID       : %s\n", t.ID)
+			fmt.Printf("Title    : %s\n", t.Title)
+			fmt.Printf("Status   : %s %s\n", taskstore.StatusIcon(t.Status), t.Status)
+			fmt.Printf("Type     : %s\n", t.Type)
+			fmt.Printf("Priority : %s (%d)\n", taskstore.PriorityLabel(t.Priority), t.Priority)
+			if t.Assignee != "" {
+				fmt.Printf("Assignee : %s\n", t.Assignee)
+			}
+			fmt.Printf("CreatedBy: %s\n", t.CreatedBy)
+			fmt.Printf("Created  : %s\n", t.CreatedAt.Format(time.RFC3339))
+			if t.StartedAt != nil {
+				fmt.Printf("Started  : %s\n", t.StartedAt.Format(time.RFC3339))
+			}
+			if t.FinishedAt != nil {
+				fmt.Printf("Finished : %s\n", t.FinishedAt.Format(time.RFC3339))
+			}
+			if len(t.DependsOn) > 0 {
+				fmt.Printf("Depends  : %s\n", strings.Join(t.DependsOn, ", "))
+			}
+			if t.RetryCount > 0 {
+				fmt.Printf("Retries  : %d / %d\n", t.RetryCount, t.MaxRetries)
+			}
+			if t.LastError != "" {
+				fmt.Printf("Error    : %s\n", t.LastError)
+			}
+			if t.RunLogPath != "" {
+				fmt.Printf("Log      : %s\n", t.RunLogPath)
+			}
+			if t.ConfirmationReq != nil {
+				fmt.Printf("Confirm  : %s\n", t.ConfirmationReq.Summary)
+			}
+			fmt.Printf("\n── Prompt ──────────────────────────────────────────\n")
+			fmt.Println(t.Prompt)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&taskID, "id", "", "task ID to find (required)")
+	_ = cmd.MarkFlagRequired("id")
 	return cmd
 }
 
