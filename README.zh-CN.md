@@ -102,7 +102,7 @@
 最简单的方式——把下面这句话发给 Claude Code 或任意 AI 编程 Agent，它会帮你完成全部安装和配置：
 
 ```
-Follow https://raw.githubusercontent.com/chenhg5/agencycli/refs/heads/main/INSTALL.md to install and configure agencycli.
+参考 https://raw.githubusercontent.com/chenhg5/agencycli/refs/heads/main/INSTALL.md 帮我安装 agencycli 然后组建一个 agent 公司。
 ```
 
 ### 手动安装
