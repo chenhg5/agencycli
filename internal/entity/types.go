@@ -561,12 +561,37 @@ type HeartbeatConfig struct {
 	// Example: "@wakeup.md" reads the prompt from <agent-dir>/wakeup.md.
 	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
 
+	// WakeupCondition is an optional shell command evaluated before each wakeup.
+	// The scheduler runs it with `sh -c` from the agent's working directory.
+	// Exit 0  → condition met, proceed with wakeup.
+	// Non-zero → condition not met, skip this cycle, sleep the full interval,
+	//            then re-evaluate on the next tick.
+	//
+	// The env vars AGENCY_DIR, PROJECT, and AGENT_NAME are injected so that
+	// agencycli commands can be used inside the condition script.
+	//
+	// Examples:
+	//   # only wake PM when there are open GitHub issues labelled agent-ready
+	//   wakeup_condition: "gh issue list --state open --label agent-ready --json id --jq 'length > 0'"
+	//
+	//   # only wake QA when there are open PRs
+	//   wakeup_condition: "gh pr list --state open | grep -q ."
+	//
+	//   # only wake when there are unread inbox messages
+	//   wakeup_condition: "agencycli --dir $AGENCY_DIR inbox messages --unread-only | grep -q ."
+	WakeupCondition string `yaml:"wakeup_condition,omitempty"`
+
 	// Runtime state (mutated by scheduler / runner).
 	PID               int        `yaml:"pid,omitempty"`
 	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
 	LastWakeupStatus  string     `yaml:"last_wakeup_status,omitempty"` // running | done | failed
 	SessionID         string     `yaml:"session_id,omitempty"`
 	SessionStartedAt  *time.Time `yaml:"session_started_at,omitempty"`
+
+	// LastConditionStatus records the outcome of the most recent WakeupCondition
+	// evaluation: "met", "not_met", or "" (never evaluated).
+	LastConditionStatus string     `yaml:"last_condition_status,omitempty"`
+	LastConditionAt     *time.Time `yaml:"last_condition_at,omitempty"`
 }
 
 // ─────────────────────────────────────────────
