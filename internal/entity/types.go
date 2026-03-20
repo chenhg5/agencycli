@@ -179,6 +179,12 @@ type AgentMeta struct {
 	// context. It is nil for agents that have never been synced after hire.
 	SyncedAt *time.Time `yaml:"synced_at,omitempty"`
 
+	// Playbook is the filename (without path) of the playbook that was copied
+	// into .agencycli-context/wakeup.md at hire time.
+	// When set, `agencycli sync` tracks the playbook's content hash and
+	// re-copies the file automatically if it changes.
+	Playbook string `yaml:"playbook,omitempty"`
+
 	// ContextHash maps each layer source key to the SHA-256 hex digest
 	// of its prompt content at hire time.
 	ContextHash map[string]string `yaml:"context_hash,omitempty"`

@@ -3,6 +3,7 @@ package ctxbuild
 import (
 	"crypto/sha256"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,30 +162,37 @@ func LayerHashes(mc *MergedContext) map[string]string {
 	return hashes
 }
 
-// loadSkillFiles scans skillDir and returns all bundled non-definition files
-// as SkillFile entries. Definition files (SKILL.md, skill.yaml, prompt.md) are
+// loadSkillFiles recursively scans skillDir and returns all bundled
+// non-definition files as SkillFile entries.
+// Definition files (SKILL.md, skill.yaml, prompt.md) at the root level are
 // excluded because they are consumed by the store layer, not deployed to agents.
+// Files in subdirectories are included with their relative path as the Name
+// (e.g. "scripts/deploy.sh"), preserving the directory structure when deployed.
 // Errors are silently ignored so a missing or empty directory is handled
 // gracefully (skills without bundled files are perfectly valid).
 func loadSkillFiles(skillDir string) []SkillFile {
-	entries, err := os.ReadDir(skillDir)
-	if err != nil {
-		return nil
-	}
 	var files []SkillFile
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
+	_ = filepath.WalkDir(skillDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
 		}
-		name := e.Name()
-		if name == "SKILL.md" || name == "skill.yaml" || name == "prompt.md" {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join(skillDir, name))
+		rel, err := filepath.Rel(skillDir, path)
 		if err != nil {
-			continue
+			return nil
 		}
-		files = append(files, SkillFile{Name: name, Content: content})
-	}
+		// Exclude top-level definition files only.
+		if !strings.Contains(rel, string(filepath.Separator)) {
+			switch rel {
+			case "SKILL.md", "skill.yaml", "prompt.md":
+				return nil
+			}
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		files = append(files, SkillFile{Name: rel, Content: content})
+		return nil
+	})
 	return files
 }

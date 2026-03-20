@@ -394,6 +394,7 @@ func hireAgentFromSpec(root, project string, spec entity.AgentSpec,
 		ContextHash: ctxbuild.LayerHashes(mc),
 		Sandbox:     sandboxCfg,
 		AddDirs:     addDirs,
+		Playbook:    spec.Playbook,
 	}
 	return s.SaveAgentMeta(project, spec.Name, meta)
 }

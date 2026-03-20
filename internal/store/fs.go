@@ -308,6 +308,18 @@ func (s *fsStore) ListProjects() ([]*entity.Project, error) {
 	return projects, nil
 }
 
+func (s *fsStore) ProjectConfig(name string) (*entity.ProjectConfig, error) {
+	path := filepath.Join(s.projectDir(name), "project.yaml")
+	var cfg entity.ProjectConfig
+	if err := readYAML(path, &cfg); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("store: read project config %q: %w", name, err)
+	}
+	return &cfg, nil
+}
+
 // ── Skills ────────────────────────────────────────────────────────────────────
 
 func (s *fsStore) skillDir(name string) string {

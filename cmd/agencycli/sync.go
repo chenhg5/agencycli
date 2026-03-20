@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -75,7 +76,7 @@ Use --project to limit to one project, --project + --name for a single agent.`,
 
 			synced, skipped := 0, 0
 			for _, t := range targets {
-				diff, err := syncAgent(s, t.project, t.name, force)
+				diff, err := syncAgent(root, s, t.project, t.name, force)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "  ✗ %s/%s: %v\n", t.project, t.name, err)
 					continue
@@ -118,7 +119,7 @@ type syncDiff struct {
 // syncAgent rebuilds the context for one agent and writes it only if the
 // content has changed (or force is true).
 // Returns a syncDiff describing what changed (all-empty == up to date).
-func syncAgent(s store.Store, project, agentName string, force bool) (syncDiff, error) {
+func syncAgent(root string, s store.Store, project, agentName string, force bool) (syncDiff, error) {
 	meta, err := s.AgentMeta(project, agentName)
 	if err != nil {
 		return syncDiff{}, err
@@ -131,6 +132,30 @@ func syncAgent(s store.Store, project, agentName string, force bool) (syncDiff, 
 	}
 
 	newHashes := ctxbuild.LayerHashes(mc)
+
+	// If meta.Playbook is empty (agent hired before this feature), fall back to
+	// reading the project.yaml to find the playbook name, and persist it into meta.
+	if meta.Playbook == "" {
+		if cfg, cerr := s.ProjectConfig(project); cerr == nil && cfg != nil {
+			for _, spec := range cfg.Agents {
+				if spec.Name == agentName && spec.Playbook != "" {
+					meta.Playbook = spec.Playbook
+					break
+				}
+			}
+		}
+	}
+
+	// Include playbook hash so changes to agent-playbooks/<file> are detected.
+	var playbookData []byte
+	if meta.Playbook != "" {
+		playbookPath := filepath.Join(root, "agent-playbooks", meta.Playbook)
+		playbookData, _ = os.ReadFile(playbookPath)
+		if len(playbookData) > 0 {
+			newHashes["playbook:"+meta.Playbook] = ctxbuild.ContentHash(string(playbookData))
+		}
+	}
+
 	diff := diffHashes(meta.ContextHash, newHashes)
 
 	if !force && len(diff.changed)+len(diff.added)+len(diff.removed) == 0 {
@@ -142,12 +167,24 @@ func syncAgent(s store.Store, project, agentName string, force bool) (syncDiff, 
 		return syncDiff{}, err
 	}
 
+	// Re-generate context files.
 	f, err := formatter.New(meta.Model)
 	if err != nil {
 		return syncDiff{}, err
 	}
 	if err := f.Format(mc, agentDir); err != nil {
 		return syncDiff{}, err
+	}
+
+	// Re-copy playbook if it changed (or force).
+	if meta.Playbook != "" && len(playbookData) > 0 {
+		ctxDir := filepath.Join(agentDir, ".agencycli-context")
+		if err := os.MkdirAll(ctxDir, 0o755); err != nil {
+			return syncDiff{}, err
+		}
+		if err := os.WriteFile(filepath.Join(ctxDir, "wakeup.md"), playbookData, 0o644); err != nil {
+			return syncDiff{}, fmt.Errorf("write wakeup.md: %w", err)
+		}
 	}
 
 	now := time.Now().UTC()

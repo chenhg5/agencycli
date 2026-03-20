@@ -23,6 +23,10 @@ func deploySkillFiles(sk ctxbuild.SkillDef, destDir string) (string, error) {
 	}
 	for _, f := range sk.Files {
 		dst := filepath.Join(destDir, f.Name)
+		// Ensure parent directory exists (handles subdirectory paths like "scripts/foo.sh").
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return "", fmt.Errorf("skill %q: create dir for %q: %w", sk.Name, f.Name, err)
+		}
 		mode := os.FileMode(0o644)
 		// Preserve executable bit for shell scripts.
 		if strings.HasSuffix(f.Name, ".sh") || strings.HasSuffix(f.Name, ".bash") {

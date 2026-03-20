@@ -68,6 +68,10 @@ type Store interface {
 	SaveProjectPrompt(name string, content string) error
 	ListProjects() ([]*entity.Project, error)
 
+	// ProjectConfig reads the declarative project.yaml (agents, playbooks, etc.).
+	// Returns nil, nil when the file does not exist.
+	ProjectConfig(name string) (*entity.ProjectConfig, error)
+
 	// ── Roles ─────────────────────────────────────────────────────────────
 	// teamPath is a slash-separated team path, e.g. "engineering".
 	// roleName is the role directory name, e.g. "backend-dev".
