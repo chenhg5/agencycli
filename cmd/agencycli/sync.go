@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/ctxbuild"
@@ -73,16 +75,25 @@ Use --project to limit to one project, --project + --name for a single agent.`,
 
 			synced, skipped := 0, 0
 			for _, t := range targets {
-				changed, err := syncAgent(s, t.project, t.name, force)
+				diff, err := syncAgent(s, t.project, t.name, force)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "  ✗ %s/%s: %v\n", t.project, t.name, err)
 					continue
 				}
-				if changed {
+				if len(diff.changed)+len(diff.added)+len(diff.removed) > 0 {
 					fmt.Printf("  ✓ synced  %s/%s\n", t.project, t.name)
+					if len(diff.changed) > 0 {
+						fmt.Printf("      changed : %s\n", strings.Join(diff.changed, ", "))
+					}
+					if len(diff.added) > 0 {
+						fmt.Printf("      added   : %s\n", strings.Join(diff.added, ", "))
+					}
+					if len(diff.removed) > 0 {
+						fmt.Printf("      removed : %s\n", strings.Join(diff.removed, ", "))
+					}
 					synced++
 				} else {
-					fmt.Printf("  - skipped %s/%s (up to date)\n", t.project, t.name)
+					fmt.Printf("  · skipped %s/%s  (up to date)\n", t.project, t.name)
 					skipped++
 				}
 			}
@@ -97,57 +108,77 @@ Use --project to limit to one project, --project + --name for a single agent.`,
 	return cmd
 }
 
+// syncDiff holds the categorised layer changes detected during a sync.
+type syncDiff struct {
+	changed []string // layers whose content hash changed
+	added   []string // layers/skills that did not exist before
+	removed []string // layers/skills that no longer exist
+}
+
 // syncAgent rebuilds the context for one agent and writes it only if the
-// content has changed (or force is true). Returns true if a write occurred.
-func syncAgent(s store.Store, project, agentName string, force bool) (bool, error) {
+// content has changed (or force is true).
+// Returns a syncDiff describing what changed (all-empty == up to date).
+func syncAgent(s store.Store, project, agentName string, force bool) (syncDiff, error) {
 	meta, err := s.AgentMeta(project, agentName)
 	if err != nil {
-		return false, err
+		return syncDiff{}, err
 	}
 
 	builder := ctxbuild.NewBuilder(s)
 	mc, err := builder.Build(project, meta.Team, meta.Role)
 	if err != nil {
-		return false, fmt.Errorf("build context: %w", err)
+		return syncDiff{}, fmt.Errorf("build context: %w", err)
 	}
 
 	newHashes := ctxbuild.LayerHashes(mc)
+	diff := diffHashes(meta.ContextHash, newHashes)
 
-	if !force && hashesEqual(meta.ContextHash, newHashes) {
-		return false, nil
+	if !force && len(diff.changed)+len(diff.added)+len(diff.removed) == 0 {
+		return syncDiff{}, nil
 	}
 
 	agentDir := s.AgentDir(project, agentName)
 	if err := os.MkdirAll(agentDir, 0o755); err != nil {
-		return false, err
+		return syncDiff{}, err
 	}
 
 	f, err := formatter.New(meta.Model)
 	if err != nil {
-		return false, err
+		return syncDiff{}, err
 	}
 	if err := f.Format(mc, agentDir); err != nil {
-		return false, err
+		return syncDiff{}, err
 	}
 
+	now := time.Now().UTC()
 	meta.ContextHash = newHashes
-	meta.HiredAt = time.Now().UTC() // update timestamp on sync
+	meta.SyncedAt = &now
+	// HiredAt is intentionally left unchanged — sync ≠ rehire.
 	if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
-		return false, err
+		return syncDiff{}, err
 	}
 
-	return true, nil
+	return diff, nil
 }
 
-// hashesEqual reports whether two hash maps have identical contents.
-func hashesEqual(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
+// diffHashes compares old and new hash maps and categorises each key.
+func diffHashes(old, new map[string]string) syncDiff {
+	var d syncDiff
+	for k, newVal := range new {
+		if oldVal, exists := old[k]; !exists {
+			d.added = append(d.added, k)
+		} else if oldVal != newVal {
+			d.changed = append(d.changed, k)
 		}
 	}
-	return true
+	for k := range old {
+		if _, exists := new[k]; !exists {
+			d.removed = append(d.removed, k)
+		}
+	}
+	sort.Strings(d.changed)
+	sort.Strings(d.added)
+	sort.Strings(d.removed)
+	return d
 }
+

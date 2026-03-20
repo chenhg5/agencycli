@@ -175,6 +175,10 @@ type AgentMeta struct {
 	Model   AgentModel `yaml:"model"`
 	HiredAt time.Time  `yaml:"hired_at"`
 
+	// SyncedAt is updated each time `agencycli sync` rewrites this agent's
+	// context. It is nil for agents that have never been synced after hire.
+	SyncedAt *time.Time `yaml:"synced_at,omitempty"`
+
 	// ContextHash maps each layer source key to the SHA-256 hex digest
 	// of its prompt content at hire time.
 	ContextHash map[string]string `yaml:"context_hash,omitempty"`
