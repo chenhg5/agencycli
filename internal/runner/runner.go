@@ -95,6 +95,11 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 
 	agentDir := filepath.Join(r.root, "projects", project, "agents", agentName)
 
+	// HTTP agent: bypass CLI subprocess.
+	if entity.NormaliseModel(meta.Model) == entity.ModelHTTPAgent {
+		return r.execPromptHTTP(agentDir, meta, prompt)
+	}
+
 	// Write prompt to a temp file.
 	promptFile, err := writeTempPrompt(agentDir, prompt)
 	if err != nil {
@@ -224,6 +229,11 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	}
 
 	agentDir := filepath.Join(r.root, "projects", project, "agents", agentName)
+
+	// HTTP agent: bypass CLI subprocess, send prompt to HTTP endpoint directly.
+	if entity.NormaliseModel(meta.Model) == entity.ModelHTTPAgent {
+		return r.runTaskHTTP(project, agentName, agentDir, meta, task)
+	}
 
 	// Build full prompt.
 	fullPrompt := task.Prompt + fmt.Sprintf(systemMetaFooter,
@@ -474,6 +484,103 @@ func cloneDockerCfg(cfg *entity.DockerSandboxConfig) *entity.DockerSandboxConfig
 	cp.ExtraEnv = append([]string(nil), cfg.ExtraEnv...)
 	cp.CredentialMounts = append([]string(nil), cfg.CredentialMounts...)
 	return &cp
+}
+
+// ── HTTP agent task/exec methods ───────────────────────────────────────────────
+
+// runTaskHTTP runs a task by posting the full prompt to the agent's HTTP
+// endpoint. The agent's context.md is sent as the system message; the task
+// prompt + system meta footer become the user message.
+func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.AgentMeta, task *entity.Task) (*RunResult, error) {
+	if meta.HTTPAgent == nil {
+		return nil, fmt.Errorf("http-agent: no http_agent config in .agencycli-agent.yaml (re-hire with --http-url)")
+	}
+
+	userPrompt := task.Prompt + fmt.Sprintf(systemMetaFooter,
+		task.ID, project, agentName, task.ID, task.ID, task.ID)
+
+	logDir, err := r.ts.RunLogDir(project, agentName)
+	if err != nil {
+		return nil, fmt.Errorf("create log dir: %w", err)
+	}
+	logName := fmt.Sprintf("%s-%s.log", time.Now().UTC().Format("20060102-150405"), task.ID)
+	logPath := filepath.Join(logDir, logName)
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("create log file: %w", err)
+	}
+	defer logFile.Close()
+
+	fmt.Fprintf(logFile, "=== agencycli run: %s/%s task=%s model=http-agent url=%s ===\n",
+		project, agentName, task.ID, meta.HTTPAgent.URL)
+	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
+
+	systemPrompt := readAgentContextFile(agentDir)
+	output, httpErr := httpExec(meta.HTTPAgent, systemPrompt, userPrompt, logFile, false)
+
+	fmt.Fprintf(logFile, "\n=== finished: %s ===\n", time.Now().UTC().Format(time.RFC3339))
+
+	result := &RunResult{LogPath: logPath}
+
+	if httpErr != nil {
+		result.Status = entity.TaskStatusDoneFailed
+		result.ErrorMsg = httpErr.Error()
+		return result, nil
+	}
+
+	// Check for sentinels in the response text.
+	if summary := parseLineSentinel(output, ConfirmSentinel); summary != "" {
+		result.Status = entity.TaskStatusAwaitingConfirmation
+		result.Summary = strings.TrimSpace(summary)
+		return result, nil
+	}
+	if sid := parseLineSentinel(output, SessionSentinel); sid != "" {
+		result.SessionID = sid
+	}
+
+	result.Status = entity.TaskStatusDoneSuccess
+	return result, nil
+}
+
+// execPromptHTTP handles ExecPrompt for http-agent: sends the raw prompt to
+// the HTTP endpoint and streams the response to stdout + log file.
+func (r *Runner) execPromptHTTP(agentDir string, meta *entity.AgentMeta, prompt string) (*RunResult, error) {
+	if meta.HTTPAgent == nil {
+		return nil, fmt.Errorf("http-agent: no http_agent config in .agencycli-agent.yaml (re-hire with --http-url)")
+	}
+
+	logDir, err := r.ts.RunLogDir(meta.Project, meta.Name)
+	if err != nil {
+		return nil, fmt.Errorf("create log dir: %w", err)
+	}
+	logName := fmt.Sprintf("%s-exec.log", time.Now().UTC().Format("20060102-150405"))
+	logPath := filepath.Join(logDir, logName)
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("create log file: %w", err)
+	}
+	defer logFile.Close()
+
+	fmt.Fprintf(logFile, "=== agencycli exec: %s/%s model=http-agent url=%s ===\n",
+		meta.Project, meta.Name, meta.HTTPAgent.URL)
+	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
+
+	systemPrompt := readAgentContextFile(agentDir)
+	output, httpErr := httpExec(meta.HTTPAgent, systemPrompt, prompt, logFile, true)
+
+	fmt.Fprintf(logFile, "\n=== finished: %s ===\n", time.Now().UTC().Format(time.RFC3339))
+
+	result := &RunResult{LogPath: logPath}
+	if httpErr != nil {
+		result.Status = entity.TaskStatusDoneFailed
+		result.ErrorMsg = httpErr.Error()
+		return result, nil
+	}
+	if sid := parseLineSentinel(output, SessionSentinel); sid != "" {
+		result.SessionID = sid
+	}
+	result.Status = entity.TaskStatusDoneSuccess
+	return result, nil
 }
 
 // remapPromptFile replaces occurrences of hostPath with containerPath in args.

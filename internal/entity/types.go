@@ -45,6 +45,11 @@ const (
 	// ModelGenericCLI is a fallback for any other CLI agent.
 	// Context file: context.md (plain merged text).
 	ModelGenericCLI AgentModel = "generic-cli"
+
+	// ModelHTTPAgent sends the prompt to an OpenAI-compatible HTTP endpoint
+	// (e.g. Ollama, LM Studio, LocalAI, or any /v1/chat/completions service).
+	// Context file: context.md (used as the system message).
+	ModelHTTPAgent AgentModel = "http-agent"
 )
 
 // KnownModels lists all supported agent models in display order.
@@ -57,6 +62,7 @@ var KnownModels = []AgentModel{
 	ModelOpenCode,
 	ModelIFlow,
 	ModelGenericCLI,
+	ModelHTTPAgent,
 }
 
 // modelAliases maps legacy or alternate spellings to the canonical model name.
@@ -185,6 +191,45 @@ type AgentMeta struct {
 	// Sandbox configures isolated container execution for this agent.
 	// When nil the agent runs directly on the host (default behaviour).
 	Sandbox *SandboxConfig `yaml:"sandbox,omitempty"`
+
+	// HTTPAgent configures an HTTP LLM backend for this agent.
+	// Required (and only used) when Model == "http-agent".
+	HTTPAgent *HTTPAgentConfig `yaml:"http_agent,omitempty"`
+}
+
+// HTTPAgentConfig configures a custom HTTP LLM backend that speaks the
+// OpenAI Chat Completions API (POST /v1/chat/completions).
+// Compatible services: Ollama, LM Studio, LocalAI, OpenAI, and any
+// OpenAI-API-compatible proxy.
+//
+// The agent's merged context (context.md written at hire time) is sent as
+// the "system" role message. The task prompt becomes the "user" message.
+type HTTPAgentConfig struct {
+	// URL is the chat completions endpoint.
+	// e.g. "http://localhost:11434/v1/chat/completions"  (Ollama)
+	//      "https://api.openai.com/v1/chat/completions"  (OpenAI)
+	URL string `yaml:"url"`
+
+	// Model is the model identifier passed in the request body.
+	// e.g. "llama3.2", "gpt-4o", "mistral", "deepseek-r1:8b"
+	Model string `yaml:"model,omitempty"`
+
+	// APIKey is used as the Bearer token in the Authorization header.
+	// Leave empty for unauthenticated local services (e.g. Ollama default).
+	// Can also be set via the AGENCYCLI_HTTP_API_KEY environment variable.
+	APIKey string `yaml:"api_key,omitempty"`
+
+	// Timeout is the per-request timeout as a Go duration string.
+	// Defaults to "10m". Increase for large models or slow hardware.
+	Timeout string `yaml:"timeout,omitempty"`
+
+	// Stream enables server-sent events streaming.
+	// When true, tokens are written to the log file as they arrive.
+	Stream bool `yaml:"stream,omitempty"`
+
+	// ExtraHeaders are additional HTTP headers sent with every request.
+	// Useful for proxies or services with custom authentication schemes.
+	ExtraHeaders map[string]string `yaml:"extra_headers,omitempty"`
 }
 
 // ─────────────────────────────────────────────

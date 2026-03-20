@@ -39,6 +39,9 @@ func New(model entity.AgentModel) (Formatter, error) {
 		return &singleFileFormatter{filename: "IFLOW.md"}, nil
 	case entity.ModelGenericCLI:
 		return &genericFormatter{}, nil
+	case entity.ModelHTTPAgent:
+		// HTTP agents use context.md as the system prompt sent with every request.
+		return &genericFormatter{}, nil
 	default:
 		return nil, fmt.Errorf("formatter: unsupported model %q", model)
 	}

@@ -51,6 +51,14 @@ func buildHireCmd(use string) *cobra.Command {
 		sandboxMemoryMB    int
 		sandboxCPUs        float64
 		sandboxNoAutoCreds bool
+
+		// HTTP agent flags (used when --model http-agent)
+		httpURL     string
+		httpModel   string
+		httpAPIKey  string
+		httpTimeout string
+		httpStream  bool
+		httpHeaders []string
 	)
 
 	cmd := &cobra.Command{
@@ -196,6 +204,31 @@ The output format depends on --model:
 				}
 			}
 
+			// Build HTTP agent config when --model http-agent is used.
+			var httpAgentCfg *entity.HTTPAgentConfig
+			if agentModel == entity.ModelHTTPAgent {
+				if httpURL == "" {
+					return fmt.Errorf("--http-url is required when --model http-agent")
+				}
+				httpAgentCfg = &entity.HTTPAgentConfig{
+					URL:     httpURL,
+					Model:   httpModel,
+					APIKey:  httpAPIKey,
+					Timeout: httpTimeout,
+					Stream:  httpStream,
+				}
+				if len(httpHeaders) > 0 {
+					httpAgentCfg.ExtraHeaders = make(map[string]string, len(httpHeaders))
+					for _, h := range httpHeaders {
+						k, v, ok := strings.Cut(h, ":")
+						if !ok {
+							return fmt.Errorf("--http-header %q: expected \"Key: Value\" format", h)
+						}
+						httpAgentCfg.ExtraHeaders[strings.TrimSpace(k)] = strings.TrimSpace(v)
+					}
+				}
+			}
+
 			meta := &entity.AgentMeta{
 				Name:        agentName,
 				Project:     project,
@@ -206,6 +239,7 @@ The output format depends on --model:
 				ContextHash: ctxbuild.LayerHashes(mc),
 				Sandbox:     sandboxCfg,
 				AddDirs:     addDirs,
+				HTTPAgent:   httpAgentCfg,
 			}
 			if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
 				return fmt.Errorf("%s: save agent meta: %w", use, err)
@@ -230,6 +264,14 @@ The output format depends on --model:
 	cmd.Flags().IntVar(&sandboxMemoryMB, "sandbox-memory", 0, "Container memory limit in MiB (0 = no limit)")
 	cmd.Flags().Float64Var(&sandboxCPUs, "sandbox-cpus", 0, "Container CPU quota (0 = no limit)")
 	cmd.Flags().BoolVar(&sandboxNoAutoCreds, "sandbox-no-auto-creds", false, "Disable automatic credential mount defaults")
+
+	// HTTP agent flags
+	cmd.Flags().StringVar(&httpURL, "http-url", "", "HTTP endpoint URL for http-agent (e.g. http://localhost:11434/v1/chat/completions)")
+	cmd.Flags().StringVar(&httpModel, "http-model", "", "Model identifier to pass in the request body (e.g. llama3.2, gpt-4o)")
+	cmd.Flags().StringVar(&httpAPIKey, "http-api-key", "", "Bearer token for the HTTP endpoint (or set AGENCYCLI_HTTP_API_KEY env var)")
+	cmd.Flags().StringVar(&httpTimeout, "http-timeout", "10m", "Per-request timeout for http-agent (e.g. 5m, 30m)")
+	cmd.Flags().BoolVar(&httpStream, "http-stream", true, "Enable SSE streaming for http-agent responses")
+	cmd.Flags().StringArrayVar(&httpHeaders, "http-header", nil, "Extra HTTP headers: \"Key: Value\" (repeatable)")
 
 	_ = cmd.MarkFlagRequired("project")
 	_ = cmd.MarkFlagRequired("team")
@@ -284,6 +326,9 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 		fmt.Printf("    agent\n")
 	case entity.ModelGemini:
 		fmt.Printf("    gemini\n")
+	case entity.ModelHTTPAgent:
+		fmt.Printf("    agencycli run --project %s --agent %s\n", project, agentName)
+		fmt.Printf("    # (prompts are sent to your configured HTTP endpoint)\n")
 	default:
 		fmt.Printf("    <your-agent-command>\n")
 	}
