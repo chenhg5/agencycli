@@ -36,6 +36,20 @@ Only after you have clear answers to these questions should you proceed to creat
 
 > **Practical tip:** Consider drafting a short summary of the proposed agency structure (team names, role names, responsibilities) and asking the user to confirm it before executing any commands. A one-paragraph confirmation now saves a full re-setup later.
 
+### Writing prompts is not optional
+
+Creating the directory structure is only half the work. **The prompts are what make agents intelligent.** An agent with an empty or thin `prompt.md` has no idea who it is, what it owns, or how to behave — it will produce generic, unreliable results.
+
+After every `agencycli create` command, you **must** write a substantive prompt for that entity before moving on. The three prompt layers are:
+
+| Layer | File | What it shapes |
+|-------|------|----------------|
+| Agency | `agency-prompt.md` | Identity, values, and universal rules shared by **every** agent |
+| Team | `teams/<name>/prompt.md` | Standards, tools, and norms for agents in this team |
+| Role | `teams/<t>/roles/<r>/prompt.md` | Who this agent is, what it owns, how it works, what "done" means |
+
+The role prompt is the most important — spend the most time on it. See Steps 1, 2, and 4 below for concrete templates.
+
 ---
 
 ## 1. Install
@@ -93,14 +107,58 @@ cd MyAgency
 
 This creates the workspace directory with a `.agencycli/` folder and a starter `agency-prompt.md`.
 
-**Edit `agency-prompt.md`** — everything here is injected into every agent. Add:
-- Company values and communication style
-- How agents should report blockers
-- How to use `agencycli` commands (task done, inbox send, etc.)
-- Any global coding or documentation standards
+**Edit `agency-prompt.md`** — this is injected into **every** agent across every team. It defines the company's identity, values, and universal rules. Fill it in fully before creating any teams.
 
 ```bash
 $EDITOR agency-prompt.md
+```
+
+A well-written `agency-prompt.md` should cover:
+
+```markdown
+# <Agency Name>
+
+## Mission
+<1–2 sentences: what this company/project is building and why it exists>
+
+## Core values
+- <Value 1>: <Brief description — e.g. "Quality over speed: we ship tested, reviewed code">
+- <Value 2>: <e.g. "Transparency: surface blockers immediately, never stay stuck silently">
+- <Value 3>: <e.g. "Ownership: if you see a problem, you own fixing it">
+
+## Communication style
+<Tone and style expected in all output — e.g. "Be concise and direct. Prefer bullet points
+over prose. Use plain language.">
+
+## Universal rules (apply to every agent)
+- Never push directly to main — always open a PR
+- Never delete files or code without explicit instruction
+- When blocked for more than 30 minutes, report via inbox and pause
+- Always confirm with the user before any irreversible action (deploy, delete, send email)
+- Keep task summaries factual — record what you did, not what you intended to do
+
+## How to use agencycli (mandatory reading)
+Every agent must know these commands:
+
+  # Complete a task
+  agencycli --dir $AGENCY_DIR task done --id <id> --status success --summary "..."
+
+  # Request human confirmation before proceeding
+  agencycli --dir $AGENCY_DIR task confirm-request --id <id> \
+    --summary "..." --action-item "Approve or reject"
+
+  # Send a message to another participant
+  agencycli --dir $AGENCY_DIR inbox send \
+    --from <project>/<agent> --to human \
+    --subject "..." --body "..."
+
+  # Reply to a message
+  agencycli --dir $AGENCY_DIR inbox reply <msg-id> \
+    --from <project>/<agent> --body "..."
+
+## Escalation policy
+<Who to message when something is blocked or uncertain — e.g. "Always send blockers
+to 'human'. Copy the PM role when starting or finishing major features.">
 ```
 
 ---
@@ -122,11 +180,40 @@ agencycli create team --name "engineering/backend"   --desc "Go/API services"
 agencycli create team --name "engineering/frontend"  --desc "React/TypeScript"
 ```
 
-**Edit `teams/<name>/prompt.md`** — add team-specific conventions:
+**Edit `teams/<name>/prompt.md`** — every agent on this team inherits this context. It defines team-level standards, norms, and tooling that all roles within the team share.
 
 ```bash
 $EDITOR teams/engineering/prompt.md
-# e.g. coding standards, branch naming, PR review process, testing requirements
+```
+
+A well-written team prompt should cover:
+
+```markdown
+# <Team Name> Team
+
+## Team mission
+<What this team is responsible for and what success looks like for the team>
+
+## Standards and conventions
+- **Language / stack:** <e.g. Go 1.22, PostgreSQL, Docker>
+- **Branch naming:** `<type>/<issue-number>-<short-desc>` (e.g. `fix/142-login-redirect`)
+- **Commit style:** <e.g. Conventional Commits: feat/fix/chore/docs/test>
+- **PR process:** <e.g. All PRs require 1 approval + passing CI before merge>
+- **Test requirements:** <e.g. New features must include unit tests; coverage must not drop>
+- **Code style:** <e.g. Run gofmt/eslint before committing; no warnings left unresolved>
+
+## Tools available to all roles in this team
+- `gh` — GitHub CLI (issues, PRs, releases)
+- <any other team-wide tools — e.g. `jq`, `docker`, `kubectl`>
+
+## Team communication norms
+- <e.g. "The PM role coordinates task assignment — check in with pm before starting new work">
+- <e.g. "QA must sign off on every feature PR before it is merged">
+- <e.g. "Post a brief status update to human inbox at the end of each work cycle">
+
+## What "quality work" means for this team
+<Define the bar — e.g. "Code is well-tested, documented, reviewed, and doesn't break
+existing functionality. Documentation is updated alongside code changes.">
 ```
 
 ---
@@ -142,17 +229,13 @@ agencycli ships two ready-made skills on GitHub that every agency should use. Do
 ```bash
 # agency-messaging — teaches agents how to discover each other and exchange inbox messages
 mkdir -p skills/agency-messaging
-curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/skill.yaml \
-  -o skills/agency-messaging/skill.yaml
-curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/prompt.md \
-  -o skills/agency-messaging/prompt.md
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/SKILL.md \
+  -o skills/agency-messaging/SKILL.md
 
 # agencycli-usage — teaches agents how to operate agencycli (add tasks, mark done, etc.)
 mkdir -p skills/agencycli-usage
-curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/skill.yaml \
-  -o skills/agencycli-usage/skill.yaml
-curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/prompt.md \
-  -o skills/agencycli-usage/prompt.md
+curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/SKILL.md \
+  -o skills/agencycli-usage/SKILL.md
 ```
 
 | Skill | Purpose |
@@ -225,15 +308,78 @@ agencycli create role --team "qa"          --name "qa-engineer" --desc "Reviews 
 agencycli create role --team "product"     --name "pm"          --desc "Manages roadmap and tasks"
 ```
 
-**Edit `teams/<team>/roles/<role>/prompt.md`** — this is the most important layer for shaping agent behaviour:
+**Edit `teams/<team>/roles/<role>/prompt.md`** — this is the most important layer. It defines who this agent is, what it owns, how it works, where its files live, and what "done" means. **Write it fully before hiring any agent with this role.**
 
 ```bash
 $EDITOR teams/engineering/roles/developer/prompt.md
-# e.g.: "You are a senior software engineer. You write clean, tested, documented code.
-#        Always open a PR for changes. Never push directly to main."
 ```
 
-> **Looking for inspiration?** [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) is a community collection of role definitions covering engineering, QA, design, product, marketing, sales, and more. Browse it for ideas and reference when writing your own `prompt.md`.
+A well-written role prompt must cover all of the following:
+
+```markdown
+# Role: <Role Title>
+
+## Identity
+You are a <seniority + job title> on the <team name> team at <agency name>.
+<1–2 sentences describing the agent's personality and working style — e.g.
+"You are pragmatic and delivery-focused. You write clean, tested, well-documented
+code and communicate proactively.">
+
+## Responsibilities
+- <Primary responsibility — e.g. "Implement features and bug fixes as assigned by the PM">
+- <e.g. "Write unit and integration tests for all code you produce">
+- <e.g. "Open a PR for every change; never commit directly to main">
+- <e.g. "Respond to PR review comments within your next active wakeup cycle">
+- <e.g. "Keep the PM informed of progress and blockers via inbox">
+
+## Work scope and boundaries
+**You own:**
+- <e.g. All files under src/, internal/, cmd/ for the assigned project>
+- <e.g. Writing and updating tests in the test/ directory>
+
+**You do NOT:**
+- <e.g. Modify CI/CD configuration or deployment scripts — escalate to DevOps role>
+- <e.g. Merge your own PRs — always request review first>
+- <e.g. Make product decisions — ask the PM role>
+- <e.g. Access production infrastructure directly>
+
+## Your workspace
+Your working directory is at: projects/<project>/agents/<your-name>/
+
+  CLAUDE.md (or AGENTS.md)   ← your full context — auto-generated, do not edit manually
+  tasks/                     ← task queue (managed by agencycli, do not edit manually)
+  notes/                     ← your persistent notes and research (you own this)
+  scratch/                   ← temporary files, experiments, drafts
+
+Always read your notes/ directory at the start of each wakeup cycle for continuity.
+
+## Your skills
+The following skills are deployed in your working directory. Read each SKILL.md
+at the start of your first session so you know how to use them:
+
+- `agency-messaging`  — How to discover other agents and send/receive inbox messages
+- `agencycli-usage`   — How to operate agencycli: tasks, inbox, sync, overview
+- `<your-skill-name>` — <One-line description of what this skill enables>
+
+## Communication
+- **Report blockers immediately** — never stay stuck. Send to human inbox after 30 min:
+  `agencycli --dir $AGENCY_DIR inbox send --from <project>/<name> --to human --subject "Blocked: ..." --body "..."`
+- **Request confirmation before irreversible actions** (merges, deploys, deletes):
+  `agencycli --dir $AGENCY_DIR task confirm-request --id <id> --summary "..." --action-item "..."`
+- **Update the PM** when starting or finishing significant work:
+  `agencycli --dir $AGENCY_DIR inbox send --from <project>/<name> --to <project>/pm ...`
+
+## Definition of done
+A task is complete when **all** of the following are true:
+1. <e.g. Code is committed and a PR is opened with a clear description>
+2. <e.g. All tests pass — run the test suite before marking done>
+3. <e.g. Relevant documentation is updated if the public interface changed>
+4. <e.g. task done is called with a clear summary of what was done>
+
+If human review is required before marking done, use `task confirm-request` instead.
+```
+
+> **Looking for inspiration?** [github.com/msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) is a community collection of role definitions covering engineering, QA, design, product, marketing, sales, and more. Browse it as a reference when writing your own `prompt.md`.
 
 **Edit `teams/<team>/roles/<role>/role.yaml`** to bind skills and configure workspace setup:
 
@@ -556,37 +702,52 @@ agencycli sync --force                        # force regenerate everything
 ## Setup checklist
 
 ```
+─── Agency ────────────────────────────────────────────────────────────────────
 [ ] agencycli create agency --name "..." --desc "..."
-[ ] Edit agency-prompt.md              ← global rules, values, how to use agencycli
+[ ] Write agency-prompt.md             ← REQUIRED: mission, values, universal rules,
+                                          agencycli command reference, escalation policy
 
+─── Teams (repeat for each team) ──────────────────────────────────────────────
 [ ] agencycli create team --name "engineering"
-[ ] Edit teams/engineering/prompt.md   ← coding standards, conventions
+[ ] Write teams/engineering/prompt.md  ← REQUIRED: team mission, stack/standards,
+                                          tools, PR process, definition of quality
 
+─── Skills ─────────────────────────────────────────────────────────────────────
 [ ] Download built-in skills:
-[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/skill.yaml -o skills/agency-messaging/skill.yaml
-[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/prompt.md  -o skills/agency-messaging/prompt.md
-[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/skill.yaml  -o skills/agencycli-usage/skill.yaml
-[ ]   curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/prompt.md   -o skills/agencycli-usage/prompt.md
-[ ] (optional) mkdir -p skills/my-skill && write SKILL.md (frontmatter + body)
+[ ]   mkdir -p skills/agency-messaging && \
+        curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agency-messaging/SKILL.md \
+          -o skills/agency-messaging/SKILL.md
+[ ]   mkdir -p skills/agencycli-usage && \
+        curl -sL https://raw.githubusercontent.com/chenhg5/agencycli/main/skills/agencycli-usage/SKILL.md \
+          -o skills/agencycli-usage/SKILL.md
+[ ] (optional) mkdir -p skills/my-skill && write skills/my-skill/SKILL.md
 
+─── Roles (repeat for each role) ──────────────────────────────────────────────
 [ ] agencycli create role --team engineering --name developer
-[ ] Edit teams/engineering/roles/developer/prompt.md   ← responsibilities, behaviour
-[ ] Edit teams/engineering/roles/developer/role.yaml   ← skills: [...], setup dirs
-[ ]   agencycli role skill add --team engineering --role developer --skill agency-messaging  ← required
-[ ]   agencycli role skill add --team engineering --role developer --skill agencycli-usage   ← recommended
-[ ]   agencycli role skill add --team engineering --role developer --skill <your-skill>      ← custom
+[ ] Write teams/engineering/roles/developer/prompt.md   ← REQUIRED: identity,
+        responsibilities, work scope & boundaries, workspace folder explanation,
+        skills overview, communication norms, definition of done
+[ ] Edit teams/engineering/roles/developer/role.yaml    ← skills: [...], setup dirs
+[ ]   agencycli role skill add --team engineering --role developer --skill agency-messaging
+[ ]   agencycli role skill add --team engineering --role developer --skill agencycli-usage
+[ ]   agencycli role skill add --team engineering --role developer --skill <your-skill>
 
+─── Project ────────────────────────────────────────────────────────────────────
 [ ] agencycli create project --name "my-app" --repo /path/to/repo
-[ ] Edit projects/my-app/prompt.md     ← tech stack, build commands, PR conventions
+[ ] Write projects/my-app/prompt.md    ← REQUIRED: tech stack, build/test/run commands,
+                                          repo URL, branch conventions, architectural notes
 
+─── Hire ───────────────────────────────────────────────────────────────────────
 [ ] agencycli hire --project my-app --team engineering --role developer --model claudecode --name dev
+[ ] agencycli show agent my-app dev --raw   ← verify merged context looks correct
 
+─── Heartbeat ──────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --enable --interval 30m
-[ ] Write projects/my-app/agents/dev/wakeup.md   ← autonomous routine
+[ ] Write projects/my-app/agents/dev/wakeup.md
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --wakeup-prompt-file ...
 
+─── Start ──────────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler start
-
 [ ] agencycli overview                 ← dashboard
 [ ] agencycli inbox list               ← task confirmations
 [ ] agencycli inbox messages           ← async messages
