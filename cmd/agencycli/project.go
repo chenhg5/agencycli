@@ -234,18 +234,21 @@ func applyAgentSpec(root, project string, spec entity.AgentSpec,
 
 	if spec.Playbook != "" {
 		playbookSrc := filepath.Join(root, "agent-playbooks", spec.Playbook)
-		wakeupDst := filepath.Join(agentDir, "wakeup.md")
+		wakeupDst := filepath.Join(agentDir, ".agencycli-context", "wakeup.md")
 		if dryRun {
-			fmt.Printf("    [dry-run] would install playbook %s → wakeup.md\n", spec.Playbook)
+			fmt.Printf("    [dry-run] would install playbook %s → .agencycli-context/wakeup.md\n", spec.Playbook)
 		} else {
 			data, err := os.ReadFile(playbookSrc)
 			if err != nil {
 				fmt.Printf("    ⚠ playbook %s not found: %v (skipping)\n", spec.Playbook, err)
 			} else {
+				if err := os.MkdirAll(filepath.Dir(wakeupDst), 0o755); err != nil {
+					return fmt.Errorf("create .agencycli-context: %w", err)
+				}
 				if err := os.WriteFile(wakeupDst, data, 0644); err != nil {
 					return fmt.Errorf("write wakeup.md: %w", err)
 				}
-				fmt.Printf("    ✓ playbook installed: %s → wakeup.md\n", spec.Playbook)
+				fmt.Printf("    ✓ playbook installed: %s → .agencycli-context/wakeup.md\n", spec.Playbook)
 			}
 		}
 	}
@@ -256,7 +259,7 @@ func applyAgentSpec(root, project string, spec entity.AgentSpec,
 		hb := spec.Heartbeat
 		// If a playbook is configured, auto-set wakeup prompt.
 		if spec.Playbook != "" && hb.WakeupPrompt == "" {
-			hb.WakeupPrompt = "@wakeup.md"
+			hb.WakeupPrompt = "@.agencycli-context/wakeup.md"
 		}
 		if dryRun {
 			interval := "not set"

@@ -316,6 +316,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 
 	r := runner.New(root, ts, s)
 	sessionID := hb.SessionID
+	i18n := wakeupStrings(agencyLang(s))
 
 	for {
 		if ctx.Err() != nil {
@@ -327,89 +328,93 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			return err
 		}
 		if task == nil {
-			// Queue is empty.  If a wakeup prompt is configured, run it once.
+			// Queue is empty.  Determine the wakeup prompt to run.
+			// WakeupPrompt may be "@<file>", inline text, or empty (use built-in trigger).
 			// The wakeup task is persisted to tasks.yaml so that the agent can
 			// call `task confirm-request --id $TASK_ID` without hitting "not found".
+			var prompt string
+			var promptErr error
 			if hb.WakeupPrompt != "" {
-				prompt, pErr := resolveWakeupPrompt(hb.WakeupPrompt, agentDir(root, project, agentName))
-				if pErr == nil && prompt != "" {
-					// Prepend any unread messages to the wakeup prompt.
-					recipient := project + "/" + agentName
-					unread, _ := ts.ListUnreadMessages(recipient)
-					if len(unread) > 0 {
-						var msgSection strings.Builder
-						msgSection.WriteString("## 📬 未读消息\n\n")
-						msgSection.WriteString("你收到了以下消息，请在本次唤醒中处理：\n\n")
-						for _, m := range unread {
-							msgSection.WriteString(fmt.Sprintf("---\n**[%s] From: %s**",
-								m.SentAt.Local().Format("01-02 15:04"), m.From))
-							if m.Subject != "" {
-								msgSection.WriteString(fmt.Sprintf("  Subject: %s", m.Subject))
-							}
-							msgSection.WriteString(fmt.Sprintf("\nID: `%s`\n\n%s\n\n", m.ID, m.Body))
+				prompt, promptErr = resolveWakeupPrompt(hb.WakeupPrompt, agentDir(root, project, agentName))
+			} else {
+				prompt = i18n.DefaultTrigger
+			}
+			if promptErr == nil && prompt != "" {
+				// Prepend any unread messages to the wakeup prompt.
+				recipient := project + "/" + agentName
+				unread, _ := ts.ListUnreadMessages(recipient)
+				if len(unread) > 0 {
+					var msgSection strings.Builder
+					msgSection.WriteString(i18n.InboxHeader)
+					msgSection.WriteString(i18n.InboxIntro)
+					for _, m := range unread {
+						msgSection.WriteString(fmt.Sprintf("---\n**[%s] From: %s**",
+							m.SentAt.Local().Format("01-02 15:04"), m.From))
+						if m.Subject != "" {
+							msgSection.WriteString(fmt.Sprintf("  Subject: %s", m.Subject))
 						}
+						msgSection.WriteString(fmt.Sprintf("\nID: `%s`\n\n%s\n\n", m.ID, m.Body))
+					}
 						msgSection.WriteString("---\n\n")
-						msgSection.WriteString("如需回复某条消息：\n")
-						msgSection.WriteString("  agencycli --dir /root/code/TechStudio inbox reply <msg-id> --body \"...\"\n\n")
-						prompt = msgSection.String() + prompt
-						fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine (%d unread message(s))\n",
-							project, agentName, len(unread))
-					} else {
-						fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine\n", project, agentName)
-					}
+					msgSection.WriteString(i18n.InboxReplyHint)
+					prompt = msgSection.String() + prompt
+					fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine (%d unread message(s))\n",
+						project, agentName, len(unread))
+				} else {
+					fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine\n", project, agentName)
+				}
 
-					now := time.Now().UTC()
-					wakeupTask := &entity.Task{
-						ID:        entity.NewTaskID(),
-						Title:     "[wakeup] routine",
-						Type:      "wakeup",
-						Priority:  9,
-						Status:    entity.TaskStatusPending,
-						Prompt:    prompt,
-						CreatedBy: "heartbeat:wakeup",
-						CreatedAt: now,
-						UpdatedAt: now,
-					}
-					// Persist before running so `task confirm-request --id $TASK_ID` works.
-					if addErr := ts.AddTask(project, agentName, wakeupTask); addErr != nil {
-						fmt.Printf("[heartbeat %s/%s] failed to persist wakeup task: %v\n", project, agentName, addErr)
-					} else {
-						wakeupTask.Status = entity.TaskStatusInProgress
-						wakeupTask.StartedAt = &now
-						wakeupTask.UpdatedAt = now
+				now := time.Now().UTC()
+				wakeupTask := &entity.Task{
+					ID:        entity.NewTaskID(),
+					Title:     "[wakeup] routine",
+					Type:      "wakeup",
+					Priority:  9,
+					Status:    entity.TaskStatusPending,
+					Prompt:    prompt,
+					CreatedBy: "heartbeat:wakeup",
+					CreatedAt: now,
+					UpdatedAt: now,
+				}
+				// Persist before running so `task confirm-request --id $TASK_ID` works.
+				if addErr := ts.AddTask(project, agentName, wakeupTask); addErr != nil {
+					fmt.Printf("[heartbeat %s/%s] failed to persist wakeup task: %v\n", project, agentName, addErr)
+				} else {
+					wakeupTask.Status = entity.TaskStatusInProgress
+					wakeupTask.StartedAt = &now
+					wakeupTask.UpdatedAt = now
+					_ = ts.UpdateTask(project, agentName, wakeupTask)
+				}
+
+				result, rErr := r.RunTask(project, agentName, wakeupTask, sessionID)
+				if rErr == nil && result.SessionID != "" {
+					sessionID = result.SessionID
+					latestHB, _ := ts.GetHeartbeat(project, agentName)
+					latestHB.SessionID = sessionID
+					_ = ts.SaveHeartbeat(project, agentName, latestHB)
+				}
+
+				finished := time.Now().UTC()
+				wakeupTask.FinishedAt = &finished
+				wakeupTask.RunLogPath = ""
+				if rErr != nil {
+					wakeupTask.Status = entity.TaskStatusDoneFailed
+					wakeupTask.LastError = rErr.Error()
+					_ = ts.ArchiveTask(project, agentName, wakeupTask)
+				} else {
+					wakeupTask.Status = result.Status
+					wakeupTask.RunLogPath = result.LogPath
+					switch result.Status {
+					case entity.TaskStatusAwaitingConfirmation:
+						// Leave in tasks.yaml; confirm-request already added the inbox item.
+						wakeupTask.ConfirmationReq = &entity.ConfirmationRequest{Summary: result.Summary}
+						wakeupTask.UpdatedAt = time.Now().UTC()
 						_ = ts.UpdateTask(project, agentName, wakeupTask)
-					}
-
-					result, rErr := r.RunTask(project, agentName, wakeupTask, sessionID)
-					if rErr == nil && result.SessionID != "" {
-						sessionID = result.SessionID
-						latestHB, _ := ts.GetHeartbeat(project, agentName)
-						latestHB.SessionID = sessionID
-						_ = ts.SaveHeartbeat(project, agentName, latestHB)
-					}
-
-					finished := time.Now().UTC()
-					wakeupTask.FinishedAt = &finished
-					wakeupTask.RunLogPath = ""
-					if rErr != nil {
-						wakeupTask.Status = entity.TaskStatusDoneFailed
-						wakeupTask.LastError = rErr.Error()
+					default:
+						// done_success, done_failed, or anything unexpected → archive.
 						_ = ts.ArchiveTask(project, agentName, wakeupTask)
-					} else {
-						wakeupTask.Status = result.Status
-						wakeupTask.RunLogPath = result.LogPath
-						switch result.Status {
-						case entity.TaskStatusAwaitingConfirmation:
-							// Leave in tasks.yaml; confirm-request already added the inbox item.
-							wakeupTask.ConfirmationReq = &entity.ConfirmationRequest{Summary: result.Summary}
-							wakeupTask.UpdatedAt = time.Now().UTC()
-							_ = ts.UpdateTask(project, agentName, wakeupTask)
-						default:
-							// done_success, done_failed, or anything unexpected → archive.
-							_ = ts.ArchiveTask(project, agentName, wakeupTask)
-							if len(unread) > 0 {
-								_ = ts.MarkMessagesRead(recipient)
-							}
+						if len(unread) > 0 {
+							_ = ts.MarkMessagesRead(recipient)
 						}
 					}
 				}
@@ -503,6 +508,49 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 // agentDir returns the filesystem path of an agent's workspace.
 func agentDir(root, project, agentName string) string {
 	return root + "/projects/" + project + "/agents/" + agentName
+}
+
+// ── i18n ─────────────────────────────────────────────────────────────────────
+
+// wakeupI18n holds the auto-generated strings injected around the wakeup prompt.
+type wakeupI18n struct {
+	InboxHeader    string // section heading for unread-message block
+	InboxIntro     string // sentence before the message list
+	InboxReplyHint string // hint line showing how to reply
+	DefaultTrigger string // used when wakeup_prompt is empty
+}
+
+// wakeupStrings returns the localised strings for the given lang code.
+// Supported: "zh", anything else falls back to "en".
+func wakeupStrings(lang string) wakeupI18n {
+	switch lang {
+	case "zh":
+		return wakeupI18n{
+			InboxHeader:    "## 📬 未读消息\n\n",
+			InboxIntro:     "你收到了以下消息，请在本次唤醒中处理：\n\n",
+			InboxReplyHint: "如需回复某条消息：\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
+			DefaultTrigger: "执行你的唤醒例程。检查待处理任务、未读消息及计划中的工作事项。如需了解具体例程，请参阅你的角色上下文。",
+		}
+	default: // "en"
+		return wakeupI18n{
+			InboxHeader:    "## 📬 Unread Messages\n\n",
+			InboxIntro:     "You have the following unread messages. Please handle them in this wakeup cycle:\n\n",
+			InboxReplyHint: "To reply to a message:\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
+			DefaultTrigger: "Execute your wakeup routine. Check pending tasks, unread messages, and your scheduled activities. Refer to your role context for the detailed routine.",
+		}
+	}
+}
+
+// agencyLang loads the agency config and returns its Lang field (default "en").
+func agencyLang(s store.Store) string {
+	if s == nil {
+		return "en"
+	}
+	a, err := s.Agency()
+	if err != nil || a.Lang == "" {
+		return "en"
+	}
+	return a.Lang
 }
 
 // resolveWakeupPrompt resolves a wakeup prompt value:
@@ -940,7 +988,7 @@ func newSchedulerHeartbeatCmd() *cobra.Command {
 
   # Set a wakeup routine (runs when queue is empty)
   agencycli scheduler heartbeat --project cc-connect --agent pm \
-    --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/wakeup.md`,
+    --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/.agencycli-context/wakeup.md`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {

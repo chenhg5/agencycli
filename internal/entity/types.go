@@ -94,6 +94,11 @@ func IsValidModel(m AgentModel) bool {
 type Agency struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
+
+	// Lang controls the language used for auto-generated scheduler messages
+	// (inbox notifications, wakeup triggers, etc.).
+	// Supported values: "en" (default), "zh".
+	Lang string `yaml:"lang,omitempty"`
 }
 
 // Team represents a functional group inside the agency.
@@ -371,7 +376,7 @@ type AgentSpec struct {
 	// Playbook is the filename (without path) of the agent's wakeup routine,
 	// resolved from agent-playbooks/<playbook> in the agency root.
 	// When set, `project apply` copies the file into the agent workspace as
-	// wakeup.md and sets HeartbeatConfig.WakeupPrompt = "@wakeup.md".
+	// .agencycli-context/wakeup.md and sets HeartbeatConfig.WakeupPrompt = "@.agencycli-context/wakeup.md".
 	// Example: "pm.md"
 	Playbook string `yaml:"playbook,omitempty"`
 
@@ -558,7 +563,7 @@ type HeartbeatConfig struct {
 	// autonomous routine (scan issues, review PRs, etc.) without requiring an
 	// explicit task to be queued first.
 	// Can be inline text or a path prefixed with "@" (relative to agent dir).
-	// Example: "@wakeup.md" reads the prompt from <agent-dir>/wakeup.md.
+	// Example: "@.agencycli-context/wakeup.md" reads the prompt from <agent-dir>/.agencycli-context/wakeup.md.
 	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
 
 	// WakeupCondition is an optional shell command evaluated before each wakeup.

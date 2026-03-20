@@ -107,6 +107,14 @@ cd MyAgency
 
 This creates the workspace directory with a `.agencycli/` folder and a starter `agency-prompt.md`.
 
+**Optional: set the agency language** in `.agencycli/agency.yaml` — this controls the language of all auto-generated scheduler messages (inbox notifications, wakeup triggers, etc.):
+
+```yaml
+# .agencycli/agency.yaml
+name: MyAgency
+lang: zh   # "zh" for Chinese, "en" for English (default)
+```
+
 **Edit `agency-prompt.md`** — this is injected into **every** agent across every team. It defines the company's identity, values, and universal rules. Fill it in fully before creating any teams.
 
 ```bash
@@ -496,50 +504,61 @@ Outside the active window the scheduler shows `⏸ outside active window — nex
 **What happens on each wakeup:**
 1. Any unread inbox messages are prepended to the prompt automatically
 2. All pending tasks are executed in priority order (0=critical → 3=low)
-3. If the queue is empty and a `wakeup.md` exists, it runs as the autonomous routine
+3. If the queue is empty and a `wakeup.md` exists (in `.agencycli-context/`), it runs as the autonomous routine
 
 ---
 
 ### Step 8 — Write a wakeup routine (playbook)
 
-A wakeup routine (`wakeup.md`) is what the agent does when it wakes up with no pending tasks. Place it directly in the agent's directory:
+When the agent wakes up with an empty task queue, the scheduler sends it a wakeup prompt.
+
+#### Recommended approach — put the SOP in the role prompt, keep wakeup.md short
+
+The detailed routine (what to check, what commands to run) belongs in the **role prompt** (`teams/<team>/roles/<role>/prompt.md`), which is baked into `CLAUDE.md` and loaded once per session. The `wakeup.md` then only needs to be a short trigger:
 
 ```bash
-$EDITOR projects/my-api/agents/dev/wakeup.md
+$EDITOR projects/my-api/agents/dev/.agencycli-context/wakeup.md
 ```
 
-Example for a developer agent:
+**English trigger example:**
+```markdown
+Execute your wakeup routine. Check pending tasks, unread messages, and your scheduled activities.
+Refer to your role context for the detailed steps.
+```
+
+**Chinese trigger example:**
+```markdown
+执行你的唤醒例程。检查待处理任务、未读消息及计划中的工作事项。
+详细步骤请参阅你的角色上下文。
+```
+
+The scheduler automatically prepends any unread inbox messages before this trigger (in the language configured in `.agencycli/agency.yaml`).
+
+> **Tip:** If you don't configure a `wakeup_prompt` at all, the scheduler will send a built-in default trigger in the agency language. This is the easiest way to get started.
+
+#### Add the detailed SOP to the role prompt
+
+In `teams/<team>/roles/<role>/prompt.md`, add a `## Wakeup Routine` section:
 
 ```markdown
-# Dev Wakeup Routine
+## Wakeup Routine
 
-You are the lead developer for my-api. Each wakeup cycle:
+Each time you are woken up with no pending tasks:
 
-## 1. Check messages
-(Unread messages are auto-injected above this prompt — reply with:
-`agencycli --dir $AGENCY_DIR inbox reply <msg-id> --from my-api/dev --body "..."`)
-
-## 2. Check for pending tasks
-Run: `agencycli --dir $AGENCY_DIR task list --project my-api --agent dev --status pending`
-If any exist, pick the highest-priority one and work on it.
-
-## 3. Scan for new GitHub issues
-Run: `gh issue list --repo owner/my-api --state open --label "ready"`
-If unassigned issues exist, pick one and create a task for yourself:
-`agencycli --dir $AGENCY_DIR task add --project my-api --agent dev --title "..." --prompt "..."`
-
-## Done
-When finished: `agencycli --dir $AGENCY_DIR task done --id <id> --status success --summary "..."`
-If you need human input first: `agencycli --dir $AGENCY_DIR task confirm-request --id <id> --summary "..." --action-item "..."`
+1. Check messages — unread messages are injected automatically before your prompt
+2. Scan for new GitHub issues: `gh issue list --repo owner/my-api --state open --label "ready"`
+3. If unassigned issues exist, pick one and create a task:
+   `agencycli --dir $AGENCY_DIR task add --project my-api --agent dev --title "..." --prompt "..."`
+4. When done: `agencycli --dir $AGENCY_DIR task done --id <id> --status success --summary "..."`
 ```
 
-Then register it as the wakeup prompt:
+Then register the wakeup trigger file:
 
 ```bash
 agencycli scheduler heartbeat \
   --project my-api \
   --agent   dev \
-  --wakeup-prompt-file projects/my-api/agents/dev/wakeup.md
+  --wakeup-prompt-file projects/my-api/agents/dev/.agencycli-context/wakeup.md
 ```
 
 ---
@@ -743,7 +762,7 @@ agencycli sync --force                        # force regenerate everything
 
 ─── Heartbeat ──────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --enable --interval 30m
-[ ] Write projects/my-app/agents/dev/wakeup.md
+[ ] Write projects/my-app/agents/dev/.agencycli-context/wakeup.md
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --wakeup-prompt-file ...
 
 ─── Start ──────────────────────────────────────────────────────────────────────
