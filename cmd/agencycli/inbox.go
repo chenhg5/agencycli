@@ -230,11 +230,8 @@ func newInboxShowCmd() *cobra.Command {
 			}
 
 			fmt.Println("── Available actions ────────────────────────────────────────")
-			fmt.Printf("  agencycli --dir %s inbox confirm %s --message \"your reply\"\n", root, taskID)
-			fmt.Printf("  agencycli --dir %s inbox reject  %s --reason \"...\"\n", root, taskID)
+			fmt.Printf("  agencycli --dir %s inbox reply   %s --body \"your reply\"\n", root, taskID)
 			fmt.Printf("  agencycli --dir %s inbox forward %s --to <project>/<agent> --note \"...\"\n", root, taskID)
-			fmt.Printf("  agencycli --dir %s inbox comment %s --message \"...\"\n", root, taskID)
-			fmt.Println(hr)
 			return nil
 		},
 	}
@@ -412,7 +409,7 @@ The human will see your report and make the final decision.`,
 
 			fmt.Printf("✓ Forwarded task %q to %s\n", t.Title, to)
 			fmt.Printf("  New task ID : %s\n", forwarded.ID)
-			fmt.Printf("  Original task %s has been archived. Use 'inbox reply' to respond to messages.\n", taskID)
+			fmt.Printf("  Original task %s has been archived.\n", taskID)
 			return nil
 		},
 	}
@@ -601,7 +598,6 @@ Use --archived to show archived messages.`,
 					fmt.Printf("  Reply-to: %s\n", m.ReplyTo)
 				}
 				fmt.Printf("\n  %s\n\n", strings.ReplaceAll(m.Body, "\n", "\n  "))
-				fmt.Println(strings.Repeat("─", 60))
 			}
 			if mark {
 				if err := ts.MarkMessagesRead(recipient); err != nil {
