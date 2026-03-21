@@ -568,6 +568,11 @@ type HeartbeatConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Interval string `yaml:"interval"` // Go duration string, e.g. "30m", "1h"
 
+	// Paused temporarily halts the heartbeat loop for this agent without
+	// removing the configuration. The scheduler continues running but skips
+	// wakeup cycles for this agent until Resume is called.
+	Paused bool `yaml:"paused,omitempty"`
+
 	// ActiveHours restricts wakeups to a specific time window each day.
 	// Format: "HH:MM-HH:MM" in local time, e.g. "09:00-18:00".
 	// If empty, wakeups are allowed at any time.

@@ -56,6 +56,12 @@ type Store interface {
 	// SaveHeartbeat persists heartbeat config and runtime state atomically.
 	SaveHeartbeat(project, agent string, h *entity.HeartbeatConfig) error
 
+	// PauseHeartbeat sets Paused=true on the agent's heartbeat config.
+	PauseHeartbeat(project, agent string) error
+
+	// ResumeHeartbeat sets Paused=false on the agent's heartbeat config.
+	ResumeHeartbeat(project, agent string) error
+
 	// ── Crons ────────────────────────────────────────────────────────────────
 
 	// ListCrons returns all cron definitions for the agent.
@@ -63,6 +69,15 @@ type Store interface {
 
 	// SaveCrons replaces the entire cron list for the agent atomically.
 	SaveCrons(project, agent string, crons []*entity.Cron) error
+
+	// PauseCron sets Enabled=false for a specific cron by ID.
+	PauseCron(project, agent, cronID string) error
+
+	// ResumeCron sets Enabled=true for a specific cron by ID.
+	ResumeCron(project, agent, cronID string) error
+
+	// DeleteCron removes a cron entirely from the agent's crons list.
+	DeleteCron(project, agent, cronID string) error
 
 	// ── Inbox (task confirmations) ───────────────────────────────────────────
 

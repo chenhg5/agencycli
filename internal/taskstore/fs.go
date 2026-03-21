@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -215,6 +216,24 @@ func (s *FSStore) SaveHeartbeat(project, agent string, h *entity.HeartbeatConfig
 	return writeYAMLAtomic(filepath.Join(dir, heartbeatFile), h)
 }
 
+func (s *FSStore) PauseHeartbeat(project, agent string) error {
+	hb, err := s.GetHeartbeat(project, agent)
+	if err != nil {
+		return err
+	}
+	hb.Paused = true
+	return s.SaveHeartbeat(project, agent, hb)
+}
+
+func (s *FSStore) ResumeHeartbeat(project, agent string) error {
+	hb, err := s.GetHeartbeat(project, agent)
+	if err != nil {
+		return err
+	}
+	hb.Paused = false
+	return s.SaveHeartbeat(project, agent, hb)
+}
+
 // ── Crons ─────────────────────────────────────────────────────────────────────
 
 func (s *FSStore) ListCrons(project, agent string) ([]*entity.Cron, error) {
@@ -239,6 +258,55 @@ func (s *FSStore) SaveCrons(project, agent string, crons []*entity.Cron) error {
 		return err
 	}
 	return writeYAMLAtomic(filepath.Join(dir, cronsFile), crons)
+}
+
+func (s *FSStore) PauseCron(project, agent, cronID string) error {
+	crons, err := s.ListCrons(project, agent)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, c := range crons {
+		if c.ID == cronID {
+			c.Enabled = false
+			found = true
+		}
+	}
+	if !found {
+		return fmt.Errorf("cron %q not found", cronID)
+	}
+	return s.SaveCrons(project, agent, crons)
+}
+
+func (s *FSStore) ResumeCron(project, agent, cronID string) error {
+	crons, err := s.ListCrons(project, agent)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, c := range crons {
+		if c.ID == cronID {
+			c.Enabled = true
+			found = true
+		}
+	}
+	if !found {
+		return fmt.Errorf("cron %q not found", cronID)
+	}
+	return s.SaveCrons(project, agent, crons)
+}
+
+func (s *FSStore) DeleteCron(project, agent, cronID string) error {
+	crons, err := s.ListCrons(project, agent)
+	if err != nil {
+		return err
+	}
+	before := len(crons)
+	crons = slices.DeleteFunc(crons, func(c *entity.Cron) bool { return c.ID == cronID })
+	if len(crons) == before {
+		return fmt.Errorf("cron %q not found", cronID)
+	}
+	return s.SaveCrons(project, agent, crons)
 }
 
 // ── Inbox ──────────────────────────────────────────────────────────────────────

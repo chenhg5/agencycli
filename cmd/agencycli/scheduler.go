@@ -62,6 +62,7 @@ Start the scheduler in the foreground:
 	cmd.AddCommand(
 		newSchedulerStartCmd(),
 		newSchedulerHeartbeatCmd(),
+		newSchedulerCronCmd(),
 		newSchedulerWakeupCmd(),
 	)
 	return cmd
@@ -118,7 +119,7 @@ func newSchedulerStartCmd() *cobra.Command {
 
 		if len(heartbeatAgents) == 0 && len(cronAgents) == 0 {
 			fmt.Println("No agents have heartbeat or cron enabled.")
-			fmt.Println("  Heartbeat: agencycli scheduler heartbeat --project P --agent A --enable --interval 30m")
+			fmt.Println("  Heartbeat: agencycli scheduler heartbeat configure --project P --agent A --enable --interval 30m")
 			fmt.Println("  Cron     : agencycli cron add --project P --agent A --schedule \"0 9 * * *\" --title T --prompt P")
 			return nil
 		}
@@ -198,8 +199,26 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 	firstCycle := true
 	for {
 		hb, err := ts.GetHeartbeat(project, agentName)
-		if err != nil || !hb.Enabled {
+		if err != nil {
 			return
+		}
+		if !hb.Enabled {
+			return // heartbeat config removed — stop goroutine
+		}
+		if hb.Paused {
+			// Sleep and re-check. Agent is paused but scheduler stays alive.
+			interval, _ := time.ParseDuration(hb.Interval)
+			if interval <= 0 {
+				interval = 5 * time.Minute
+			}
+			nextAt := nextAtStr(time.Now().Add(interval))
+			log("heartbeat paused — sleeping %s before next check — next at %s", interval.Round(time.Second), nextAt)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(interval):
+			}
+			continue
 		}
 
 		interval, err := time.ParseDuration(hb.Interval)
@@ -974,9 +993,24 @@ useful for testing and for agent-to-agent wakeup from inside a task.`,
 	return cmd
 }
 
-// ── scheduler heartbeat (configure) ──────────────────────────────────────────
+// ── scheduler heartbeat (parent) ─────────────────────────────────────────────
 
 func newSchedulerHeartbeatCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "heartbeat",
+		Short: "Configure, pause, or resume an agent's heartbeat",
+	}
+	cmd.AddCommand(
+		newSchedulerHeartbeatConfigureCmd(),
+		newSchedulerHeartbeatPauseCmd(),
+		newSchedulerHeartbeatResumeCmd(),
+	)
+	return cmd
+}
+
+// ── scheduler heartbeat configure ────────────────────────────────────────────
+
+func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 	var (
 		project          string
 		agentName        string
@@ -991,32 +1025,32 @@ func newSchedulerHeartbeatCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "heartbeat",
-		Short: "Configure heartbeat for an agent",
+		Use:   "configure",
+		Short: "Configure heartbeat settings for an agent (interval, active hours, etc.)",
 		Example: `  # Enable heartbeat with 30-minute interval
-  agencycli scheduler heartbeat --project cc-connect --agent qa-reviewer \
+  agencycli scheduler heartbeat configure --project cc-connect --agent qa-reviewer \
     --enable --interval 30m
 
   # Only wake up between 09:00 and 18:00 on weekdays
-  agencycli scheduler heartbeat --project cc-connect --agent dev \
+  agencycli scheduler heartbeat configure --project cc-connect --agent dev \
     --enable --interval 1h --active-hours "09:00-18:00" --active-days "weekdays"
 
   # Night-shift agent: only wake up between 22:00 and 06:00
-  agencycli scheduler heartbeat --project cc-connect --agent dev \
+  agencycli scheduler heartbeat configure --project cc-connect --agent dev \
     --active-hours "22:00-06:00"
 
   # Clear active-hours restriction (run anytime)
-  agencycli scheduler heartbeat --project cc-connect --agent dev \
+  agencycli scheduler heartbeat configure --project cc-connect --agent dev \
     --active-hours ""
 
   # Disable
-  agencycli scheduler heartbeat --project cc-connect --agent qa-reviewer --disable
+  agencycli scheduler heartbeat configure --project cc-connect --agent qa-reviewer --disable
 
 		# Show current config
-  agencycli scheduler heartbeat --project cc-connect --agent qa-reviewer
+  agencycli scheduler heartbeat configure --project cc-connect --agent qa-reviewer
 
   # Set a wakeup routine (runs when queue is empty)
-  agencycli scheduler heartbeat --project cc-connect --agent pm \
+  agencycli scheduler heartbeat configure --project cc-connect --agent pm \
     --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/.agencycli-context/wakeup.md`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -1113,6 +1147,9 @@ func newSchedulerHeartbeatCmd() *cobra.Command {
 			if hb.Enabled {
 				status = "enabled"
 			}
+			if hb.Paused && hb.Enabled {
+				status = "paused"
+			}
 			fmt.Printf("Heartbeat config — %s/%s\n", project, agentName)
 			fmt.Printf("  Status  : %s\n", status)
 			fmt.Printf("  Interval: %s\n", taskstore.FormatDuration(hb.Interval))
@@ -1128,6 +1165,8 @@ func newSchedulerHeartbeatCmd() *cobra.Command {
 			}
 			if !hb.Enabled {
 				fmt.Printf("  (currently disabled — no wakeups scheduled)\n")
+			} else if hb.Paused {
+				fmt.Printf("  (currently paused — use 'scheduler heartbeat resume' to resume)\n")
 			} else if !isInActiveWindow(hb) {
 				dur := nextWindowStart(hb)
 				if dur > 0 {
@@ -1175,4 +1214,197 @@ func newSchedulerHeartbeatCmd() *cobra.Command {
 	cmd.Flags().StringVar(&wakeupPromptFile, "wakeup-prompt-file", "", "path to a markdown file used as the default wakeup routine when queue is empty")
 	cmd.Flags().StringVar(&wakeupCondition, "wakeup-condition", "", `shell command evaluated before each wakeup; exit 0 = proceed, non-zero = skip cycle (e.g. "gh issue list --state open | grep -q .")`)
 	return cmd
+}
+
+// ── scheduler heartbeat pause ──────────────────────────────────────────────────
+
+func newSchedulerHeartbeatPauseCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "pause <project>/<agent>",
+		Short: "Temporarily halt an agent's heartbeat without removing the configuration",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			if err := ts.PauseHeartbeat(project, agent); err != nil {
+				return err
+			}
+			fmt.Printf("Heartbeat paused for %s/%s — scheduler stays alive and will resume when you call 'scheduler heartbeat resume'\n", project, agent)
+			return nil
+		},
+	}
+}
+
+// ── scheduler heartbeat resume ─────────────────────────────────────────────────
+
+func newSchedulerHeartbeatResumeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "resume <project>/<agent>",
+		Short: "Resume a previously paused heartbeat",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			if err := ts.ResumeHeartbeat(project, agent); err != nil {
+				return err
+			}
+			fmt.Printf("Heartbeat resumed for %s/%s\n", project, agent)
+			return nil
+		},
+	}
+}
+
+// ── scheduler cron ─────────────────────────────────────────────────────────────
+
+func newSchedulerCronCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cron",
+		Short: "Manage individual cron jobs: list, pause, resume, delete",
+	}
+	cmd.AddCommand(
+		newSchedulerCronListCmd(),
+		newSchedulerCronPauseCmd(),
+		newSchedulerCronResumeCmd(),
+		newSchedulerCronDeleteCmd(),
+	)
+	return cmd
+}
+
+func newSchedulerCronListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list <project>/<agent>",
+		Short: "List all cron jobs for an agent",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			crons, err := ts.ListCrons(project, agent)
+			if err != nil {
+				return err
+			}
+			if len(crons) == 0 {
+				fmt.Printf("No crons configured for %s/%s\n", project, agent)
+				return nil
+			}
+			fmt.Printf("Crons for %s/%s:\n", project, agent)
+			for _, c := range crons {
+				status := "enabled"
+				if !c.Enabled {
+					status = "disabled"
+				}
+				lastRun := "never"
+				if c.LastRun != nil {
+					lastRun = c.LastRun.Local().Format("01-02 15:04")
+				}
+				fmt.Printf("  %-20s %-10s schedule=%-15s last=%-10s %s\n",
+					c.ID, status, c.Schedule, lastRun, c.Title)
+			}
+			return nil
+		},
+	}
+}
+
+func newSchedulerCronPauseCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "pause <project>/<agent> <cron-id>",
+		Short: "Disable a cron job by ID",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			cronID := args[1]
+			ts := taskstore.New(root)
+			if err := ts.PauseCron(project, agent, cronID); err != nil {
+				return err
+			}
+			fmt.Printf("Cron %q paused for %s/%s\n", cronID, project, agent)
+			return nil
+		},
+	}
+}
+
+func newSchedulerCronResumeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "resume <project>/<agent> <cron-id>",
+		Short: "Re-enable a paused cron job by ID",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			cronID := args[1]
+			ts := taskstore.New(root)
+			if err := ts.ResumeCron(project, agent, cronID); err != nil {
+				return err
+			}
+			fmt.Printf("Cron %q resumed for %s/%s\n", cronID, project, agent)
+			return nil
+		},
+	}
+}
+
+func newSchedulerCronDeleteCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete <project>/<agent> <cron-id>",
+		Short: "Remove a cron job entirely by ID",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			project, agent, err := parseProjectAgent(args[0])
+			if err != nil {
+				return err
+			}
+			cronID := args[1]
+			ts := taskstore.New(root)
+			if err := ts.DeleteCron(project, agent, cronID); err != nil {
+				return err
+			}
+			fmt.Printf("Cron %q deleted from %s/%s\n", cronID, project, agent)
+			return nil
+		},
+	}
+}
+
+// parseProjectAgent splits "project/agent" into project and agent.
+func parseProjectAgent(input string) (project, agent string, err error) {
+	parts := strings.SplitN(input, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("expected <project>/<agent>, got %q", input)
+	}
+	return parts[0], parts[1], nil
 }
