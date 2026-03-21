@@ -248,29 +248,48 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		firstCycle = false
 
 		if waitDur > 0 {
-			// Compute the projected next wake time. If it falls outside the active
-			// window, cap the sleep so we wake exactly at the window boundary;
-			// the loop's window check will then skip to the next window.
 			projectedNext := time.Now().Add(waitDur)
+
+			// Case 1: projected wake is outside the active window.
 			if !isInActiveWindowAt(projectedNext, hb) {
-				if nextWindow := nextWindowStart(hb); nextWindow > 0 {
-					// Currently outside window: sleep until window opens.
-					log("outside active window — sleeping %s until window opens at %s",
-						nextWindow.Round(time.Minute), hb.ActiveHours)
-					select {
-					case <-ctx.Done():
-						return
-					case <-time.After(nextWindow):
+				insideNow := isInActiveWindow(hb)
+				if !insideNow {
+					// We are currently outside the window: sleep until it opens.
+					nextWake := nextWindowStart(hb)
+					if nextWake > 0 {
+						log("outside active window — sleeping %s until window opens at %s",
+							nextWake.Round(time.Minute), hb.ActiveHours)
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(nextWake):
+						}
+						continue
 					}
-					continue
 				}
-				// Inside window but projected wake is past window end: cap to window end.
+				// We are inside the window but projected wake is past window end:
+				// cap waitDur to remaining window time so we wake at the boundary.
 				_, remaining := isActiveHour(hb.ActiveHours, time.Now())
 				if remaining > 0 && remaining < waitDur {
 					waitDur = remaining
 					projectedNext = time.Now().Add(waitDur)
 				}
 			}
+
+			// Case 2: jitter or interval calculation produced a very small wait
+			// (less than 1 second after window capping). Sleep until the window
+			// opens instead so the cycle check handles it correctly without
+			// hammering the agent with back-to-back wakes.
+			if waitDur < time.Second {
+				if hb.LastWakeup == nil {
+					log("first wakeup deferred — waiting for active window at %s", hb.ActiveHours)
+				} else {
+					log("next wakeup deferred — waiting for active window at %s", hb.ActiveHours)
+				}
+				// Just loop back; the window check will sleep until next window.
+				continue
+			}
+
 			nextAt := nextAtStr(projectedNext)
 			if hb.LastWakeup == nil {
 				log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
