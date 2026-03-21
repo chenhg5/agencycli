@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -12,6 +13,33 @@ import (
 	"github.com/chenhg5/agencycli/internal/taskstore"
 	"github.com/spf13/cobra"
 )
+
+// validateRecipient checks that recipient is either "human" or "project/agent".
+// If a bare agent name (no "/") is used, it looks up whether it's a known agent
+// and returns an error suggesting the correct project/agent format.
+func validateRecipient(ts taskstore.Store, recipient string) error {
+	if recipient == "human" || strings.Contains(recipient, "/") {
+		return nil
+	}
+	fs, ok := ts.(*taskstore.FSStore)
+	if !ok {
+		return nil // bail out gracefully for non-filesystem stores
+	}
+	projects, err := fs.ListProjects()
+	if err != nil {
+		return err
+	}
+	for _, project := range projects {
+		agents, err := fs.ListAgents(project)
+		if err != nil {
+			continue
+		}
+		if slices.Contains(agents, recipient) {
+			return fmt.Errorf("recipient %q is an agent in project %q; use --recipient %s/%s", recipient, project, project, recipient)
+		}
+	}
+	return nil
+}
 
 func newInboxCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -536,6 +564,9 @@ Use --archived to show archived messages.`,
 				recipient = "human"
 			}
 			ts := taskstore.New(root)
+			if err := validateRecipient(ts, recipient); err != nil {
+				return err
+			}
 			var msgs []*entity.Message
 			if archived {
 				allMsgs, e := ts.ListAllMessages(recipient)
@@ -829,6 +860,9 @@ func newInboxReadCmd() *cobra.Command {
 				recipient = "human"
 			}
 			ts := taskstore.New(root)
+			if err := validateRecipient(ts, recipient); err != nil {
+				return err
+			}
 			if err := ts.MarkMessageRead(recipient, args[0]); err != nil {
 				return err
 			}
@@ -858,6 +892,9 @@ func newInboxArchiveCmd() *cobra.Command {
 				recipient = "human"
 			}
 			ts := taskstore.New(root)
+			if err := validateRecipient(ts, recipient); err != nil {
+				return err
+			}
 			if err := ts.ArchiveMessage(recipient, args[0]); err != nil {
 				return err
 			}
@@ -889,6 +926,9 @@ func newInboxDeleteCmd() *cobra.Command {
 				recipient = "human"
 			}
 			ts := taskstore.New(root)
+			if err := validateRecipient(ts, recipient); err != nil {
+				return err
+			}
 			if err := ts.DeleteMessage(recipient, args[0]); err != nil {
 				return err
 			}
