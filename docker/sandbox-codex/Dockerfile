@@ -36,6 +36,7 @@ RUN if [ "$CN_MIRROR" = "1" ]; then \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git jq make unzip openssh-client ripgrep fzf \
     python3 python3-pip \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Node.js ────────────────────────────────────────────────────────────────────

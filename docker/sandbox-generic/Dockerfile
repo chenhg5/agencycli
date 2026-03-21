@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     python3 \
     python3-pip \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js (needed by many agent CLIs)
