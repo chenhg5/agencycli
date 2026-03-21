@@ -36,6 +36,11 @@ const (
 	// AgencycliMount is where the agencycli binary is mounted inside the
 	// container so that agents can run `agencycli task add` etc.
 	AgencycliMount = "/usr/local/bin/agencycli"
+
+	// AgencycliBin is where user-provided binaries are mounted inside the
+	// container. If <root>/bin/ exists on the host, it is mounted here and
+	// prepended to PATH so those binaries are directly accessible.
+	AgencycliBin = "/agencycli/bin"
 )
 
 // defaultImage returns the default Docker image for a given agent model.
@@ -135,6 +140,20 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 		"-v", absAgentDir+":"+absAgentDir,
 		"-w", absAgentDir,
 	)
+
+	// ── User bin directory ────────────────────────────────────────────────────
+	// If <root>/bin/ exists, mount it to /agencycli/bin and add to PATH so
+	// custom binaries are directly accessible inside the container.
+	// agentDir = <root>/projects/<project>/agents/<agent> → root = ../../
+	binHostDir := filepath.Join(
+		filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(agentDir)))),
+		"bin",
+	)
+	if fi, err := os.Stat(binHostDir); err == nil && fi.IsDir() {
+		args = append(args, "-v", binHostDir+":"+AgencycliBin)
+		// Prepend /agencycli/bin to PATH.
+		args = append(args, "-e", "PATH="+AgencycliBin+":$PATH")
+	}
 
 	// ── Credential mounts ────────────────────────────────────────────────────
 	mounts := resolveCredentialMounts(model, cfg)
