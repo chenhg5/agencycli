@@ -211,8 +211,7 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			if interval <= 0 {
 				interval = 5 * time.Minute
 			}
-			nextAt := nextAtStr(time.Now().Add(interval))
-			log("heartbeat paused — sleeping %s before next check — next at %s", interval.Round(time.Second), nextAt)
+				log("heartbeat paused — sleeping %s before next check", interval.Round(time.Second))
 			select {
 			case <-ctx.Done():
 				return
@@ -277,6 +276,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 					return
 				case <-time.After(nextWake):
 				}
+				// Do NOT update LastWakeup: the window sleep is not a real wakeup.
+				// Loop back and recompute waitDur from the actual last wake time.
 				continue
 			}
 		}
@@ -319,7 +320,9 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			}
 		}
 
-		// Mark as running.
+		// Mark as running. Set LastWakeup here (after all checks pass), not at the
+		// top of the loop, so that a window-skip or condition-skip does not corrupt
+		// the elapsed-time calculation for the next cycle.
 		now := time.Now().UTC()
 		hb.LastWakeup = &now
 		hb.LastWakeupStatus = "running"
