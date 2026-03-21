@@ -378,19 +378,19 @@ func hireAgentFromSpec(root, project string, spec entity.AgentSpec,
 		}
 	}
 
-	// Build sandbox config if requested.
+	// Build sandbox config if specified in the blueprint.
 	var sandboxCfg *entity.SandboxConfig
-	if spec.Sandbox {
+	if spec.Sandbox != nil {
 		if err := sandbox.CheckDocker(); err != nil {
 			return fmt.Errorf("sandbox requires Docker: %w", err)
 		}
-		img := sandbox.ImageForModel(agentModel)
-		sandboxCfg = &entity.SandboxConfig{
-			Provider: entity.SandboxDocker,
-			Docker: &entity.DockerSandboxConfig{
-				Image:       img,
-				NetworkMode: "bridge",
-			},
+		// Use the spec's sandbox config, but fill in defaults for image if not set.
+		sandboxCfg = spec.Sandbox
+		if sandboxCfg.Provider == "" {
+			sandboxCfg.Provider = entity.SandboxDocker
+		}
+		if sandboxCfg.Docker != nil && sandboxCfg.Docker.Image == "" {
+			sandboxCfg.Docker.Image = sandbox.ImageForModel(agentModel)
 		}
 	}
 
@@ -425,7 +425,7 @@ func printProjectConfig(cfg *entity.ProjectConfig, project, root string) {
 		fmt.Fprintln(w, "  ────\t─────\t────\t───────\t─────────")
 		for _, a := range cfg.Agents {
 			sbx := "no"
-			if a.Sandbox {
+			if a.Sandbox != nil {
 				sbx = "docker"
 			}
 			hb := "(manual only)"

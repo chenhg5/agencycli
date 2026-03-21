@@ -379,7 +379,16 @@ type AgentSpec struct {
 	Role    string `yaml:"role,omitempty"`   // references teams/<team>/roles/<role>
 	Team    string `yaml:"team,omitempty"`   // team the role belongs to
 	Model   string `yaml:"model"`            // e.g. claudecode, codex, gemini
-	Sandbox bool   `yaml:"sandbox,omitempty"`
+
+	// Sandbox configures isolated container execution for this agent.
+	// When nil the agent runs directly on the host (default behaviour).
+	// Example YAML:
+	//   sandbox:
+	//     provider: docker
+	//     docker:
+	//       image: ghcr.io/myuser/my-sandbox:latest
+	//       memory_mb: 8192
+	Sandbox *SandboxConfig `yaml:"sandbox,omitempty"`
 
 	// Repos lists additional repository paths to mount/expose to the agent.
 	Repos []string `yaml:"repos,omitempty"`
