@@ -318,9 +318,27 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 	sessionID := hb.SessionID
 	i18n := wakeupStrings(agencyLang(s))
 
+	cycleStart := time.Now()
+	tasksProcessed := 0
+	var maxDuration time.Duration
+	if hb.MaxCycleDuration != "" {
+		var err error
+		maxDuration, err = time.ParseDuration(hb.MaxCycleDuration)
+		if err != nil {
+			return fmt.Errorf("invalid max_cycle_duration %q: %w", hb.MaxCycleDuration, err)
+		}
+	}
+
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+
+		// Check cycle duration limit before fetching the next task.
+		if maxDuration > 0 && time.Since(cycleStart) > maxDuration {
+			fmt.Printf("[heartbeat %s/%s] ▶ cycle limit reached (%d task(s), %s elapsed)\n",
+				project, agentName, tasksProcessed, time.Since(cycleStart).Round(time.Second))
+			return nil
 		}
 
 		task, err := nextPendingTask(ts, project, agentName)
@@ -433,6 +451,13 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			break
 		}
 
+		// Check max tasks per cycle limit before processing this task.
+		if hb.MaxTasksPerCycle > 0 && tasksProcessed >= hb.MaxTasksPerCycle {
+			fmt.Printf("[heartbeat %s/%s] ▶ cycle limit reached (%d task(s), %s elapsed)\n",
+				project, agentName, tasksProcessed, time.Since(cycleStart).Round(time.Second))
+			return nil
+		}
+
 		fmt.Printf("[heartbeat %s/%s] ▶ task %s  %s\n", project, agentName, task.ID, task.Title)
 
 		now := time.Now().UTC()
@@ -507,6 +532,8 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			_ = ts.AddToInbox(item)
 			fmt.Printf("[heartbeat %s/%s] ? task %s awaiting confirmation\n", project, agentName, task.ID)
 		}
+
+		tasksProcessed++
 
 		// Per-task session scope: reset sessionID so next task starts independently.
 		if hb.SessionScope == entity.SessionScopeTask {

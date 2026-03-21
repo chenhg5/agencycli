@@ -604,6 +604,17 @@ type HeartbeatConfig struct {
 	//   wakeup_condition: "agencycli --dir $AGENCY_DIR inbox messages --unread-only | grep -q ."
 	WakeupCondition string `yaml:"wakeup_condition,omitempty"`
 
+	// MaxTasksPerCycle limits how many tasks are processed in a single wakeup
+	// cycle before the cycle ends. 0 (default) means unlimited.
+	// Use this to prevent a single wakeup from monopolising the agent on a large queue.
+	MaxTasksPerCycle int `yaml:"max_tasks_per_cycle,omitempty"`
+
+	// MaxCycleDuration limits how long a wakeup cycle runs before it stops.
+	// The value is a Go duration string (e.g. "15m", "1h"). 0 (default) means unlimited.
+	// The elapsed time is checked between tasks; a running task will complete even
+	// if it pushes the total over the limit.
+	MaxCycleDuration string `yaml:"max_cycle_duration,omitempty"`
+
 	// Runtime state (mutated by scheduler / runner).
 	PID               int        `yaml:"pid,omitempty"`
 	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
