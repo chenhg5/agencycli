@@ -21,6 +21,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ANSI color codes for scheduler output.
+const (
+	colorReset  = "\033[0m"
+	colorGreen  = "\033[32m"
+	colorCyan   = "\033[36m"
+	colorYellow = "\033[33m"
+	colorRed    = "\033[31m"
+	colorDim    = "\033[2m"
+)
+
+// nextAtStr formats a future time for display. If it's on a different day
+// than today, it includes the date; otherwise just the time.
+func nextAtStr(t time.Time) string {
+	now := time.Now()
+	if t.Day() != now.Day() || t.Month() != now.Month() || t.Year() != now.Year() {
+		return t.Format("01-02 15:04:05")
+	}
+	return t.Format("15:04:05")
+}
+
 func newSchedulerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "scheduler",
@@ -171,7 +191,7 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 	ts taskstore.Store, s store.Store) {
 
 	log := func(format string, a ...any) {
-		fmt.Printf("[heartbeat %s/%s] %s\n", project, agentName,
+		fmt.Printf("%s[heartbeat %s/%s]%s %s\n", colorCyan, project, agentName, colorReset,
 			fmt.Sprintf(format, a...))
 	}
 
@@ -210,7 +230,7 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		firstCycle = false
 
 		if waitDur > 0 {
-			nextAt := time.Now().Add(waitDur).Format("15:04:05")
+			nextAt := nextAtStr(time.Now().Add(waitDur))
 			if hb.LastWakeup == nil {
 				log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
 			} else {
@@ -294,13 +314,18 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			log("cron: enqueued %d task(s)", n)
 		}
 
+		cycleStart := time.Now()
 		if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
-			log("wakeup cycle failed: %v", err)
+			dur := time.Since(cycleStart).Round(time.Second)
+			fmt.Printf("%s[heartbeat %s/%s]%s %swakeup cycle failed%s after %s — %v\n",
+				colorCyan, project, agentName, colorReset, colorRed, colorReset, dur, err)
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "failed"
 			hb.PID = 0
 		} else {
-			log("wakeup cycle done")
+			dur := time.Since(cycleStart).Round(time.Second)
+			fmt.Printf("%s[heartbeat %s/%s]%s %swakeup cycle done%s in %s\n",
+				colorCyan, project, agentName, colorReset, colorGreen, colorReset, dur)
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "done"
 			hb.PID = 0
