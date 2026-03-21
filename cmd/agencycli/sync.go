@@ -146,10 +146,12 @@ func syncAgent(root string, s store.Store, project, agentName string, force bool
 		}
 	}
 
-	// Include playbook hash so changes to agent-playbooks/<file> are detected.
+	// Include playbook hash so changes to playbooks are detected.
+	// meta.Playbook carries the relative path from the blueprint directory
+	// (e.g. "playbooks/pm.md").
 	var playbookData []byte
 	if meta.Playbook != "" {
-		playbookPath := filepath.Join(root, "agent-playbooks", meta.Playbook)
+		playbookPath := filepath.Join(root, "project-blueprints", project, meta.Playbook)
 		playbookData, _ = os.ReadFile(playbookPath)
 		if len(playbookData) > 0 {
 			newHashes["playbook:"+meta.Playbook] = ctxbuild.ContentHash(string(playbookData))
@@ -169,7 +171,7 @@ func syncAgent(root string, s store.Store, project, agentName string, force bool
 
 	// Copy playbook BEFORE running the formatter so CLAUDE.md/@import picks it up.
 	if meta.Playbook != "" && len(playbookData) > 0 {
-		ctxDir := filepath.Join(agentDir, ".agencycli-context")
+		ctxDir := filepath.Join(agentDir, ".agencycli", "context")
 		if err := os.MkdirAll(ctxDir, 0o755); err != nil {
 			return syncDiff{}, err
 		}

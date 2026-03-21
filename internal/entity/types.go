@@ -166,7 +166,7 @@ type RoleSetupFile struct {
 }
 
 // AgentMeta records the provenance of a hired agent working directory.
-// Stored at <root>/projects/<project>/agents/<name>/.agencycli-agent.yaml.
+// Stored at <root>/projects/<project>/agents/<name>/.agencycli/agent.yaml.
 // It is used by `agencycli sync` to detect which context layers have changed.
 type AgentMeta struct {
 	Name    string     `yaml:"name"`
@@ -179,10 +179,11 @@ type AgentMeta struct {
 	// context. It is nil for agents that have never been synced after hire.
 	SyncedAt *time.Time `yaml:"synced_at,omitempty"`
 
-	// Playbook is the filename (without path) of the playbook that was copied
-	// into .agencycli-context/wakeup.md at hire time.
+	// Playbook is the path, relative to the blueprint directory,
+	// of the playbook that was copied into .agencycli/context/wakeup.md at hire time.
 	// When set, `agencycli sync` tracks the playbook's content hash and
 	// re-copies the file automatically if it changes.
+	// Example: "playbooks/pm.md"
 	Playbook string `yaml:"playbook,omitempty"`
 
 	// ContextHash maps each layer source key to the SHA-256 hex digest
@@ -383,11 +384,9 @@ type AgentSpec struct {
 	// Repos lists additional repository paths to mount/expose to the agent.
 	Repos []string `yaml:"repos,omitempty"`
 
-	// Playbook is the filename (without path) of the agent's wakeup routine,
-	// resolved from agent-playbooks/<playbook> in the agency root.
-	// When set, `project apply` copies the file into the agent workspace as
-	// .agencycli-context/wakeup.md and sets HeartbeatConfig.WakeupPrompt = "@.agencycli-context/wakeup.md".
-	// Example: "pm.md"
+	// Playbook is the path, relative to the blueprint directory,
+	// of the agent's wakeup routine (e.g. "playbooks/pm.md").
+	// project apply copies it into .agencycli/context/wakeup.md.
 	Playbook string `yaml:"playbook,omitempty"`
 
 	// Heartbeat defines the autonomous wakeup schedule.
@@ -415,7 +414,7 @@ type ConfirmationRequest struct {
 }
 
 // Task is the atomic unit of work assigned to an agent or human.
-// Stored in <agent-dir>/tasks.yaml (active) and tasks_archive.yaml (terminal).
+// Stored in <agent-dir>/.agencycli/tasks.yaml (active) and .agencycli/tasks_archive.yaml (terminal).
 type Task struct {
 	ID       string     `yaml:"id"`
 	Title    string     `yaml:"title"`
@@ -573,7 +572,7 @@ type HeartbeatConfig struct {
 	// autonomous routine (scan issues, review PRs, etc.) without requiring an
 	// explicit task to be queued first.
 	// Can be inline text or a path prefixed with "@" (relative to agent dir).
-	// Example: "@.agencycli-context/wakeup.md" reads the prompt from <agent-dir>/.agencycli-context/wakeup.md.
+	// Example: "@.agencycli/context/wakeup.md" reads the prompt from <agent-dir>/.agencycli/context/wakeup.md.
 	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
 
 	// WakeupCondition is an optional shell command evaluated before each wakeup.

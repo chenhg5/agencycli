@@ -13,14 +13,21 @@ import (
 )
 
 const (
-	tasksFile   = "tasks.yaml"
-	archiveFile = "tasks_archive.yaml"
+	tasksFile     = "tasks.yaml"
+	archiveFile   = "tasks_archive.yaml"
 	heartbeatFile = "heartbeat.yaml"
-	cronsFile   = "crons.yaml"
-	inboxYAML   = "inbox.yaml"
-	inboxMD     = "inbox.md"
-	aiosDir     = ".agencycli"
-	runsDir     = "runs"
+	cronsFile     = "crons.yaml"
+	inboxYAML     = "inbox.yaml"
+	inboxMD       = "inbox.md"
+	runsDir       = "runs"
+
+	// Workspace-level .agencycli directory (for human inbox/messages)
+	aiosDir = ".agencycli"
+
+	// Consolidated system subdirectory under agent dir
+	systemDir     = ".agencycli"
+	contextDir    = "context"  // was ".agencycli-context"
+	agentMetaFile = "agent.yaml" // was ".agencycli-agent.yaml"
 )
 
 // FSStore is the filesystem-backed implementation of Store.
@@ -42,6 +49,11 @@ func New(root string) Store {
 // agentDir returns <root>/projects/<project>/agents/<agent>.
 func (s *FSStore) agentDir(project, agent string) string {
 	return filepath.Join(s.root, "projects", project, "agents", agent)
+}
+
+// systemDir returns <root>/projects/<project>/agents/<agent>/.agencycli.
+func (s *FSStore) systemDir(project, agent string) string {
+	return filepath.Join(s.agentDir(project, agent), systemDir)
 }
 
 // projectDir returns <root>/projects/<project>.
@@ -126,7 +138,7 @@ func (s *FSStore) ArchiveTask(project, agent string, t *entity.Task) error {
 		return err
 	}
 	archived = append(archived, t)
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	if err := writeYAMLAtomic(filepath.Join(dir, archiveFile), archived); err != nil {
 		return err
 	}
@@ -145,17 +157,17 @@ func (s *FSStore) ArchiveTask(project, agent string, t *entity.Task) error {
 }
 
 func (s *FSStore) ListArchivedTasks(project, agent string) ([]*entity.Task, error) {
-	path := filepath.Join(s.agentDir(project, agent), archiveFile)
+	path := filepath.Join(s.systemDir(project, agent), archiveFile)
 	return loadTasksFromFile(path)
 }
 
 func (s *FSStore) loadTasks(project, agent string) ([]*entity.Task, error) {
-	path := filepath.Join(s.agentDir(project, agent), tasksFile)
+	path := filepath.Join(s.systemDir(project, agent), tasksFile)
 	return loadTasksFromFile(path)
 }
 
 func (s *FSStore) saveTasks(project, agent string, tasks []*entity.Task) error {
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -180,7 +192,7 @@ func loadTasksFromFile(path string) ([]*entity.Task, error) {
 // ── Heartbeat ─────────────────────────────────────────────────────────────────
 
 func (s *FSStore) GetHeartbeat(project, agent string) (*entity.HeartbeatConfig, error) {
-	path := filepath.Join(s.agentDir(project, agent), heartbeatFile)
+	path := filepath.Join(s.systemDir(project, agent), heartbeatFile)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return &entity.HeartbeatConfig{}, nil
@@ -196,7 +208,7 @@ func (s *FSStore) GetHeartbeat(project, agent string) (*entity.HeartbeatConfig, 
 }
 
 func (s *FSStore) SaveHeartbeat(project, agent string, h *entity.HeartbeatConfig) error {
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -206,7 +218,7 @@ func (s *FSStore) SaveHeartbeat(project, agent string, h *entity.HeartbeatConfig
 // ── Crons ─────────────────────────────────────────────────────────────────────
 
 func (s *FSStore) ListCrons(project, agent string) ([]*entity.Cron, error) {
-	path := filepath.Join(s.agentDir(project, agent), cronsFile)
+	path := filepath.Join(s.systemDir(project, agent), cronsFile)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -222,7 +234,7 @@ func (s *FSStore) ListCrons(project, agent string) ([]*entity.Cron, error) {
 }
 
 func (s *FSStore) SaveCrons(project, agent string, crons []*entity.Cron) error {
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -319,7 +331,7 @@ func (s *FSStore) regenerateInboxMD(items []*entity.InboxItem) error {
 
 // RunLogDir returns (and creates) the runs/ directory for the given agent.
 func (s *FSStore) RunLogDir(project, agent string) (string, error) {
-	dir := filepath.Join(s.agentDir(project, agent), runsDir)
+	dir := filepath.Join(s.systemDir(project, agent), runsDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -348,7 +360,7 @@ func (s *FSStore) ListAgents(project string) ([]string, error) {
 // OverwriteArchive replaces the entire archive for an agent.
 // Used by task retry to remove the retried entry from the archive.
 func (s *FSStore) OverwriteArchive(project, agent string, tasks []*entity.Task) error {
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -356,7 +368,7 @@ func (s *FSStore) OverwriteArchive(project, agent string, tasks []*entity.Task) 
 }
 
 func (s *FSStore) ClearTasks(project, agent string) error {
-	dir := s.agentDir(project, agent)
+	dir := s.systemDir(project, agent)
 	for _, name := range []string{tasksFile, archiveFile} {
 		p := filepath.Join(dir, name)
 		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
@@ -511,8 +523,19 @@ func (s *FSStore) SaveProjectConfig(project string, cfg *entity.ProjectConfig) e
 }
 
 func (s *FSStore) GetProjectBlueprint(name string) (*entity.ProjectConfig, error) {
-	p := filepath.Join(s.root, "project-blueprints", name+".yaml")
+	// New format: project-blueprints/<name>/blueprint.yaml
+	p := filepath.Join(s.root, "project-blueprints", name, "blueprint.yaml")
 	data, err := os.ReadFile(p)
+	if err == nil {
+		var cfg entity.ProjectConfig
+		return &cfg, yaml.Unmarshal(data, &cfg)
+	}
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	// Legacy flat format: project-blueprints/<name>.yaml
+	p = filepath.Join(s.root, "project-blueprints", name+".yaml")
+	data, err = os.ReadFile(p)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -532,10 +555,22 @@ func (s *FSStore) ListProjectBlueprints() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	seen := make(map[string]bool)
 	var out []string
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".yaml") {
-			out = append(out, strings.TrimSuffix(e.Name(), ".yaml"))
+		if e.IsDir() {
+			// New format: directory containing blueprint.yaml
+			bpPath := filepath.Join(dir, e.Name(), "blueprint.yaml")
+			if _, err := os.Stat(bpPath); err == nil {
+				out = append(out, e.Name())
+				seen[e.Name()] = true
+			}
+		} else if strings.HasSuffix(e.Name(), ".yaml") {
+			name := strings.TrimSuffix(e.Name(), ".yaml")
+			// Legacy flat format: skip if already found as directory
+			if !seen[name] {
+				out = append(out, name)
+			}
 		}
 	}
 	return out, nil
@@ -556,7 +591,7 @@ func (s *FSStore) messagesPath(recipient string) string {
 	if len(parts) != 2 {
 		return filepath.Join(s.root, aiosDir, messagesYAML)
 	}
-	return filepath.Join(s.root, "projects", parts[0], "agents", parts[1], messagesYAML)
+	return filepath.Join(s.systemDir(parts[0], parts[1]), messagesYAML)
 }
 
 func (s *FSStore) SendMessage(msg *entity.Message) error {

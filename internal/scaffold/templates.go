@@ -60,23 +60,23 @@ const gitignoreTmpl = `# ── agencycli runtime state ────────
 .agencycli/messages.yaml
 
 # Agent runtime state (PID, session IDs, last wakeup times)
-projects/*/agents/*/heartbeat.yaml
+projects/*/agents/*/.agencycli/heartbeat.yaml
 
 # Async message queues
-projects/*/agents/*/messages.yaml
+projects/*/agents/*/.agencycli/messages.yaml
 
 # Task history (runtime, can be large)
-projects/*/agents/*/tasks_archive.yaml
+projects/*/agents/*/.agencycli/tasks_archive.yaml
 
 # Execution logs
-projects/*/agents/*/runs/
+projects/*/agents/*/.agencycli/runs/
 *.log
 
 # Fired agents
 projects/*/agents/.fired/
 
 # Wakeup prompt temp files
-projects/*/agents/*/.wakeup-*.md
+projects/*/agents/*/.agencycli/.prompt-*.txt
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store

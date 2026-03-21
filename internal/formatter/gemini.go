@@ -17,8 +17,23 @@ import (
 //
 // Output structure inside outDir:
 //
-//	GEMINI.md               ← merged context (uses @import like Claude Code)
-//	.agencycli-context/          ← individual layer files
+//	GEMINI.md                    ← merged context (uses @import like Claude Code)
+//	.agencycli/
+//	  context/
+//	    agency.md
+//	    role-<team>-<role>.md
+//	    project-<project>.md
+//	    wakeup.md              ← playbook (installed by project apply / sync)
+//	  agent.yaml               ← agent metadata
+//	  tasks.yaml              ← active task queue
+//	  tasks_archive.yaml      ← archived tasks
+//	  heartbeat.yaml          ← wakeup config
+//	  crons.yaml              ← scheduled tasks
+//	  messages.yaml           ← async messages
+//	  runs/                   ← execution logs
+//	  tasks/                  ← role workspace (from role setup)
+//	  roadmap/                ← role workspace (from role setup)
+//	  okr/                    ← role workspace (from role setup)
 //	.gemini/
 //	  skills/
 //	    git/
@@ -26,7 +41,7 @@ import (
 type geminiFormatter struct{}
 
 func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) error {
-	contextDir := filepath.Join(outDir, ".agencycli-context")
+	contextDir := filepath.Join(outDir, ".agencycli", "context")
 	if err := os.MkdirAll(contextDir, 0o755); err != nil {
 		return fmt.Errorf("gemini: create context dir: %w", err)
 	}
@@ -38,12 +53,12 @@ func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) erro
 		if err := os.WriteFile(path, []byte(layer.Content), 0o644); err != nil {
 			return fmt.Errorf("gemini: write layer %q: %w", layer.Source, err)
 		}
-		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
+		importLines = append(importLines, fmt.Sprintf("@.agencycli/context/%s", filename))
 	}
 
 	// Include wakeup routine if installed.
 	if _, err := os.Stat(filepath.Join(contextDir, "wakeup.md")); err == nil {
-		importLines = append(importLines, "@.agencycli-context/wakeup.md")
+		importLines = append(importLines, "@.agencycli/context/wakeup.md")
 	}
 
 	// GEMINI.md supports the same @import syntax as CLAUDE.md

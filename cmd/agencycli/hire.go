@@ -335,16 +335,18 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 }
 
 // applyRoleSetup creates the directories and files specified in a role's setup
-// definition inside the agent's working directory.
+// definition inside the agent's .agencycli/ directory.
 func applyRoleSetup(setup entity.RoleSetup, agentDir string) error {
+	// Role setup directories live inside .agencycli/ to keep system files consolidated.
+	agencycliDir := filepath.Join(agentDir, ".agencycli")
 	for _, dir := range setup.Dirs {
-		full := filepath.Join(agentDir, dir)
+		full := filepath.Join(agencycliDir, dir)
 		if err := os.MkdirAll(full, 0o755); err != nil {
 			return fmt.Errorf("create dir %q: %w", dir, err)
 		}
 	}
 	for _, f := range setup.Files {
-		full := filepath.Join(agentDir, f.Path)
+		full := filepath.Join(agencycliDir, f.Path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			return fmt.Errorf("create parent for %q: %w", f.Path, err)
 		}

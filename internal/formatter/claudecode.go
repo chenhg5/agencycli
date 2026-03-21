@@ -14,11 +14,22 @@ import (
 // Output structure inside outDir:
 //
 //	CLAUDE.md                    ← main file; uses @import to reference layers
-//	.agencycli-context/
-//	  company.md
-//	  department-engineering.md
-//	  department-engineering-backend.md
-//	  project-cc-connect.md
+//	.agencycli/
+//	  context/
+//	    agency.md
+//	    role-<team>-<role>.md
+//	    project-<project>.md
+//	    wakeup.md              ← playbook (installed by project apply / sync)
+//	  agent.yaml               ← agent metadata
+//	  tasks.yaml              ← active task queue
+//	  tasks_archive.yaml      ← archived tasks
+//	  heartbeat.yaml          ← wakeup config
+//	  crons.yaml              ← scheduled tasks
+//	  messages.yaml           ← async messages
+//	  runs/                   ← execution logs
+//	  tasks/                  ← role workspace (from role setup)
+//	  roadmap/                ← role workspace (from role setup)
+//	  okr/                    ← role workspace (from role setup)
 //	.claude/
 //	  skills/
 //	    git/
@@ -32,14 +43,14 @@ import (
 type claudeCodeFormatter struct{}
 
 func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) error {
-	contextDir := filepath.Join(outDir, ".agencycli-context")
+	contextDir := filepath.Join(outDir, ".agencycli", "context")
 	if err := os.MkdirAll(contextDir, 0o755); err != nil {
 		return fmt.Errorf("claudecode: create context dir: %w", err)
 	}
 
 	var importLines []string
 
-	// Write each layer into its own file under .agencycli-context/
+	// Write each layer into its own file under .agencycli/context/
 	for _, layer := range mc.Layers {
 		filename := sourceToFilename(layer.Source) + ".md"
 		path := filepath.Join(contextDir, filename)
@@ -47,14 +58,14 @@ func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) 
 			return fmt.Errorf("claudecode: write layer %q: %w", layer.Source, err)
 		}
 		// CLAUDE.md @import paths are relative to the file containing the import.
-		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
+		importLines = append(importLines, fmt.Sprintf("@.agencycli/context/%s", filename))
 	}
 
 	// If a playbook (wakeup routine) has been installed, include it so the agent
 	// loads the full SOP at session start rather than receiving it each wakeup.
 	wakeupMD := filepath.Join(contextDir, "wakeup.md")
 	if _, err := os.Stat(wakeupMD); err == nil {
-		importLines = append(importLines, "@.agencycli-context/wakeup.md")
+		importLines = append(importLines, "@.agencycli/context/wakeup.md")
 	}
 
 	// Write CLAUDE.md with @import directives

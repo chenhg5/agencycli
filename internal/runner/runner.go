@@ -401,7 +401,12 @@ func (r *Runner) ResumeTask(project, agentName string, task *entity.Task, confir
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-func writeTempPrompt(dir, content string) (string, error) {
+func writeTempPrompt(agentDir, content string) (string, error) {
+	// Store temp prompt files in .agencycli/ to keep agent root clean.
+	dir := filepath.Join(agentDir, ".agencycli")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
 	f, err := os.CreateTemp(dir, ".prompt-*.txt")
 	if err != nil {
 		return "", err

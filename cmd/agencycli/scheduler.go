@@ -328,18 +328,28 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			return err
 		}
 		if task == nil {
-			// Queue is empty.  Determine the wakeup prompt to run.
+			// Queue is empty. Determine the wakeup prompt to run.
 			// WakeupPrompt may be "@<file>", inline text, or empty (use built-in trigger).
 			// The wakeup task is persisted to tasks.yaml so that the agent can
 			// call `task confirm-request --id $TASK_ID` without hitting "not found".
+			//
+			// NOTE: When WakeupPrompt points to a file (e.g., "@.agencycli/context/wakeup.md"),
+			// we do NOT read the file content here. The wakeup.md is already imported
+			// via CLAUDE.md (@.agencycli/context/wakeup.md), so the agent has access to it.
+			// We just send a short trigger to start the wakeup routine.
 			var prompt string
-			var promptErr error
 			if hb.WakeupPrompt != "" {
-				prompt, promptErr = resolveWakeupPrompt(hb.WakeupPrompt, agentDir(root, project, agentName))
+				if strings.HasPrefix(hb.WakeupPrompt, "@") {
+					// File reference: wakeup content is in CLAUDE.md via @import, use short trigger.
+					prompt = i18n.DefaultTrigger
+				} else {
+					// Inline text: use as-is.
+					prompt = hb.WakeupPrompt
+				}
 			} else {
 				prompt = i18n.DefaultTrigger
 			}
-			if promptErr == nil && prompt != "" {
+			if prompt != "" {
 				// Prepend any unread messages to the wakeup prompt.
 				recipient := project + "/" + agentName
 				unread, _ := ts.ListUnreadMessages(recipient)
@@ -551,24 +561,6 @@ func agencyLang(s store.Store) string {
 		return "en"
 	}
 	return a.Lang
-}
-
-// resolveWakeupPrompt resolves a wakeup prompt value:
-//   - If it starts with "@", the rest is treated as a path relative to agentDir.
-//   - Otherwise the value itself is the prompt text.
-func resolveWakeupPrompt(value, agentDir string) (string, error) {
-	if strings.HasPrefix(value, "@") {
-		path := strings.TrimPrefix(value, "@")
-		if !strings.HasPrefix(path, "/") {
-			path = agentDir + "/" + path
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-	}
-	return value, nil
 }
 
 // ── cron helpers ─────────────────────────────────────────────────────────────

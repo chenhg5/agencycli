@@ -415,7 +415,7 @@ func (s *fsStore) AgentDir(project, name string) string {
 }
 
 func (s *fsStore) AgentMeta(project, name string) (*entity.AgentMeta, error) {
-	path := filepath.Join(s.AgentDir(project, name), ".agencycli-agent.yaml")
+	path := filepath.Join(s.AgentDir(project, name), ".agencycli", "agent.yaml")
 	var m entity.AgentMeta
 	if err := readYAML(path, &m); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -427,7 +427,7 @@ func (s *fsStore) AgentMeta(project, name string) (*entity.AgentMeta, error) {
 }
 
 func (s *fsStore) SaveAgentMeta(project, name string, meta *entity.AgentMeta) error {
-	path := filepath.Join(s.AgentDir(project, name), ".agencycli-agent.yaml")
+	path := filepath.Join(s.AgentDir(project, name), ".agencycli", "agent.yaml")
 	if err := writeYAML(path, meta); err != nil {
 		return fmt.Errorf("store: save agent meta %q/%q: %w", project, name, err)
 	}
@@ -491,7 +491,7 @@ func (s *fsStore) ListFiredAgents(project string) ([]*FiredAgentEntry, error) {
 		}
 
 		// Read meta from the archived directory.
-		metaPath := filepath.Join(firedDir, ".agencycli-agent.yaml")
+		metaPath := filepath.Join(firedDir, ".agencycli", "agent.yaml")
 		var meta entity.AgentMeta
 		if err := readYAML(metaPath, &meta); err != nil {
 			continue // skip entries without valid meta
