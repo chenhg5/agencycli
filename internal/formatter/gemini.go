@@ -41,6 +41,11 @@ func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) erro
 		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
 	}
 
+	// Include wakeup routine if installed.
+	if _, err := os.Stat(filepath.Join(contextDir, "wakeup.md")); err == nil {
+		importLines = append(importLines, "@.agencycli-context/wakeup.md")
+	}
+
 	// GEMINI.md supports the same @import syntax as CLAUDE.md
 	geminiMD := buildGeminiMD(importLines)
 	if err := os.WriteFile(filepath.Join(outDir, "GEMINI.md"), []byte(geminiMD), 0o644); err != nil {

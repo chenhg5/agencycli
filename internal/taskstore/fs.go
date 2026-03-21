@@ -355,6 +355,24 @@ func (s *FSStore) OverwriteArchive(project, agent string, tasks []*entity.Task) 
 	return writeYAMLAtomic(filepath.Join(dir, archiveFile), tasks)
 }
 
+func (s *FSStore) ClearTasks(project, agent string) error {
+	dir := s.agentDir(project, agent)
+	for _, name := range []string{tasksFile, archiveFile} {
+		p := filepath.Join(dir, name)
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (s *FSStore) ClearInbox() error {
+	if err := s.saveInbox(nil); err != nil {
+		return err
+	}
+	return s.regenerateInboxMD(nil)
+}
+
 // ListProjects returns all project names in the workspace.
 func (s *FSStore) ListProjects() ([]string, error) {
 	base := filepath.Join(s.root, "projects")

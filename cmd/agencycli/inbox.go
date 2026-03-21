@@ -202,8 +202,22 @@ func newInboxShowCmd() *cobra.Command {
 			}
 
 			if taskPrompt != "" {
-				fmt.Println("── Original task (full prompt) ──────────────────────────────")
-				fmt.Println(taskPrompt)
+				// For wakeup tasks the prompt is the routine trigger — not useful to
+				// the human deciding on the confirmation.  Show a short excerpt instead.
+				isWakeup := found.Title == "[wakeup] routine" ||
+					strings.HasPrefix(found.Title, "[wakeup]")
+				maxLines := 12
+				lines := strings.Split(strings.TrimSpace(taskPrompt), "\n")
+				if isWakeup && len(lines) > maxLines {
+					fmt.Println("── Original task (wakeup trigger — truncated) ───────────────")
+					for _, l := range lines[:maxLines] {
+						fmt.Println(l)
+					}
+					fmt.Printf("  … (%d more lines, this is the wakeup routine prompt)\n", len(lines)-maxLines)
+				} else {
+					fmt.Println("── Original task (full prompt) ──────────────────────────────")
+					fmt.Println(taskPrompt)
+				}
 				fmt.Println()
 			}
 

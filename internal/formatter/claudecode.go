@@ -50,6 +50,13 @@ func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) 
 		importLines = append(importLines, fmt.Sprintf("@.agencycli-context/%s", filename))
 	}
 
+	// If a playbook (wakeup routine) has been installed, include it so the agent
+	// loads the full SOP at session start rather than receiving it each wakeup.
+	wakeupMD := filepath.Join(contextDir, "wakeup.md")
+	if _, err := os.Stat(wakeupMD); err == nil {
+		importLines = append(importLines, "@.agencycli-context/wakeup.md")
+	}
+
 	// Write CLAUDE.md with @import directives
 	claudeMD := buildClaudeMD(importLines)
 	if err := os.WriteFile(filepath.Join(outDir, "CLAUDE.md"), []byte(claudeMD), 0o644); err != nil {

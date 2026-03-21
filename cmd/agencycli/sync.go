@@ -167,16 +167,7 @@ func syncAgent(root string, s store.Store, project, agentName string, force bool
 		return syncDiff{}, err
 	}
 
-	// Re-generate context files.
-	f, err := formatter.New(meta.Model)
-	if err != nil {
-		return syncDiff{}, err
-	}
-	if err := f.Format(mc, agentDir); err != nil {
-		return syncDiff{}, err
-	}
-
-	// Re-copy playbook if it changed (or force).
+	// Copy playbook BEFORE running the formatter so CLAUDE.md/@import picks it up.
 	if meta.Playbook != "" && len(playbookData) > 0 {
 		ctxDir := filepath.Join(agentDir, ".agencycli-context")
 		if err := os.MkdirAll(ctxDir, 0o755); err != nil {
@@ -185,6 +176,15 @@ func syncAgent(root string, s store.Store, project, agentName string, force bool
 		if err := os.WriteFile(filepath.Join(ctxDir, "wakeup.md"), playbookData, 0o644); err != nil {
 			return syncDiff{}, fmt.Errorf("write wakeup.md: %w", err)
 		}
+	}
+
+	// Re-generate context files (formatter will detect wakeup.md and @import it).
+	f, err := formatter.New(meta.Model)
+	if err != nil {
+		return syncDiff{}, err
+	}
+	if err := f.Format(mc, agentDir); err != nil {
+		return syncDiff{}, err
 	}
 
 	now := time.Now().UTC()

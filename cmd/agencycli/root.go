@@ -64,6 +64,7 @@ func init() {
 		newListCmd(),
 		newShowCmd(),
 		newTaskCmd(),
+		newAgentCmd(),
 		newRunCmd(),
 		newExecCmd(),
 		newInboxCmd(),
@@ -74,6 +75,7 @@ func init() {
 		newProjectCmd(),
 		newSandboxCmd(),
 		newOverviewCmd(),
+		newClearCmd(),
 	)
 }
 

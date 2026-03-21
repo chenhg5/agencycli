@@ -41,6 +41,12 @@ type Store interface {
 	// Used by task retry to remove a retried task from the archive.
 	OverwriteArchive(project, agent string, tasks []*entity.Task) error
 
+	// ClearTasks removes all tasks (active and archived) for the given agent.
+	ClearTasks(project, agent string) error
+
+	// ClearInbox removes all items from the human inbox and rewrites the summary.
+	ClearInbox() error
+
 	// ── Heartbeat ────────────────────────────────────────────────────────────
 
 	// GetHeartbeat returns the heartbeat config for the agent.

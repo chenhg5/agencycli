@@ -245,10 +245,20 @@ func applyAgentSpec(root, project string, spec entity.AgentSpec,
 				if err := os.MkdirAll(filepath.Dir(wakeupDst), 0o755); err != nil {
 					return fmt.Errorf("create .agencycli-context: %w", err)
 				}
-				if err := os.WriteFile(wakeupDst, data, 0644); err != nil {
-					return fmt.Errorf("write wakeup.md: %w", err)
+			if err := os.WriteFile(wakeupDst, data, 0644); err != nil {
+				return fmt.Errorf("write wakeup.md: %w", err)
+			}
+			fmt.Printf("    ✓ playbook installed: %s → .agencycli-context/wakeup.md\n", spec.Playbook)
+
+			// Re-run formatter so CLAUDE.md gains the @import for wakeup.md.
+			if meta, err2 := s.AgentMeta(project, spec.Name); err2 == nil {
+				if f2, err3 := formatter.New(meta.Model); err3 == nil {
+					bld := ctxbuild.NewBuilder(s)
+					if mc2, err4 := bld.Build(project, spec.Team, spec.Role); err4 == nil {
+						_ = f2.Format(mc2, agentDir)
+					}
 				}
-				fmt.Printf("    ✓ playbook installed: %s → .agencycli-context/wakeup.md\n", spec.Playbook)
+			}
 			}
 		}
 	}
