@@ -122,8 +122,15 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 			return nil, err
 		}
 		dockerCfg := cloneDockerCfg(meta.Sandbox.Docker)
-		if repoMount := r.resolveRepoMount(project); repoMount != "" {
-			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, repoMount)
+		for _, addDir := range meta.AddDirs {
+			absDir, err := filepath.Abs(addDir)
+			if err != nil {
+				continue
+			}
+			if _, err := os.Stat(absDir); err != nil {
+				continue
+			}
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, absDir+":"+absDir)
 		}
 		if wsMount := r.root + ":" + r.root; r.root != "" {
 			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, wsMount)
@@ -275,8 +282,15 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		// inside the container. This lets the agent read/write/commit code at
 		// the exact path it expects (e.g. /root/code/cc-connect), matching
 		// what is written in CLAUDE.md / the project prompt.
-		if repoMount := r.resolveRepoMount(project); repoMount != "" {
-			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, repoMount)
+		for _, addDir := range meta.AddDirs {
+			absDir, err := filepath.Abs(addDir)
+			if err != nil {
+				continue
+			}
+			if _, err := os.Stat(absDir); err != nil {
+				continue
+			}
+			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, absDir+":"+absDir)
 		}
 
 		// Auto-mount the workspace root at the same path so agents can use
@@ -457,32 +471,6 @@ func resolveAgencycliBinaryMount() string {
 		return ""
 	}
 	return binPath + ":" + sandbox.AgencycliMount + ":ro"
-}
-
-// resolveRepoMount looks up the project's repo path and returns a Docker
-// volume mount string in the form "abs_host_path:abs_host_path" so that the
-// repository is visible inside the container at exactly the same absolute path
-// the agent's context references (e.g. /root/code/cc-connect).
-// Returns "" if the project has no repo configured or the path doesn't exist.
-func (r *Runner) resolveRepoMount(project string) string {
-	proj, err := r.agentStore.Project(project)
-	if err != nil || proj.Repo == "" {
-		return ""
-	}
-	repoPath := proj.Repo
-	if !filepath.IsAbs(repoPath) {
-		repoPath = filepath.Join(r.root, repoPath)
-	}
-	repoPath, err = filepath.Abs(repoPath)
-	if err != nil {
-		return ""
-	}
-	if _, err := os.Stat(repoPath); err != nil {
-		return "" // directory not present on this host, skip silently
-	}
-	// Mount at the same path: the agent sees /root/code/cc-connect
-	// inside the container, matching what is written in CLAUDE.md.
-	return repoPath + ":" + repoPath
 }
 
 // cloneDockerCfg returns a shallow copy of cfg (or a fresh struct if nil)
