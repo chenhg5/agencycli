@@ -50,6 +50,11 @@ const (
 	// (e.g. Ollama, LM Studio, LocalAI, or any /v1/chat/completions service).
 	// Context file: context.md (used as the system message).
 	ModelHTTPAgent AgentModel = "http-agent"
+
+	// ModelHuman represents a human team member with their own inbox.
+	// Human agents have no context files or autonomous wakeup; they receive
+	// messages and tasks routed via inbox and task queues.
+	ModelHuman AgentModel = "human"
 )
 
 // KnownModels lists all supported agent models in display order.
@@ -63,6 +68,7 @@ var KnownModels = []AgentModel{
 	ModelIFlow,
 	ModelGenericCLI,
 	ModelHTTPAgent,
+	ModelHuman,
 }
 
 // modelAliases maps legacy or alternate spellings to the canonical model name.

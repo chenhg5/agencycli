@@ -232,7 +232,7 @@ func applyAgentSpec(root, project string, spec entity.AgentSpec,
 
 	// ── Playbook → wakeup.md ──────────────────────────────────────────────────
 
-	if spec.Playbook != "" {
+	if spec.Playbook != "" && entity.AgentModel(spec.Model) != entity.ModelHuman {
 		playbookSrc := filepath.Join(root, "project-blueprints", project, spec.Playbook)
 		wakeupDst := filepath.Join(agentDir, ".agencycli/context", "wakeup.md")
 		if dryRun {
@@ -265,7 +265,7 @@ func applyAgentSpec(root, project string, spec entity.AgentSpec,
 
 	// ── Heartbeat ─────────────────────────────────────────────────────────────
 
-	if spec.Heartbeat != nil {
+	if spec.Heartbeat != nil && entity.AgentModel(spec.Model) != entity.ModelHuman {
 		hb := spec.Heartbeat
 		// If a playbook is configured, auto-set wakeup prompt.
 		if spec.Playbook != "" && hb.WakeupPrompt == "" {
@@ -332,15 +332,28 @@ func hireAgentFromSpec(root, project string, spec entity.AgentSpec,
 
 	agentModel := entity.AgentModel(spec.Model)
 
+	agentDir := filepath.Join(root, "projects", project, "agents", spec.Name)
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		return err
+	}
+
+	// Human agents need no context files, sandbox, or repo mounting.
+	if agentModel == entity.ModelHuman {
+		meta := &entity.AgentMeta{
+			Name:    spec.Name,
+			Project: project,
+			Team:    spec.Team,
+			Role:    spec.Role,
+			Model:   agentModel,
+			HiredAt: time.Now().UTC(),
+		}
+		return s.SaveAgentMeta(project, spec.Name, meta)
+	}
+
 	builder := ctxbuild.NewBuilder(s)
 	mc, err := builder.Build(project, spec.Team, spec.Role)
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
-	}
-
-	agentDir := filepath.Join(root, "projects", project, "agents", spec.Name)
-	if err := os.MkdirAll(agentDir, 0o755); err != nil {
-		return err
 	}
 
 	f, err := formatter.New(agentModel)

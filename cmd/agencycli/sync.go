@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/ctxbuild"
+	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/formatter"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/spf13/cobra"
@@ -123,6 +124,11 @@ func syncAgent(root string, s store.Store, project, agentName string, force bool
 	meta, err := s.AgentMeta(project, agentName)
 	if err != nil {
 		return syncDiff{}, err
+	}
+
+	// Human agents have no context files to sync.
+	if meta.Model == entity.ModelHuman {
+		return syncDiff{}, nil
 	}
 
 	builder := ctxbuild.NewBuilder(s)

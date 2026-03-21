@@ -124,6 +124,26 @@ The output format depends on --model:
 				)
 			}
 
+			// Human agents need no context files or sandbox — just create the dir and save meta.
+			if agentModel == entity.ModelHuman {
+				if err := os.MkdirAll(agentDir, 0o755); err != nil {
+					return fmt.Errorf("%s: create agent dir: %w", use, err)
+				}
+				meta := &entity.AgentMeta{
+					Name:    agentName,
+					Project: project,
+					Team:    team,
+					Role:    role,
+					Model:   agentModel,
+					HiredAt: time.Now().UTC(),
+				}
+				if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
+					return fmt.Errorf("%s: save agent meta: %w", use, err)
+				}
+				fmt.Printf("✓ Human agent hired: %s/%s\n", project, agentName)
+				return nil
+			}
+
 			builder := ctxbuild.NewBuilder(s)
 			mc, err := builder.Build(project, team, role)
 			if err != nil {
@@ -329,6 +349,8 @@ func printHireSuccess(agentDir string, model entity.AgentModel, mc *ctxbuild.Mer
 	case entity.ModelHTTPAgent:
 		fmt.Printf("    agencycli run --project %s --agent %s\n", project, agentName)
 		fmt.Printf("    # (prompts are sent to your configured HTTP endpoint)\n")
+	case entity.ModelHuman:
+		fmt.Printf("  Human identity — inbox at: projects/%s/agents/%s/.agencycli/\n", project, agentName)
 	default:
 		fmt.Printf("    <your-agent-command>\n")
 	}
