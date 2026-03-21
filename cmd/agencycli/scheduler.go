@@ -411,6 +411,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 					wakeupTask.Status = entity.TaskStatusDoneFailed
 					wakeupTask.LastError = rErr.Error()
 					_ = ts.ArchiveTask(project, agentName, wakeupTask)
+					return fmt.Errorf("[heartbeat %s/%s] wakeup failed: %w", project, agentName, rErr)
 				} else {
 					wakeupTask.Status = result.Status
 					wakeupTask.RunLogPath = result.LogPath
@@ -450,7 +451,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			task.FinishedAt = &finished
 			_ = ts.ArchiveTask(project, agentName, task)
 			fmt.Printf("[heartbeat %s/%s] ✗ task %s failed: %v\n", project, agentName, task.ID, err)
-			continue
+			return fmt.Errorf("[heartbeat %s/%s] task %s failed: %w", project, agentName, task.ID, err)
 		}
 
 		// Update session ID for the cycle (per-cycle scope by default).

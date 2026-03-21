@@ -335,18 +335,19 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Run the agent.
-	cmd := exec.Command(executable, args...)
+	// Note: when UseStdinPrompt is true, we wrap in `bash -c "cmd < file"` because
+	// docker's `-i` flag does not work correctly with stdin from a regular file
+	// via Go's cmd.Stdin = file (docker tries to seek on stdin, which fails for regular files).
+	// Using bash stdin redirect works correctly.
+	var cmd *exec.Cmd
+	if invoker.UseStdinPrompt() {
+		shellCmd := fmt.Sprintf("%s %s < %s", executable, strings.Join(args, " "), shellEscape(promptFile))
+		cmd = exec.Command("bash", "-c", shellCmd)
+	} else {
+		cmd = exec.Command(executable, args...)
+	}
 	if execDir != "" {
 		cmd.Dir = execDir
-	}
-
-	if invoker.UseStdinPrompt() {
-		pf, err := os.Open(promptFile)
-		if err != nil {
-			return nil, fmt.Errorf("open prompt file for stdin: %w", err)
-		}
-		defer pf.Close()
-		cmd.Stdin = pf
 	}
 
 	var outBuf bytes.Buffer
@@ -380,7 +381,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	if runErr != nil {
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = runErr.Error()
-		return result, nil
+		return result, runErr
 	}
 
 	result.Status = entity.TaskStatusDoneSuccess
@@ -417,6 +418,12 @@ func writeTempPrompt(agentDir, content string) (string, error) {
 		return "", err
 	}
 	return f.Name(), nil
+}
+
+// shellEscape returns a single-quoted string safe for use in a bash command.
+func shellEscape(s string) string {
+	// Replace ' with '\'' and wrap in single quotes.
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 // parseLineSentinel scans output line by line for lines starting with prefix.
