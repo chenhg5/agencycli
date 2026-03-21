@@ -248,16 +248,31 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		firstCycle = false
 
 		if waitDur > 0 {
-			nextAt := nextAtStr(time.Now().Add(waitDur))
-			if hb.LastWakeup == nil {
-				log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
+			// Compute the projected next wake time. If it falls outside the active
+			// window, display when the window opens instead so the log is accurate.
+			projectedNext := time.Now().Add(waitDur)
+			if !isInActiveWindowAt(projectedNext, hb) {
+				if nextWindow := nextWindowStart(hb); nextWindow > 0 {
+					log("sleeping %s before next wakeup — next at %s (window closes at %s)",
+						waitDur.Round(time.Second), nextAtStr(time.Now().Add(nextWindow)), hb.ActiveHours)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(waitDur):
+				}
 			} else {
-				log("sleeping %s before next wakeup — next at %s", waitDur.Round(time.Second), nextAt)
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(waitDur):
+				nextAt := nextAtStr(projectedNext)
+				if hb.LastWakeup == nil {
+					log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
+				} else {
+					log("sleeping %s before next wakeup — next at %s", waitDur.Round(time.Second), nextAt)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(waitDur):
+				}
 			}
 		}
 
@@ -759,13 +774,17 @@ func isAlreadyRunning(hb *entity.HeartbeatConfig) bool {
 // heartbeat's configured ActiveHours and ActiveDays restrictions.
 // Both fields are optional; empty means "always allowed".
 func isInActiveWindow(hb *entity.HeartbeatConfig) bool {
-	now := time.Now()
+	return isInActiveWindowAt(time.Now(), hb)
+}
 
-	if hb.ActiveDays != "" && !isActiveDay(hb.ActiveDays, now) {
+// isInActiveWindowAt returns true if the given time t falls within the
+// heartbeat's configured ActiveHours and ActiveDays restrictions.
+func isInActiveWindowAt(t time.Time, hb *entity.HeartbeatConfig) bool {
+	if hb.ActiveDays != "" && !isActiveDay(hb.ActiveDays, t) {
 		return false
 	}
 	if hb.ActiveHours != "" {
-		ok, _ := isActiveHour(hb.ActiveHours, now)
+		ok, _ := isActiveHourAt(hb.ActiveHours, t)
 		return ok
 	}
 	return true
@@ -798,6 +817,12 @@ func parseHHMM(s string) (int, int, error) {
 // isActiveHour checks whether now is within the "HH:MM-HH:MM" range.
 // Also returns duration until the window starts (0 if already inside).
 func isActiveHour(activeHours string, now time.Time) (bool, time.Duration) {
+	return isActiveHourAt(activeHours, now)
+}
+
+// isActiveHourAt checks whether t is within the "HH:MM-HH:MM" range.
+// Also returns duration until the window starts (0 if already inside).
+func isActiveHourAt(activeHours string, t time.Time) (bool, time.Duration) {
 	parts := strings.SplitN(activeHours, "-", 2)
 	if len(parts) != 2 {
 		return true, 0 // malformed — don't block
@@ -808,9 +833,9 @@ func isActiveHour(activeHours string, now time.Time) (bool, time.Duration) {
 		return true, 0
 	}
 
-	loc := now.Location()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), startH, startM, 0, 0, loc)
-	todayEnd := time.Date(now.Year(), now.Month(), now.Day(), endH, endM, 0, 0, loc)
+	loc := t.Location()
+	todayStart := time.Date(t.Year(), t.Month(), t.Day(), startH, startM, 0, 0, loc)
+	todayEnd := time.Date(t.Year(), t.Month(), t.Day(), endH, endM, 0, 0, loc)
 
 	// Overnight range (e.g. 22:00-06:00): end wraps to next day.
 	overnight := todayEnd.Before(todayStart) || todayEnd.Equal(todayStart)
@@ -818,14 +843,14 @@ func isActiveHour(activeHours string, now time.Time) (bool, time.Duration) {
 		todayEnd = todayEnd.Add(24 * time.Hour)
 	}
 
-	// Check whether now is inside [start, end).
-	if now.Equal(todayStart) || (now.After(todayStart) && now.Before(todayEnd)) {
+	// Check whether t is inside [start, end).
+	if t.Equal(todayStart) || (t.After(todayStart) && t.Before(todayEnd)) {
 		return true, 0
 	}
 
 	// Compute time until window opens.
 	nextOpen := todayStart
-	if now.After(todayStart) {
+	if t.After(todayStart) {
 		// Start already passed today; next open is tomorrow's start.
 		nextOpen = todayStart.Add(24 * time.Hour)
 	}
