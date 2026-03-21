@@ -109,7 +109,13 @@ func (c *codexInvoker) Args(promptFile, sessionID string) []string {
 	// `codex exec -` reads the prompt from stdin.
 	// --skip-git-repo-check allows running outside a git repo (agent workspace
 	// dirs are not git repos themselves; the project repo is mounted separately).
-	args := []string{"codex", "exec", "--skip-git-repo-check"}
+	// When sessionID is provided, use `codex exec resume` to continue a session.
+	var args []string
+	if sessionID != "" {
+		args = []string{"codex", "exec", "resume", sessionID}
+	} else {
+		args = []string{"codex", "exec", "--skip-git-repo-check"}
+	}
 	for _, dir := range c.addDirs {
 		args = append(args, "--add-dir", dir)
 	}
@@ -169,7 +175,7 @@ func (c *cursorInvoker) Args(promptFile, sessionID string) []string {
 	// `agent --print --output-format stream-json` reads the prompt from stdin.
 	args := []string{"agent", "--print", "--output-format", "stream-json"}
 	if sessionID != "" {
-		args = append(args, "--session", sessionID)
+		args = append(args, "--resume", sessionID)
 	}
 	return args
 }

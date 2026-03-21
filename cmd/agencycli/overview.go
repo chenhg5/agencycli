@@ -238,57 +238,72 @@ func fmtDuration(d time.Duration) string {
 
 // ── agent row renderer ────────────────────────────────────────────────────
 
+// renderAgentRow builds an agent-status line and returns exactly boxW visible
+// characters by measuring each component's visible width.
 func renderAgentRow(name string, meta *entity.AgentMeta, snap hbSnap, taskCount int) string {
-	model := silver("—")
+	modelVis := 10
+	modelStr := silver(padStr("—", modelVis))
 	if meta != nil {
-		model = silver(padStr(string(meta.Model), 11))
-	} else {
-		model = silver(padStr("—", 11))
+		modelStr = silver(padStr(string(meta.Model), modelVis))
 	}
 
-	namePart := bold(padStr(name, 16))
+	nameVis := 16
+	nameStr := bold(padStr(name, nameVis))
 
-	var statusIcon, schedPart string
+	statusIcon := silver("○")
+	schedStr := silver("no heartbeat")
+	schedVis := 12 // "no heartbeat" visible length
 
 	switch {
 	case !snap.enabled:
-		statusIcon = silver("○")
-		schedPart = silver("no heartbeat")
+		// already set above
 
 	case snap.isRunning:
 		statusIcon = col(ansiBGreen, "▶")
-		schedPart = col(ansiBGreen, "running…")
+		schedStr = col(ansiBGreen, "running…")
+		schedVis = 8
 
 	case snap.interval == 0:
 		statusIcon = silver("○")
-		schedPart = silver("↻" + snap.intervalStr)
+		schedStr = silver("↻" + snap.intervalStr)
+		schedVis = 1 + visibleLen(snap.intervalStr)
 
 	default:
 		statusIcon = col(ansiGreen, "▶")
 		intStr := muted("↻") + col(ansiCyan, snap.intervalStr)
+		intVis := 1 + visibleLen(snap.intervalStr) // "↻" + interval
 		bar := progressBar(snap.fraction, 10)
+		barVis := 10
 		nextStr := ""
+		nextVis := 0
 		if !snap.nextWakeup.IsZero() {
 			remaining := time.Until(snap.nextWakeup)
-			nextStr = muted("→ ") +
-				col(ansiWhite, snap.nextWakeup.Format("15:04:05")) +
-				silver(" ("+fmtDuration(remaining)+")")
+			timeStr := snap.nextWakeup.Format("15:04:05")
+			durStr := fmtDuration(remaining)
+			nextStr = muted("→ ") + col(ansiWhite, timeStr) + silver(" ("+durStr+")")
+			nextVis = 2 + visibleLen(timeStr) + 2 + visibleLen(durStr) + 2 // "→ " + time + " (" + dur + ")"
 		}
-		schedPart = intStr + "  " + bar + "  " + nextStr
+		schedStr = intStr + "  " + bar + "  " + nextStr
+		schedVis = intVis + 2 + barVis + 2 + nextVis
 	}
 
 	taskTag := ""
+	taskTagVis := 0
 	if taskCount > 0 {
 		taskTag = "  " + col(ansiBYellow, fmt.Sprintf("[%d task%s]", taskCount, plural(taskCount)))
+		taskTagVis = 2 + visibleLen(fmt.Sprintf("[%d task%s]", taskCount, plural(taskCount)))
 	}
 
-	return fmt.Sprintf("    %s  %s  %s  %s%s",
-		statusIcon,
-		namePart,
-		model,
-		schedPart,
-		taskTag,
-	)
+	// Build total by concatenation and measure
+	row := fmt.Sprintf("    %s  %s  %s  %s%s", statusIcon, nameStr, modelStr, schedStr, taskTag)
+	rowVis := 4 + visibleLen(statusIcon) + 2 + nameVis + 2 + modelVis + 2 + schedVis + taskTagVis
+
+	// Pad to boxW if needed
+	if rowVis < boxW {
+		row += strings.Repeat(" ", boxW-rowVis)
+	}
+
+	return row
 }
 
 func plural(n int) string {

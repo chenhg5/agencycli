@@ -131,7 +131,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 		if binMount := resolveAgencycliBinaryMount(); binMount != "" {
 			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, binMount)
 		}
-		containerPromptFile := sandbox.WorkspaceMount + "/" + filepath.Base(promptFile)
+		containerPromptFile := agentDir + "/" + filepath.Base(promptFile)
 		remappedInner := remapPromptFile(innerArgs, promptFile, containerPromptFile)
 		var err error
 		executable, args, err = sandbox.RunArgs(agentDir, model, dockerCfg, remappedInner)
@@ -293,9 +293,9 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 			dockerCfg.ExtraVolumes = append(dockerCfg.ExtraVolumes, binMount)
 		}
 
-		// The prompt file path inside the container (workspace-relative).
-		// innerArgs reference the host promptFile path — remap it to /workspace.
-		containerPromptFile := sandbox.WorkspaceMount + "/" + filepath.Base(promptFile)
+		// The prompt file path inside the container.
+		// innerArgs reference the host promptFile path — remap it to the real agent path.
+		containerPromptFile := agentDir + "/" + filepath.Base(promptFile)
 		remappedInner := remapPromptFile(innerArgs, promptFile, containerPromptFile)
 
 		var err error
