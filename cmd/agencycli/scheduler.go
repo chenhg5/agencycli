@@ -249,30 +249,38 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 
 		if waitDur > 0 {
 			// Compute the projected next wake time. If it falls outside the active
-			// window, display when the window opens instead so the log is accurate.
+			// window, cap the sleep so we wake exactly at the window boundary;
+			// the loop's window check will then skip to the next window.
 			projectedNext := time.Now().Add(waitDur)
 			if !isInActiveWindowAt(projectedNext, hb) {
 				if nextWindow := nextWindowStart(hb); nextWindow > 0 {
-					log("sleeping %s before next wakeup — next at %s (window closes at %s)",
-						waitDur.Round(time.Second), nextAtStr(time.Now().Add(nextWindow)), hb.ActiveHours)
+					// Currently outside window: sleep until window opens.
+					log("outside active window — sleeping %s until window opens at %s",
+						nextWindow.Round(time.Minute), hb.ActiveHours)
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(nextWindow):
+					}
+					continue
 				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(waitDur):
+				// Inside window but projected wake is past window end: cap to window end.
+				_, remaining := isActiveHour(hb.ActiveHours, time.Now())
+				if remaining > 0 && remaining < waitDur {
+					waitDur = remaining
+					projectedNext = time.Now().Add(waitDur)
 				}
+			}
+			nextAt := nextAtStr(projectedNext)
+			if hb.LastWakeup == nil {
+				log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
 			} else {
-				nextAt := nextAtStr(projectedNext)
-				if hb.LastWakeup == nil {
-					log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
-				} else {
-					log("sleeping %s before next wakeup — next at %s", waitDur.Round(time.Second), nextAt)
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(waitDur):
-				}
+				log("sleeping %s before next wakeup — next at %s", waitDur.Round(time.Second), nextAt)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(waitDur):
 			}
 		}
 
