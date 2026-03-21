@@ -93,32 +93,16 @@ agencycli --dir $AGENCY_DIR task done \
 agencycli --dir $AGENCY_DIR task done \
   --id $TASK_ID --status failed --error "reason"
 
-# Pause and request human confirmation (blocks until human responds)
+# Request human input before proceeding (non-blocking)
 agencycli --dir $AGENCY_DIR task confirm-request \
   --id $TASK_ID \
   --summary "PR #42 ready, awaiting merge approval" \
   --action-item "Review: gh pr view 42 --repo org/repo" \
-  --action-item "Confirm merge: reply 'merge'" \
-  --action-item "Hold: reply 'hold <reason>'"
+  --action-item "Approve: inbox reply <msg-id> --body 'approve'" \
+  --action-item "Hold: inbox reply <msg-id> --body 'hold <reason>'"
 ```
 
-After `confirm-request`, the task is paused. The human uses `inbox confirm/reject` to resume it. The human's reply text is available as `$CONFIRMATION_REPLY` in the re-run.
-
----
-
-## Inbox — task confirmations (blocking)
-
-When an agent calls `task confirm-request`, the task appears here for the human to resolve.
-
-```bash
-agencycli --dir $AGENCY_DIR inbox list
-agencycli --dir $AGENCY_DIR inbox show    <task-id>
-agencycli --dir $AGENCY_DIR inbox confirm <task-id> --message "yes, proceed"
-agencycli --dir $AGENCY_DIR inbox reject  <task-id> --reason "out of scope"
-agencycli --dir $AGENCY_DIR inbox comment <task-id> --message "check the edge case first"
-agencycli --dir $AGENCY_DIR inbox forward <task-id> \
-  --to <project>/<agent> --note "please double-check the auth flow"
-```
+After `confirm-request`, the task is archived (non-blocking). The human replies via `inbox reply` and the agent continues on their next wakeup.
 
 ---
 

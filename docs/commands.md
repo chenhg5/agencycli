@@ -120,8 +120,7 @@ agencycli task confirm-request --id <id> --summary "PR ready" \
 ```
 pending → in_progress → done_success
                       → done_failed  → (auto-retry if max_retries set)
-                      → awaiting_confirmation → in_progress (confirm)
-                                              → cancelled   (reject)
+                      → awaiting_confirmation → done_success (via inbox reply)
 ```
 
 ---
@@ -146,9 +145,7 @@ The inbox has two distinct concepts.
 agencycli inbox list
 agencycli inbox list --to cc-connect/pm          # filter by recipient
 agencycli inbox show    <task-id>                # summary, action items, log tail
-agencycli inbox confirm <task-id> [--message "notes for the agent"]
-agencycli inbox reject  <task-id> --reason "..."
-agencycli inbox comment <task-id> --message "..."
+agencycli inbox reply   <task-id> --body "yes, proceed"
 agencycli inbox forward <task-id> --to <project>/<agent> --note "..."
 ```
 

@@ -630,8 +630,7 @@ agencycli exec --project my-api --agent dev \
 ```
 pending → in_progress → done_success
                       → done_failed   → (auto-retry if max_retries set)
-                      → awaiting_confirmation → in_progress  (on confirm)
-                                              → cancelled    (on reject)
+                      → awaiting_confirmation → done_success (via inbox reply)
 ```
 
 ---
@@ -645,9 +644,7 @@ When an agent calls `task confirm-request`, the task pauses until you respond:
 ```bash
 agencycli inbox list
 agencycli inbox show    <task-id>     # summary, action items, log tail
-agencycli inbox confirm <task-id> --message "Approved — merge when CI passes"
-agencycli inbox reject  <task-id> --reason "Out of scope"
-agencycli inbox comment <task-id> --message "Please also update the docs"
+agencycli inbox reply   <task-id> --body "Approved — merge when CI passes"
 agencycli inbox forward <task-id> --to my-api/dev --note "Check the auth module"
 ```
 

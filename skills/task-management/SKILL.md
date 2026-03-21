@@ -108,7 +108,7 @@ agencycli --dir $AGENCY_DIR task done \
 
 ---
 
-## Request human confirmation (pause a task mid-execution)
+## Request human confirmation (non-blocking)
 
 When an agent needs a human decision before continuing, it calls:
 
@@ -120,16 +120,16 @@ agencycli --dir $AGENCY_DIR task confirm-request \
   --action-item "Option B: reply 'reject <reason>'"
 ```
 
-The task is paused. The human resolves it via:
+The task is archived. The human responds via:
 
 ```bash
 agencycli --dir $AGENCY_DIR inbox list
-agencycli --dir $AGENCY_DIR inbox confirm <task-id> --message "approve"
+agencycli --dir $AGENCY_DIR inbox messages    # view messages
+agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body "approve"
 agencycli --dir $AGENCY_DIR inbox reject  <task-id> --reason "out of scope"
-agencycli --dir $AGENCY_DIR inbox comment <task-id> --message "please check X first"
 ```
 
-The human's reply text is injected into the re-run as context.
+The human's reply is sent as a message. The agent sees it on the next wakeup and continues via session memory.
 
 ---
 

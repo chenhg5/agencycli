@@ -74,7 +74,7 @@ Every agent execution produces a timestamped log stored alongside the agent's wo
 |-------|---------|
 | `pending` | Created, not yet started. In the agent's queue. |
 | `in_progress` | Agent is actively working on this task right now. |
-| `awaiting_confirmation` | Agent has finished its part but needs human (or another agent) to approve before the task closes or continues. |
+| `awaiting_confirmation` | Agent has requested human input. Task is archived. Human replies via `inbox reply` and agent sees it on next wakeup. |
 | `blocked` | Waiting for a dependency task to complete or an external event. |
 | `done_success` | Completed successfully. Archived. |
 | `done_failed` | Agent tried but could not complete it (error, gave up). Archived, can be retried. |
@@ -94,15 +94,11 @@ pending ──────────► in_progress ────────�
    │              │     │                                             │
    │              └─────►                                             │
    │                    │                                             │
-   │                    └──────────────► awaiting_confirmation        │
-   │                                           │                      │
-   │                              confirmed ───┤                      │
-   │                                           ▼                      │
-   │                                     in_progress                  │
-   │                                           │                      │
-   │                         rejected ─────────┼──────────────► cancelled
-   │                                           │
-   └───────────────────────────────────────────┘ (re-open)
+   │                    └──────────────► awaiting_confirmation (archived)│
+   │                                                                   │
+   │                              human replies via inbox reply        │
+   │                              agent sees on next wakeup             │
+   └───────────────────────────────────────────────────────────────────┘ (re-open)
 ```
 
 **Transition table:**
@@ -113,12 +109,10 @@ pending ──────────► in_progress ────────�
 | `pending` | `cancelled` | Human or PM cancels |
 | `in_progress` | `done_success` | Agent reports success |
 | `in_progress` | `done_failed` | Agent reports failure / max retries exceeded |
-| `in_progress` | `awaiting_confirmation` | Agent emits a confirmation request |
+| `in_progress` | `awaiting_confirmation` | Agent emits a confirmation request (task archived) |
 | `in_progress` | `blocked` | Dependency not yet done |
 | `blocked` | `in_progress` | Dependency resolved |
-| `awaiting_confirmation` | `in_progress` | Human confirms → agent continues |
-| `awaiting_confirmation` | `done_success` | Human confirms → task is considered complete |
-| `awaiting_confirmation` | `cancelled` | Human rejects |
+| `awaiting_confirmation` | `done_success` | Human replies via `inbox reply` → task considered complete |
 | `done_failed` | `pending` | Manual retry (`agencycli task retry <id>`) |
 
 ### 3.3 Who Drives Transitions
@@ -127,8 +121,8 @@ pending ──────────► in_progress ────────�
 |------------|--------|
 | `pending` → `in_progress` | `agencycli run` command or scheduler |
 | `in_progress` → `done_*` | Agent exit code / output parser |
-| `in_progress` → `awaiting_confirmation` | Agent writes a special sentinel in its output |
-| `awaiting_confirmation` → * | Human via `agencycli inbox confirm/reject` |
+| `in_progress` → `awaiting_confirmation` | Agent calls `task confirm-request` (task archived) |
+| `awaiting_confirmation` → `done_success` | Human replies via `inbox reply`; agent sees it on next wakeup |
 | `blocked` → `in_progress` | Dependency watcher (scheduler) or manual `agencycli task unblock` |
 
 ---
@@ -139,8 +133,8 @@ pending ──────────► in_progress ────────�
 
 ```
 projects/<project>/agents/<name>/
-  tasks.yaml          ← active tasks (pending, in_progress, blocked, awaiting_confirmation)
-  tasks_archive.yaml  ← completed and cancelled tasks (append-only)
+  tasks.yaml          ← active tasks (pending, in_progress, blocked)
+  tasks_archive.yaml  ← completed, cancelled, and awaiting_confirmation tasks (append-only)
   crons.yaml          ← recurring schedules
   runs/
     <YYYYMMDD-HHMMSS>-<task-id>.log   ← execution log per run
@@ -178,7 +172,7 @@ Workspace-level:
     2. Run the test suite mentally (or via CI links)
     3. Post a review comment on GitHub with your findings
     4. If you approve: mark this task done_success
-    5. If changes are needed: mark this task awaiting_confirmation and describe what needs human decision
+    5. If changes are needed: call `task confirm-request` to archive task and notify human via inbox
 
   context: {}               # optional extra key-value context injected alongside prompt
 
@@ -261,9 +255,7 @@ Reviewer found a potential SQL injection vector in the new endpoint.
 
 **Run log:** projects/cc-connect/agents/qa-reviewer/runs/20260316-113400-t-20260316-001.log
 
-**To confirm:** `agencycli inbox confirm t-20260316-007`
-**To reject:**  `agencycli inbox reject  t-20260316-007 --reason "false positive"`
-**To comment:** `agencycli inbox comment t-20260316-007 --message "Check line 42 specifically"`
+**To reply:** `agencycli inbox reply t-20260316-007 --body "LGTM, proceed"`
 ```
 
 ---
@@ -298,17 +290,17 @@ qa-reviewer wakes up
       └── Reviews PR → security concern found
                 └── agencycli task confirm-request --id t-xxx \
                         --summary "Possible injection in endpoint X"
-                        → task moves to awaiting_confirmation
-                        → inbox.yaml + inbox.md updated
+                        → task archived as awaiting_confirmation
+                        → message added to human inbox
 
 [Human checks inbox]
       │
       ├── agencycli inbox                     # list
       ├── agencycli inbox show t-xxx          # view detail + log
-      └── agencycli inbox reject t-xxx \
-              --reason "Not an injection, it's parameterized"
-                → task → cancelled
-                → qa-reviewer proceeds to next task
+      └── agencycli inbox reply t-xxx \
+              --body "Not an injection, it's parameterized"
+                → message delivered to qa-reviewer
+                → qa-reviewer sees it on next wakeup and acts accordingly
 ```
 
 ### 5.2 The PM → Dev Pipeline
@@ -379,10 +371,10 @@ qa-reviewer: task status=pending
         │
         ├─► done_success (auto tests pass) → PR merged, issue closed
         │
-        └─► awaiting_confirmation (needs human smoke test)
+        └─► awaiting_confirmation (task archived, human notified)
                 │
-                ▼ (human confirms via inbox)
-             done_success → PR merged
+                ▼ (human replies via inbox)
+             agent sees reply on next wakeup → continues work
 ```
 
 ---
@@ -462,14 +454,8 @@ agencycli inbox
 # Show detail + log path for a specific item
 agencycli inbox show <task-id>
 
-# Confirm: human approves, agent continues
-agencycli inbox confirm <task-id>
-
-# Reject: human rejects, task → cancelled
-agencycli inbox reject <task-id> [--reason "..."]
-
-# Comment: human adds feedback (task stays in awaiting_confirmation)
-agencycli inbox comment <task-id> --message "Please check line 42"
+# Reply: human responds, message delivered to agent's next wakeup
+agencycli inbox reply <task-id> --body "yes, proceed with merge"
 ```
 
 ### 6.4 `agencycli run` (immediate execution)
@@ -525,26 +511,22 @@ agencycli scheduler stop
 8. Update .agencycli/inbox.yaml and inbox.md if needed
 ```
 
-### 7.2 The Confirmation Sentinel
+### 7.2 Human Confirmation via Inbox
 
-Agents signal a confirmation request by writing a specific line to stdout:
+When an agent needs human input before continuing, it calls `task confirm-request`:
 
+```bash
+agencycli task confirm-request --id $TASK_ID \
+  --summary "PR #42 ready for merge approval" \
+  --action-item "Review: gh pr view 42" \
+  --action-item "Reply: inbox reply <msg-id> --body 'approve'"
 ```
-AGENCYCLI_AWAIT_CONFIRM: <summary text>
-```
 
-The runner detects this, captures everything after it as the `summary`, and transitions the task to `awaiting_confirmation`. The agent process should exit 0 at this point — it will be re-invoked later when the human confirms, with the confirmation message appended to the original prompt.
+This:
+1. Archives the task (status → `awaiting_confirmation`)
+2. Creates an inbox message for the human
 
-**Re-invocation on confirm:**
-
-```
-Original prompt
----
-[Human confirmed at 2026-03-16T14:00:00Z]
-Human message: "Not an injection, it's parameterized. Proceed with approval."
----
-Please continue from where you left off.
-```
+The human replies via `inbox reply`. On the agent's next wakeup, the message is injected at the top of the wakeup prompt so the agent can act on it.
 
 ### 7.3 Agent Command Map
 

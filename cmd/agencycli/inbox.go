@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
-	"github.com/chenhg5/agencycli/internal/runner"
-	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
 	"github.com/spf13/cobra"
 )
@@ -18,19 +16,17 @@ import (
 func newInboxCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inbox",
-		Short: "Manage tasks awaiting your confirmation",
-		Long: `inbox shows all tasks that have been routed to you for confirmation.
+		Short: "Manage inbox tasks and async messages",
+		Long: `inbox shows all tasks and messages routed to you for review.
 
-Agents route tasks here when they need human input before proceeding.
-Use 'inbox confirm' or 'inbox reject' to resolve them.`,
+Agents route tasks here when they need human input.
+Use 'inbox reply' to respond to messages or 'inbox forward' to route elsewhere.`,
 	}
 	cmd.AddCommand(
 		newInboxListCmd(),
 		newInboxShowCmd(),
-		newInboxConfirmCmd(),
 		newInboxRejectCmd(),
 		newInboxForwardCmd(),
-		newInboxCommentCmd(),
 		// Async message commands (non-blocking, any participant can use these)
 		newInboxSendCmd(),
 		newInboxMessagesCmd(),
@@ -259,118 +255,6 @@ func tailFile(path string, n int) ([]string, error) {
 	return lines, nil
 }
 
-// ── inbox confirm ─────────────────────────────────────────────────────────────
-
-func newInboxConfirmCmd() *cobra.Command {
-	var message string
-
-	cmd := &cobra.Command{
-		Use:   "confirm <task-id>",
-		Short: "Confirm and continue a task",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			taskID := args[0]
-
-			project, agentName, err := resolveTaskOwner(root, taskID)
-			if err != nil {
-				return err
-			}
-
-			ts := taskstore.New(root)
-			t, err := ts.GetTask(project, agentName, taskID)
-			if err != nil {
-				return err
-			}
-			if t.Status != entity.TaskStatusAwaitingConfirmation {
-				return fmt.Errorf("task %s is in state %s, not awaiting_confirmation", taskID, t.Status)
-			}
-
-			hb, err := ts.GetHeartbeat(project, agentName)
-			if err != nil {
-				return err
-			}
-
-			reply := message
-			if reply == "" {
-				reply = "Confirmed. Please proceed."
-			}
-			t.ConfirmationReply = reply
-
-			// Re-run the agent with the confirmation context.
-			s := store.NewFS(root)
-			r := runner.New(root, ts, s)
-			fmt.Printf("▶ Resuming task %s with your confirmation...\n", taskID)
-
-			now := time.Now().UTC()
-			t.Status = entity.TaskStatusInProgress
-			t.UpdatedAt = now
-			if err := ts.UpdateTask(project, agentName, t); err != nil {
-				return err
-			}
-
-			result, err := r.ResumeTask(project, agentName, t, reply, hb.SessionID)
-			if err != nil {
-				return fmt.Errorf("resume execution error: %w", err)
-			}
-
-			// Update session ID if changed.
-			if result.SessionID != "" && result.SessionID != hb.SessionID {
-				hb.SessionID = result.SessionID
-				_ = ts.SaveHeartbeat(project, agentName, hb)
-			}
-
-			t.RunLogPath = result.LogPath
-			finished := time.Now().UTC()
-			t.FinishedAt = &finished
-			t.Status = result.Status
-
-			switch result.Status {
-			case entity.TaskStatusDoneSuccess:
-				fmt.Printf("✓ Task %s completed after confirmation\n", taskID)
-				_ = ts.ArchiveTask(project, agentName, t)
-				_ = ts.RemoveFromInbox(taskID)
-				if len(t.OnSuccess) > 0 {
-					_ = fireOnSuccessTriggers(root, project, agentName, t)
-				}
-
-			case entity.TaskStatusDoneFailed:
-				t.LastError = result.ErrorMsg
-				fmt.Printf("✗ Task %s failed after confirmation: %s\n", taskID, result.ErrorMsg)
-				_ = ts.ArchiveTask(project, agentName, t)
-				_ = ts.RemoveFromInbox(taskID)
-
-			case entity.TaskStatusAwaitingConfirmation:
-				// Agent needs another round.
-				t.ConfirmationReq = &entity.ConfirmationRequest{Summary: result.Summary}
-				t.UpdatedAt = time.Now().UTC()
-				_ = ts.UpdateTask(project, agentName, t)
-				// Update inbox item summary.
-				_ = ts.RemoveFromInbox(taskID)
-				item := &entity.InboxItem{
-					TaskID:  taskID,
-					Project: project,
-					Agent:   agentName,
-					Title:   t.Title,
-					Summary: result.Summary,
-					LogPath: result.LogPath,
-				}
-				_ = ts.AddToInbox(item)
-				fmt.Printf("? Task %s needs another confirmation round\n", taskID)
-				fmt.Printf("  %s\n", result.Summary)
-			}
-
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&message, "message", "", "confirmation message to the agent")
-	return cmd
-}
-
 // ── inbox reject ──────────────────────────────────────────────────────────────
 
 func newInboxRejectCmd() *cobra.Command {
@@ -528,8 +412,7 @@ The human will see your report and make the final decision.`,
 
 			fmt.Printf("✓ Forwarded task %q to %s\n", t.Title, to)
 			fmt.Printf("  New task ID : %s\n", forwarded.ID)
-			fmt.Printf("  Original inbox item %s remains in awaiting_confirmation.\n", taskID)
-			fmt.Printf("  When %s finishes, it will route results back to your inbox.\n", to)
+			fmt.Printf("  Original task %s has been archived. Use 'inbox reply' to respond to messages.\n", taskID)
 			return nil
 		},
 	}
@@ -545,58 +428,6 @@ func noteOrDefault(note, def string) string {
 		return note
 	}
 	return def
-}
-
-// ── inbox comment ─────────────────────────────────────────────────────────────
-
-func newInboxCommentCmd() *cobra.Command {
-	var message string
-
-	cmd := &cobra.Command{
-		Use:   "comment <task-id>",
-		Short: "Add a comment to an inbox item (task stays awaiting)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			if message == "" {
-				return fmt.Errorf("--message is required")
-			}
-			taskID := args[0]
-
-			project, agentName, err := resolveTaskOwner(root, taskID)
-			if err != nil {
-				return err
-			}
-
-			ts := taskstore.New(root)
-			t, err := ts.GetTask(project, agentName, taskID)
-			if err != nil {
-				return err
-			}
-
-			// Append comment to ConfirmationReply (the agent will see it on next resume).
-			if t.ConfirmationReply == "" {
-				t.ConfirmationReply = message
-			} else {
-				t.ConfirmationReply += "\n" + message
-			}
-			t.UpdatedAt = time.Now().UTC()
-
-			if err := ts.UpdateTask(project, agentName, t); err != nil {
-				return err
-			}
-
-			fmt.Printf("✓ Comment added to task %s\n", taskID)
-			fmt.Printf("  (Task remains in awaiting_confirmation — use 'inbox confirm' to resume)\n")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&message, "message", "", "comment text")
-	return cmd
 }
 
 // ── inbox send ────────────────────────────────────────────────────────────────

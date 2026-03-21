@@ -595,6 +595,30 @@ func (s *FSStore) messagesPath(recipient string) string {
 }
 
 func (s *FSStore) SendMessage(msg *entity.Message) error {
+	// Validate recipient: bare agent names (no "/") should not be used
+	// because they get stored at the human level and won't be seen by the agent's
+	// wakeup routine (which checks project/agent level mailboxes).
+	if !strings.Contains(msg.To, "/") && msg.To != "human" {
+		projects, err := s.ListProjects()
+		if err != nil {
+			return err
+		}
+		for _, project := range projects {
+			agents, err := s.ListAgents(project)
+			if err != nil {
+				continue
+			}
+			for _, agent := range agents {
+				if agent == msg.To {
+					return fmt.Errorf(
+						"recipient %q is an agent in project %q; "+
+							"use --to %s/%s to send to an agent",
+						msg.To, project, project, msg.To)
+				}
+			}
+		}
+	}
+
 	msgs, err := s.ListMessages(msg.To)
 	if err != nil {
 		return err

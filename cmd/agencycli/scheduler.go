@@ -433,18 +433,11 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 				} else {
 					wakeupTask.Status = result.Status
 					wakeupTask.RunLogPath = result.LogPath
-					switch result.Status {
-					case entity.TaskStatusAwaitingConfirmation:
-						// Leave in tasks.yaml; confirm-request already added the inbox item.
-						wakeupTask.ConfirmationReq = &entity.ConfirmationRequest{Summary: result.Summary}
-						wakeupTask.UpdatedAt = time.Now().UTC()
-						_ = ts.UpdateTask(project, agentName, wakeupTask)
-					default:
-						// done_success, done_failed, or anything unexpected → archive.
-						_ = ts.ArchiveTask(project, agentName, wakeupTask)
-						if len(unread) > 0 {
-							_ = ts.MarkMessagesRead(recipient)
-						}
+					// All statuses (including awaiting_confirmation) are archived.
+					// Human responds via `inbox reply`; agent continues on next wakeup.
+					_ = ts.ArchiveTask(project, agentName, wakeupTask)
+					if len(unread) > 0 {
+						_ = ts.MarkMessagesRead(recipient)
 					}
 				}
 			}
@@ -518,19 +511,10 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			}
 
 		case entity.TaskStatusAwaitingConfirmation:
-			task.ConfirmationReq = &entity.ConfirmationRequest{Summary: result.Summary}
-			task.UpdatedAt = time.Now().UTC()
-			_ = ts.UpdateTask(project, agentName, task)
-			item := &entity.InboxItem{
-				TaskID:  task.ID,
-				Project: project,
-				Agent:   agentName,
-				Title:   task.Title,
-				Summary: result.Summary,
-				LogPath: task.RunLogPath,
-			}
-			_ = ts.AddToInbox(item)
-			fmt.Printf("[heartbeat %s/%s] ? task %s awaiting confirmation\n", project, agentName, task.ID)
+			// Archive the task. Human responds via `inbox reply`; agent continues
+			// on next wakeup using session memory.
+			_ = ts.ArchiveTask(project, agentName, task)
+			fmt.Printf("[heartbeat %s/%s] ? task %s done (awaiting reply)\n", project, agentName, task.ID)
 		}
 
 		tasksProcessed++

@@ -16,10 +16,10 @@ First public release of agencycli.
 - `--dir` global flag to operate on any workspace from anywhere
 
 **Task automation**
-- Per-agent task queues with 7-state lifecycle (`pending → in_progress → done_success / done_failed / awaiting_confirmation / cancelled`)
+- Per-agent task queues with 6-state lifecycle (`pending → in_progress → done_success / done_failed / awaiting_confirmation / cancelled`)
 - Priority ordering: 0=critical, 1=high, 2=normal, 3=low
 - `task add / list / show / cancel / retry / stop-all / tokens`
-- `task confirm-request` — agent escalates to human inbox, blocks until decision
+- `task confirm-request` — agent escalates to human inbox (non-blocking, task archived)
 - `run` (queue-based) and `exec` (one-shot) execution modes
 
 **Heartbeat scheduler**

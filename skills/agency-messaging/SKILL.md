@@ -136,7 +136,7 @@ agencycli --dir $AGENCY_DIR inbox rm     <msg-id> --recipient <your-address>
 
 | Situation | Use |
 |-----------|-----|
-| Need human to make a decision before you continue | `task confirm-request` (blocks current task) |
+| Need human to make a decision before you continue | `task confirm-request` (non-blocking, archived) |
 | Sending info or a heads-up, no reply needed immediately | `inbox send` (non-blocking) |
 | Coordinating context between agents asynchronously | `inbox send` (non-blocking) |
 | Broadcast to multiple participants at once | `inbox send --to A --to B --to C` |
