@@ -710,6 +710,14 @@ func (s *FSStore) DeleteMessage(recipient, msgID string) error {
 	return writeYAMLAtomic(s.messagesPath(recipient), filtered)
 }
 
+func (s *FSStore) ClearMessages(recipient string) error {
+	path := s.messagesPath(recipient)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil // nothing to clear
+	}
+	return writeYAMLAtomic(path, []*entity.Message{})
+}
+
 func (s *FSStore) ListAllMessages(recipient string) ([]*entity.Message, error) {
 	return s.loadAllMessages(recipient)
 }

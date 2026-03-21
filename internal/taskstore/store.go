@@ -108,6 +108,9 @@ type Store interface {
 	// Returns an error if the message is not found.
 	DeleteMessage(recipient, msgID string) error
 
+	// ClearMessages removes all messages for a recipient (human or project/agent).
+	ClearMessages(recipient string) error
+
 	// ── Discovery ────────────────────────────────────────────────────────────
 
 	// ListProjects returns the names of all projects in the workspace.
