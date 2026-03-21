@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.1.1] - 2026-03-21
+
+### Added
+
+- `scheduler heartbeat pause <project>/<agent>` — temporarily halt heartbeat without removing config; scheduler stays alive
+- `scheduler heartbeat resume <project>/<agent>` — resume a paused heartbeat
+- `scheduler cron list <project>/<agent>` — list all crons with enabled status
+- `scheduler cron pause <project>/<agent> <cron-id>` — disable a cron
+- `scheduler cron resume <project>/<agent> <cron-id>` — re-enable a paused cron
+- `scheduler cron delete <project>/<agent> <cron-id>` — remove a cron entirely
+- `--model human` support for multiple human identities in inbox routing
+
+### Fixed
+
+- Scheduler `active_hours` timing: `waitDur` is now correctly capped to the remaining window so displayed "next at" times are accurate and the scheduler never schedules a wakeup outside the active window
+- Scheduler now shows accurate "next at" time when the projected wake falls outside the active window (shows window closing time instead)
+- Scheduler: moved `LastWakeup` assignment to after all checks so window-skip does not corrupt elapsed-time calculation for the next cycle
+- Scheduler: fixed jitter being negated when multiple agents have wake times that all fall before the window opens on restart
+- Sandbox: agent `AddDirs` are now correctly mounted into Docker containers (previously only the project-level `repo:` was checked, which was always empty when repos are defined per-agent in `AgentSpec.repos`)
+
+### Changed
+
+- `scheduler heartbeat configure` renamed from `scheduler heartbeat` (subcommands added); old usage still works via flags
+- Scheduler startup log now shows which agents have `active_hours` windows configured
+
 ## [v0.1.0] - 2026-03-19
 
 First public release of agencycli.
