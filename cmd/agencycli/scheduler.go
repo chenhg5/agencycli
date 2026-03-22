@@ -39,28 +39,6 @@ func nowStr() string {
 	return time.Now().Format("15:04:05")
 }
 
-// stripANSI returns s with all ANSI escape sequences removed.
-func stripANSI(s string) string {
-	var result strings.Builder
-	inEscape := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\033' && i+1 < len(s) && s[i+1] == '[' {
-			// CSI sequence: find the end (a letter)
-			inEscape = true
-			i++ // skip '['
-			continue
-		}
-		if inEscape {
-			if (s[i] >= 0x40 && s[i] <= 0x7e) {
-				inEscape = false
-			}
-			continue
-		}
-		result.WriteByte(s[i])
-	}
-	return result.String()
-}
-
 // nextAtStr formats a future time for display. If it's on a different day
 // than today, it includes the date; otherwise just the time.
 func nextAtStr(t time.Time) string {
@@ -197,11 +175,11 @@ func newSchedulerStartCmd() *cobra.Command {
 		lines = append(lines, "")
 		lines = append(lines, fmt.Sprintf("  %sCtrl+C to stop%s", colorDim, colorReset))
 
-		// Compute the widest visible content line.
+		// Compute the widest visible content line using terminal column width.
 		maxLen := 0
 		for _, l := range lines {
-			if len(stripANSI(l)) > maxLen {
-				maxLen = len(stripANSI(l))
+			if visibleLen(l) > maxLen {
+				maxLen = visibleLen(l)
 			}
 		}
 		// Box inner width = content + left/right padding
@@ -220,11 +198,9 @@ func newSchedulerStartCmd() *cobra.Command {
 				fmt.Printf("│%s│\n", strings.Repeat(" ", boxWidth))
 				continue
 			}
-			padding := strings.Repeat(" ", maxLen-len(stripANSI(line)))
-			// Left border (dim), content (colored), padding spaces (dim), right border (dim).
-			// The content line already has embedded colors and ends with \033[0m (reset).
-			// We use dim for the static elements to avoid ANSI state issues.
-			fmt.Printf("│  %s%s  │\n", line, padding)
+			// Use padV to pad to exactly maxLen visible columns.
+			padded := padV(line, maxLen)
+			fmt.Printf("│  %s  │\n", padded)
 		}
 		fmt.Println(borderBot)
 		fmt.Println()
