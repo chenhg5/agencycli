@@ -39,6 +39,28 @@ func nowStr() string {
 	return time.Now().Format("15:04:05")
 }
 
+// stripANSI returns s with all ANSI escape sequences removed.
+func stripANSI(s string) string {
+	var result strings.Builder
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\033' && i+1 < len(s) && s[i+1] == '[' {
+			// CSI sequence: find the end (a letter)
+			inEscape = true
+			i++ // skip '['
+			continue
+		}
+		if inEscape {
+			if (s[i] >= 0x40 && s[i] <= 0x7e) {
+				inEscape = false
+			}
+			continue
+		}
+		result.WriteByte(s[i])
+	}
+	return result.String()
+}
+
 // nextAtStr formats a future time for display. If it's on a different day
 // than today, it includes the date; otherwise just the time.
 func nextAtStr(t time.Time) string {
@@ -136,10 +158,14 @@ func newSchedulerStartCmd() *cobra.Command {
 		defer cancel()
 
 		startedAt := nowStr()
-		fmt.Printf("%s┌─ Scheduler ──────────────────────────────────────────────┐%s\n", colorBold, colorReset)
-		fmt.Printf("%s│%s Started at %s%s%s\n", colorBold, colorReset, colorCyan, startedAt, colorReset)
+
+		// Build box content lines, then pad and frame them.
+		var lines []string
+
+		lines = append(lines, fmt.Sprintf("  Started at %s%s%s", colorCyan, startedAt, colorReset))
+
 		if len(heartbeatAgents) > 0 {
-			fmt.Printf("%s│%s ♥ Heartbeat (%d)%s\n", colorBold, colorReset, len(heartbeatAgents), colorReset)
+			lines = append(lines, fmt.Sprintf("  %s♥ Heartbeat  (%d agents)%s", colorBold, len(heartbeatAgents), colorReset))
 			for _, k := range heartbeatAgents {
 				hb, _ := ts.GetHeartbeat(k.project, k.agent)
 				status := colorGreen + "●" + colorReset
@@ -148,24 +174,57 @@ func newSchedulerStartCmd() *cobra.Command {
 				}
 				window := ""
 				if hb.ActiveHours != "" {
-					window = colorDim + " [" + hb.ActiveHours + "]" + colorReset
+					window = fmt.Sprintf("%s  [%s]%s", colorDim, hb.ActiveHours, colorReset)
 				}
-				fmt.Printf("  %s %s/%s  %s%s%s\n", status, k.project, k.agent, colorDim, hb.Interval, window)
+				lines = append(lines, fmt.Sprintf("    %s  %-16s  %-4s  %s", status, k.agent, hb.Interval, window))
 			}
 		}
 		if len(cronAgents) > 0 {
-			fmt.Printf("%s│%s ⏰ Cron (%d)%s\n", colorBold, colorReset, len(cronAgents), colorReset)
+			if len(heartbeatAgents) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, fmt.Sprintf("  %s⏰ Cron  (%d agents)%s", colorBold, len(cronAgents), colorReset))
 			for _, k := range cronAgents {
 				crons, _ := ts.ListCrons(k.project, k.agent)
 				for _, c := range crons {
 					if c.Enabled {
-						fmt.Printf("  %s %s/%s  %s%s %s\n", colorYellow+"●"+colorReset, k.project, k.agent, colorDim, c.Schedule, c.Title)
+						lines = append(lines, fmt.Sprintf("    %s  %-16s  %-20s  %s%s",
+							colorYellow+"●"+colorReset, k.agent, c.Schedule, colorDim, c.Title+colorReset))
 					}
 				}
 			}
 		}
-		fmt.Printf("%s│%s Ctrl+C to stop\n", colorBold, colorReset)
-		fmt.Printf("%s└─────────────────────────────────────────────────────────┘%s\n", colorBold, colorReset)
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("  %sCtrl+C to stop%s", colorDim, colorReset))
+
+		// Compute box width from longest visible content.
+		width := 58
+		for _, l := range lines {
+			if len(stripANSI(l)) > width {
+				width = len(stripANSI(l))
+			}
+		}
+		width += 2 // small gap between content and border
+
+		pad := func(s string) string {
+			return s + strings.Repeat(" ", width-len(stripANSI(s)))
+		}
+
+		borderTop := fmt.Sprintf("%s┌─ Scheduler %s┐%s", colorBold, strings.Repeat("─", width-len("Scheduler")-4), colorReset)
+		borderMid := fmt.Sprintf("%s├%s┤%s", colorBold, strings.Repeat("─", width), colorReset)
+		borderBot := fmt.Sprintf("%s└%s┘%s", colorBold, strings.Repeat("─", width), colorReset)
+
+		fmt.Println()
+		fmt.Println(borderTop)
+		fmt.Println(borderMid)
+		for _, line := range lines {
+			if line == "" {
+				fmt.Printf("%s│%s│\n", colorBold, strings.Repeat(" ", width))
+				continue
+			}
+			fmt.Printf("%s│%s  %s%s│\n", colorBold, colorReset, pad(line), colorReset)
+		}
+		fmt.Println(borderBot)
 		fmt.Println()
 
 		var wg sync.WaitGroup
