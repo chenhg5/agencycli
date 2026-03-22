@@ -155,6 +155,7 @@ func newSchedulerStartCmd() *cobra.Command {
 				st().Foreground(lipgloss.Color("86")).Render(startedAt))
 
 		if len(heartbeatAgents) > 0 {
+			content = append(content, "")
 			content = append(content,
 				st().Foreground(lipgloss.Color("208")).Bold(true).Render("  ♥")+" "+
 					st().Bold(true).Render(fmt.Sprintf("Heartbeat  (%d agents)", len(heartbeatAgents))))
@@ -177,9 +178,7 @@ func newSchedulerStartCmd() *cobra.Command {
 		}
 
 		if len(cronAgents) > 0 {
-			if len(heartbeatAgents) > 0 {
-				content = append(content, "")
-			}
+			content = append(content, "")
 			content = append(content,
 				st().Foreground(lipgloss.Color("213")).Bold(true).Render("  ⏰")+" "+
 					st().Bold(true).Render(fmt.Sprintf("Cron  (%d agents)", len(cronAgents))))
@@ -203,11 +202,11 @@ func newSchedulerStartCmd() *cobra.Command {
 		// Join content vertically.
 		body := lipgloss.JoinVertical(lipgloss.Top, content...)
 
-		// Wrap in a double-border box; lipgloss handles all width/height math.
+		// Wrap in a normal (single-line) border with comfortable padding.
 		box := lipgloss.NewStyle().
-			BorderStyle(lipgloss.DoubleBorder()).
+			BorderStyle(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("99")).
-			Padding(1, 0)
+			Padding(1, 2)
 
 		fmt.Println()
 		fmt.Println(box.Render(body))
