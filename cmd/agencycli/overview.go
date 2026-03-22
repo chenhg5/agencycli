@@ -73,6 +73,7 @@ func runeWidth(r rune) int {
 
 // visibleLen returns the terminal column width of s, ignoring ANSI escape sequences
 // and correctly counting wide (CJK) characters as 2 columns.
+// Box-drawing characters (U+2500–U+257F) also render as double-width in terminals.
 func visibleLen(s string) int {
 	n := 0
 	inEsc := false
@@ -85,7 +86,13 @@ func visibleLen(s string) int {
 		case r == '\033':
 			inEsc = true
 		default:
-			n += runeWidth(r)
+			w := runeWidth(r)
+			// Override: box-drawing and geometric shapes render as 2 columns in terminals
+			// even though Unicode EastAsianWidth says "narrow" (U+2500–U+257F, U+25A0–U+25FF).
+			if r >= 0x2500 && r <= 0x257F {
+				w = 2
+			}
+			n += w
 		}
 	}
 	return n

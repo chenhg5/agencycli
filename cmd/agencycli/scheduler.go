@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/runner"
 	"github.com/chenhg5/agencycli/internal/store"
@@ -137,72 +138,79 @@ func newSchedulerStartCmd() *cobra.Command {
 
 		startedAt := nowStr()
 
-		// Build box content lines, then pad and frame them.
-		var lines []string
+		// ── Render the startup banner with lipgloss ─────────────────────────────────
 
-		lines = append(lines, fmt.Sprintf("  Started at %s%s%s", colorCyan, startedAt, colorReset))
+		st := lipgloss.NewStyle
+
+		// Build content lines.
+		var content []string
+
+		// Title as first line.
+		content = append(content,
+			st().Foreground(lipgloss.Color("208")).Bold(true).Render("  [ Scheduler ]"))
+
+		// Timestamp.
+		content = append(content,
+			st().Foreground(lipgloss.Color("244")).Render("  Started at ")+
+				st().Foreground(lipgloss.Color("86")).Render(startedAt))
 
 		if len(heartbeatAgents) > 0 {
-			lines = append(lines, fmt.Sprintf("  %s♥ Heartbeat  (%d agents)%s", colorBold, len(heartbeatAgents), colorReset))
+			content = append(content,
+				st().Foreground(lipgloss.Color("208")).Bold(true).Render("  ♥")+" "+
+					st().Bold(true).Render(fmt.Sprintf("Heartbeat  (%d agents)", len(heartbeatAgents))))
 			for _, k := range heartbeatAgents {
 				hb, _ := ts.GetHeartbeat(k.project, k.agent)
-				status := colorGreen + "●" + colorReset
+				status := st().Foreground(lipgloss.Color("82")).Render("  ●")
 				if hb.Paused {
-					status = colorYellow + "⏸" + colorReset
+					status = st().Foreground(lipgloss.Color("226")).Render("  ⏸")
 				}
 				window := ""
 				if hb.ActiveHours != "" {
-					window = fmt.Sprintf("%s  [%s]%s", colorDim, hb.ActiveHours, colorReset)
+					window = st().Foreground(lipgloss.Color("244")).Render(fmt.Sprintf("  [%s]", hb.ActiveHours))
 				}
-				lines = append(lines, fmt.Sprintf("    %s  %-16s  %-4s  %s", status, k.agent, hb.Interval, window))
+				line := status +
+					st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("  %-16s", k.agent)) +
+					st().Foreground(lipgloss.Color("86")).Render(hb.Interval) +
+					window
+				content = append(content, line)
 			}
 		}
+
 		if len(cronAgents) > 0 {
 			if len(heartbeatAgents) > 0 {
-				lines = append(lines, "")
+				content = append(content, "")
 			}
-			lines = append(lines, fmt.Sprintf("  %s⏰ Cron  (%d agents)%s", colorBold, len(cronAgents), colorReset))
+			content = append(content,
+				st().Foreground(lipgloss.Color("213")).Bold(true).Render("  ⏰")+" "+
+					st().Bold(true).Render(fmt.Sprintf("Cron  (%d agents)", len(cronAgents))))
 			for _, k := range cronAgents {
 				crons, _ := ts.ListCrons(k.project, k.agent)
 				for _, c := range crons {
 					if c.Enabled {
-						lines = append(lines, fmt.Sprintf("    %s  %-16s  %-20s  %s%s",
-							colorYellow+"●"+colorReset, k.agent, c.Schedule, colorDim, c.Title+colorReset))
+						line := st().Foreground(lipgloss.Color("226")).Render("  ●") +
+							st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("  %-16s", k.agent)) +
+							st().Foreground(lipgloss.Color("86")).Render("  "+c.Schedule) +
+							st().Foreground(lipgloss.Color("244")).Render("  " + c.Title)
+						content = append(content, line)
 					}
 				}
 			}
 		}
-		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("  %sCtrl+C to stop%s", colorDim, colorReset))
 
-		// Compute the widest visible content line using terminal column width.
-		maxLen := 0
-		for _, l := range lines {
-			if visibleLen(l) > maxLen {
-				maxLen = visibleLen(l)
-			}
-		}
-		// Box inner width = content + left/right padding
-		boxWidth := maxLen + 4
+		content = append(content, "")
+		content = append(content, st().Foreground(lipgloss.Color("244")).Render("  Ctrl+C to stop"))
 
-		// Build border lines without ANSI (box-drawing chars don't need color).
-		borderLine := "├" + strings.Repeat("─", boxWidth) + "┤"
-		borderBot := "└" + strings.Repeat("─", boxWidth) + "┘"
+		// Join content vertically.
+		body := lipgloss.JoinVertical(lipgloss.Top, content...)
+
+		// Wrap in a double-border box; lipgloss handles all width/height math.
+		box := lipgloss.NewStyle().
+			BorderStyle(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("99")).
+			Padding(1, 0)
 
 		fmt.Println()
-		// Top border: "┌─ Scheduler ────────────────┐"
-		fmt.Println("┌─ Scheduler " + strings.Repeat("─", boxWidth-len("┌─ Scheduler ")) + "┐")
-		fmt.Println(borderLine)
-		for _, line := range lines {
-			if line == "" {
-				fmt.Printf("│%s│\n", strings.Repeat(" ", boxWidth))
-				continue
-			}
-			// Use padV to pad to exactly maxLen visible columns.
-			padded := padV(line, maxLen)
-			fmt.Printf("│  %s  │\n", padded)
-		}
-		fmt.Println(borderBot)
+		fmt.Println(box.Render(body))
 		fmt.Println()
 
 		var wg sync.WaitGroup
