@@ -14,6 +14,8 @@ import (
 var globalDir string
 
 var rootCmd = &cobra.Command{
+	SilenceErrors: true, // error is printed by main()
+	SilenceUsage:  true, // no usage on error
 	Use:   "agencycli",
 	Short: "AI agent organisation and context management",
 	Long: `agencycli manages the organisational context for AI agents.

@@ -161,13 +161,14 @@ func newTaskListCmd() *cobra.Command {
 		agentName string
 		status    string
 		archived  bool
+		format    string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tasks for an agent",
 		Example: `  agencycli task list --project cc-connect --agent qa-reviewer
-  agencycli task list --project cc-connect --agent qa-reviewer --status pending
+  agencycli task list --project cc-connect --agent qa-reviewer --status pending --format table
   agencycli task list --project cc-connect --agent qa-reviewer --archived`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -192,7 +193,7 @@ func newTaskListCmd() *cobra.Command {
 				return err
 			}
 
-			if len(tasks) == 0 {
+			if len(tasks) == 0 && format == "table" {
 				fmt.Println("No tasks found.")
 				return nil
 			}
@@ -212,6 +213,14 @@ func newTaskListCmd() *cobra.Command {
 				return ti.CreatedAt.Before(tj.CreatedAt)
 			})
 
+			if format == "json" || format == "" {
+				if tasks == nil {
+					tasks = []*entity.Task{}
+				}
+				return printJSON(tasks)
+			}
+
+			// --format table
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "STATUS\tID\tPRI\tCREATED\tTITLE")
 			fmt.Fprintln(w, "──────\t──\t───\t───────\t─────")
@@ -233,6 +242,7 @@ func newTaskListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
 	cmd.Flags().StringVar(&status, "status", "", "filter by status")
 	cmd.Flags().BoolVar(&archived, "archived", false, "show archived (terminal) tasks")
+	cmd.Flags().StringVar(&format, "format", "json", "output format: json or table")
 	return cmd
 }
 

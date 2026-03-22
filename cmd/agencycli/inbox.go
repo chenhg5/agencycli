@@ -6,7 +6,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
@@ -18,12 +17,42 @@ import (
 // If a bare agent name (no "/") is used, it looks up whether it's a known agent
 // and returns an error suggesting the correct project/agent format.
 func validateRecipient(ts taskstore.Store, recipient string) error {
-	if recipient == "human" || strings.Contains(recipient, "/") {
+	ident := validateIdentity(ts, recipient, "recipient")
+	if ident != nil {
+		return ident
+	}
+	return nil
+}
+
+// validateIdentity checks that identity is either "human" or "project/agent".
+// For "project/agent", it also verifies the project and agent exist.
+// If a bare agent name (no "/") is used, it looks up whether it's a known agent
+// and returns an error suggesting the correct project/agent format or using "human".
+func validateIdentity(ts taskstore.Store, identity, fieldName string) error {
+	if identity == "human" {
 		return nil
 	}
+	if strings.Contains(identity, "/") {
+		// Validate project/agent format exists
+		parts := strings.SplitN(identity, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return fmt.Errorf("invalid %s %q: expected 'human' or 'project/agent'", fieldName, identity)
+		}
+		project, agent := parts[0], parts[1]
+		fs, ok := ts.(*taskstore.FSStore)
+		if !ok {
+			return nil
+		}
+		agents, err := fs.ListAgents(project)
+		if err != nil || !slices.Contains(agents, agent) {
+			return fmt.Errorf("agent %q not found in project %q (hint: check --dir workspace or verify the project/agent exists)", agent, project)
+		}
+		return nil
+	}
+	// Bare name — check if it's a known agent in any project
 	fs, ok := ts.(*taskstore.FSStore)
 	if !ok {
-		return nil // bail out gracefully for non-filesystem stores
+		return nil
 	}
 	projects, err := fs.ListProjects()
 	if err != nil {
@@ -34,11 +63,12 @@ func validateRecipient(ts taskstore.Store, recipient string) error {
 		if err != nil {
 			continue
 		}
-		if slices.Contains(agents, recipient) {
-			return fmt.Errorf("recipient %q is an agent in project %q; use --recipient %s/%s", recipient, project, project, recipient)
+		if slices.Contains(agents, identity) {
+			return fmt.Errorf("%s %q is an agent in project %q; did you mean --%s %s/%s? or use --%s human",
+				fieldName, identity, project, fieldName, project, identity, fieldName)
 		}
 	}
-	return nil
+	return fmt.Errorf("unknown %s %q (hint: use 'human' or 'project/agent' format, e.g. cc-connect/pm)", fieldName, identity)
 }
 
 func newInboxCmd() *cobra.Command {
@@ -71,78 +101,88 @@ Use 'inbox reply' to respond to messages or 'inbox forward' to route elsewhere.`
 
 func newInboxListCmd() *cobra.Command {
 	var (
-		to      string
-		jsonOut bool
+		recipient string
+		unreadOnly bool
+		jsonOut   bool
 	)
 
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all items awaiting confirmation",
-		Long: `List confirmation-request items in the inbox.
+		Short:   "List messages in the inbox",
+		Long: `List async messages in the mailbox.
 
-By default shows all items (human inbox).
-Use --to to filter by recipient (e.g. --to cc-connect/pm shows only items routed to pm).`,
+By default shows unread messages for 'human'.
+Use --recipient to filter by mailbox (e.g. --recipient cc-connect/pm).
+Use --all to show all messages including read ones.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
 			ts := taskstore.New(root)
-			items, err := ts.ListInbox()
+
+			recip := recipient
+			if recip == "" {
+				recip = "human"
+			}
+
+			var msgs []*entity.Message
+			if unreadOnly {
+				msgs, err = ts.ListUnreadMessages(recip)
+			} else {
+				msgs, err = ts.ListMessages(recip)
+			}
 			if err != nil {
 				return err
 			}
 
-			if to != "" {
-				filtered := items[:0]
-				for _, item := range items {
-					if item.Recipient() == to {
-						filtered = append(filtered, item)
-					}
-				}
-				items = filtered
-			}
-
 			if jsonOut {
-				if items == nil {
-					items = []*entity.InboxItem{}
+				if msgs == nil {
+					msgs = []*entity.Message{}
 				}
-				return printJSON(items)
+				return printJSON(msgs)
 			}
 
-			if len(items) == 0 {
-				if to != "" {
-					fmt.Printf("Inbox is empty for %s.\n", to)
-				} else {
-					fmt.Println("Inbox is empty.")
-				}
+			if len(msgs) == 0 {
+				fmt.Printf("No messages for %s.\n", recip)
 				return nil
 			}
 
-			header := fmt.Sprintf("Inbox — %d item(s) awaiting confirmation", len(items))
-			if to != "" {
-				header += fmt.Sprintf(" (to: %s)", to)
+			unread := 0
+			for _, m := range msgs {
+				if m.ReadAt == nil {
+					unread++
+				}
 			}
+
+			header := fmt.Sprintf("Messages for %s (%d unread, %d total)", recip, unread, len(msgs))
 			fmt.Println(header)
 			fmt.Println()
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "TASK ID\tFROM\tTO\tTITLE")
-			fmt.Fprintln(w, "───────\t────\t──\t─────")
-			for _, item := range items {
-				fmt.Fprintf(w, "%s\t%s/%s\t%s\t%s\n",
-					item.TaskID,
-					item.Project, item.Agent,
-					item.Recipient(),
-					item.Title,
-				)
+
+			for _, m := range msgs {
+				symbol := " "
+				if m.ReadAt == nil {
+					symbol = "●"
+					unread++
+				}
+				from := m.From
+				if m.Subject != "" {
+					fmt.Printf("%s [%s] From: %s → To: %s — %s\n", symbol, formatInboxTime(m.SentAt), from, m.To, m.Subject)
+				} else {
+					preview := m.Body
+					if len(preview) > 60 {
+						preview = preview[:57] + "..."
+					}
+					preview = strings.ReplaceAll(preview, "\n", " ")
+					fmt.Printf("%s [%s] From: %s → To: %s — %s\n", symbol, formatInboxTime(m.SentAt), from, m.To, preview)
+				}
 			}
-			w.Flush()
-			fmt.Printf("\nRun 'agencycli inbox show <task-id>' for details.\n")
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&to, "to", "", "filter by recipient: 'human' or 'project/agent' (e.g. cc-connect/pm)")
+	cmd.Flags().StringVar(&recipient, "recipient", "", "mailbox to inspect: 'human' (default) or 'project/agent'")
+	cmd.Flags().BoolVar(&unreadOnly, "unread-only", false, "show only unread messages")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	return cmd
 }
@@ -494,11 +534,22 @@ Examples:
 			if len(to) == 0 {
 				return fmt.Errorf("--to is required")
 			}
-			sender := from
-			if sender == "" {
-				sender = "human"
+			if from == "" {
+				return fmt.Errorf("--from is required")
 			}
+			sender := from
 			ts := taskstore.New(root)
+
+			// Validate from and to identities exist
+			if err := validateIdentity(ts, sender, "from"); err != nil {
+				return err
+			}
+			for _, recipient := range to {
+				if err := validateIdentity(ts, recipient, "to"); err != nil {
+					return err
+				}
+			}
+
 			sentAt := time.Now().UTC()
 			for _, recipient := range to {
 				msg := &entity.Message{
@@ -528,8 +579,9 @@ Examples:
 	cmd.Flags().StringVar(&subject, "subject", "", "optional subject line")
 	cmd.Flags().StringVar(&body, "body", "", "message body")
 	cmd.Flags().StringVar(&replyTo, "reply-to", "", "ID of message being replied to")
-	cmd.Flags().StringVar(&from, "from", "", "override sender (defaults to 'human'; agents set this to 'project/agent')")
+	cmd.Flags().StringVar(&from, "from", "", "sender identity: 'human' or 'project/agent'")
 	_ = cmd.MarkFlagRequired("to")
+	_ = cmd.MarkFlagRequired("from")
 	return cmd
 }
 
@@ -622,6 +674,7 @@ Use --archived to show archived messages.`,
 				}
 				fmt.Printf("%s [%s] ID: %s\n", status, m.SentAt.Local().Format("01-02 15:04"), m.ID)
 				fmt.Printf("  From    : %s\n", m.From)
+				fmt.Printf("  To      : %s\n", m.To)
 				if m.Subject != "" {
 					fmt.Printf("  Subject : %s\n", m.Subject)
 				}
@@ -671,6 +724,13 @@ func newInboxReplyCmd() *cobra.Command {
 				return fmt.Errorf("--body is required")
 			}
 			ts := taskstore.New(root)
+
+			// Validate --from if provided (empty means "human" which is always valid)
+			if from != "" {
+				if err := validateIdentity(ts, from, "from"); err != nil {
+					return err
+				}
+			}
 
 			// Find the original message to determine the reply recipient.
 			// Search human mailbox first, then all agents.
@@ -768,6 +828,19 @@ Supports group forward by repeating --to.
 
 			// Find the original message across all mailboxes.
 			ts := taskstore.New(root)
+
+			// Validate identities if provided
+			if from != "" {
+				if err := validateIdentity(ts, from, "from"); err != nil {
+					return err
+				}
+			}
+			for _, r := range to {
+				if err := validateIdentity(ts, r, "to"); err != nil {
+					return err
+				}
+			}
+
 			var original *entity.Message
 			searchBoxes := []string{recipient}
 			// If recipient not specified (human), also search agent mailboxes.
@@ -946,4 +1019,9 @@ func printJSON(v any) error {
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
 	return enc.Encode(v)
+}
+
+// formatInboxTime returns a local "MM-DD HH:MM" string for display.
+func formatInboxTime(t time.Time) string {
+	return t.Local().Format("01-02 15:04")
 }

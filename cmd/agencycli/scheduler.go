@@ -23,13 +23,21 @@ import (
 
 // ANSI color codes for scheduler output.
 const (
-	colorReset  = "\033[0m"
-	colorGreen  = "\033[32m"
-	colorCyan   = "\033[36m"
-	colorYellow = "\033[33m"
-	colorRed    = "\033[31m"
-	colorDim    = "\033[2m"
+	colorReset   = "\033[0m"
+	colorGreen   = "\033[32m"
+	colorCyan    = "\033[36m"
+	colorYellow  = "\033[33m"
+	colorRed     = "\033[31m"
+	colorDim     = "\033[2m"
+	colorBold    = "\033[1m"
+	colorMagenta = "\033[35m"
+	colorBlue    = "\033[34m"
 )
+
+// nowStr returns a compact HH:MM:SS timestamp for the current moment.
+func nowStr() string {
+	return time.Now().Format("15:04:05")
+}
 
 // nextAtStr formats a future time for display. If it's on a different day
 // than today, it includes the date; otherwise just the time.
@@ -127,26 +135,38 @@ func newSchedulerStartCmd() *cobra.Command {
 		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer cancel()
 
-		fmt.Printf("Scheduler started\n")
+		startedAt := nowStr()
+		fmt.Printf("%s┌─ Scheduler ──────────────────────────────────────────────┐%s\n", colorBold, colorReset)
+		fmt.Printf("%s│%s Started at %s%s%s\n", colorBold, colorReset, colorCyan, startedAt, colorReset)
 		if len(heartbeatAgents) > 0 {
-			fmt.Printf("  Heartbeat agents (%d):\n", len(heartbeatAgents))
+			fmt.Printf("%s│%s ♥ Heartbeat (%d)%s\n", colorBold, colorReset, len(heartbeatAgents), colorReset)
 			for _, k := range heartbeatAgents {
 				hb, _ := ts.GetHeartbeat(k.project, k.agent)
-				fmt.Printf("    ● %s/%s  interval=%s\n", k.project, k.agent, hb.Interval)
+				status := colorGreen + "●" + colorReset
+				if hb.Paused {
+					status = colorYellow + "⏸" + colorReset
+				}
+				window := ""
+				if hb.ActiveHours != "" {
+					window = colorDim + " [" + hb.ActiveHours + "]" + colorReset
+				}
+				fmt.Printf("  %s %s/%s  %s%s%s\n", status, k.project, k.agent, colorDim, hb.Interval, window)
 			}
 		}
 		if len(cronAgents) > 0 {
-			fmt.Printf("  Cron agents (%d):\n", len(cronAgents))
+			fmt.Printf("%s│%s ⏰ Cron (%d)%s\n", colorBold, colorReset, len(cronAgents), colorReset)
 			for _, k := range cronAgents {
 				crons, _ := ts.ListCrons(k.project, k.agent)
 				for _, c := range crons {
 					if c.Enabled {
-						fmt.Printf("    ● %s/%s  [%s]  %s\n", k.project, k.agent, c.Schedule, c.Title)
+						fmt.Printf("  %s %s/%s  %s%s %s\n", colorYellow+"●"+colorReset, k.project, k.agent, colorDim, c.Schedule, c.Title)
 					}
 				}
 			}
 		}
-		fmt.Println("Press Ctrl+C to stop.")
+		fmt.Printf("%s│%s Ctrl+C to stop\n", colorBold, colorReset)
+		fmt.Printf("%s└─────────────────────────────────────────────────────────┘%s\n", colorBold, colorReset)
+		fmt.Println()
 
 		var wg sync.WaitGroup
 
@@ -191,12 +211,20 @@ func newSchedulerStartCmd() *cobra.Command {
 func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 	ts taskstore.Store, s store.Store) {
 
-	log := func(format string, a ...any) {
-		fmt.Printf("%s[heartbeat %s/%s]%s %s\n", colorCyan, project, agentName, colorReset,
+	// agentLog prints a timestamped, colorized line prefixed with the agent identity.
+	agentLog := func(format string, a ...any) {
+		fmt.Printf("%s%s%s %s%s/%s%s  %s\n",
+			colorDim, nowStr(), colorReset,
+			colorBold, project, agentName, colorReset,
 			fmt.Sprintf(format, a...))
 	}
 
+	// wakeCount tracks how many times this agent has woken up today.
+	// Resets automatically when the date changes.
+	var wakeCount int
+	lastWakeDate := ""
 	firstCycle := true
+
 	for {
 		hb, err := ts.GetHeartbeat(project, agentName)
 		if err != nil {
@@ -206,12 +234,11 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			return // heartbeat config removed — stop goroutine
 		}
 		if hb.Paused {
-			// Sleep and re-check. Agent is paused but scheduler stays alive.
 			interval, _ := time.ParseDuration(hb.Interval)
 			if interval <= 0 {
 				interval = 5 * time.Minute
 			}
-				log("heartbeat paused — sleeping %s before next check", interval.Round(time.Second))
+			agentLog("%s heartbeat paused — sleeping %s before next check", colorYellow+"⏸", interval.Round(time.Second))
 			select {
 			case <-ctx.Done():
 				return
@@ -222,7 +249,7 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 
 		interval, err := time.ParseDuration(hb.Interval)
 		if err != nil {
-			log("invalid interval %q: %v", hb.Interval, err)
+			agentLog("%s invalid interval %q: %v", colorRed+"✗", hb.Interval, err)
 			return
 		}
 
@@ -257,8 +284,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 					// We are currently outside the window: sleep until it opens.
 					nextWake := nextWindowStart(hb)
 					if nextWake > 0 {
-						log("outside active window — sleeping %s until window opens at %s",
-							nextWake.Round(time.Minute), hb.ActiveHours)
+						agentLog("%s outside active window — sleeping %s until window opens at %s",
+							colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
 						select {
 						case <-ctx.Done():
 							return
@@ -282,19 +309,22 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			// hammering the agent with back-to-back wakes.
 			if waitDur < time.Second {
 				if hb.LastWakeup == nil {
-					log("first wakeup deferred — waiting for active window at %s", hb.ActiveHours)
+					agentLog("%s first wakeup deferred — waiting for active window at %s",
+						colorDim+"○", hb.ActiveHours)
 				} else {
-					log("next wakeup deferred — waiting for active window at %s", hb.ActiveHours)
+					agentLog("%s next wakeup deferred — waiting for active window at %s",
+						colorDim+"○", hb.ActiveHours)
 				}
-				// Just loop back; the window check will sleep until next window.
 				continue
 			}
 
 			nextAt := nextAtStr(projectedNext)
 			if hb.LastWakeup == nil {
-				log("sleeping %s before first wakeup (startup jitter) — next at %s", waitDur.Round(time.Second), nextAt)
+				agentLog("%s sleeping %s before first wakeup — next at %s",
+					colorDim+"○", waitDur.Round(time.Second), nextAt)
 			} else {
-				log("sleeping %s before next wakeup — next at %s", waitDur.Round(time.Second), nextAt)
+				agentLog("%s sleeping %s — next at %s",
+					colorDim+"○", waitDur.Round(time.Second), nextAt)
 			}
 			select {
 			case <-ctx.Done():
@@ -312,21 +342,21 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		if !isInActiveWindow(hb) {
 			nextWake := nextWindowStart(hb)
 			if nextWake > 0 {
-				log("outside active window — sleeping %s until window opens", nextWake.Round(time.Minute))
+				agentLog("%s outside active window — sleeping %s until window opens",
+					colorDim+"○", nextWake.Round(time.Minute))
 				select {
 				case <-ctx.Done():
 					return
 				case <-time.After(nextWake):
 				}
-				// Do NOT update LastWakeup: the window sleep is not a real wakeup.
-				// Loop back and recompute waitDur from the actual last wake time.
 				continue
 			}
 		}
 
 		// Check overlap: if PID is set and process is still running, skip.
 		if isAlreadyRunning(hb) {
-			log("skipping wakeup — agent process still running (pid=%d)", hb.PID)
+			agentLog("%s skipping wakeup — agent process still running (pid=%d)",
+				colorYellow+"⚠", hb.PID)
 			time.Sleep(30 * time.Second)
 			continue
 		}
@@ -347,11 +377,11 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 				hb.LastConditionStatus = "not_met"
 				_ = ts.SaveHeartbeat(project, agentName, hb)
 				if output != "" {
-					log("condition not met (%s) — skipping cycle, next check in %s",
-						truncate(output, 80), interval.Round(time.Second))
+					agentLog("%s condition not met (%s) — skipping cycle, next check in %s",
+						colorYellow+"⏸", truncate(output, 80), interval.Round(time.Second))
 				} else {
-					log("condition not met — skipping cycle, next check in %s",
-						interval.Round(time.Second))
+					agentLog("%s condition not met — skipping cycle, next check in %s",
+						colorYellow+"⏸", interval.Round(time.Second))
 				}
 				select {
 				case <-ctx.Done():
@@ -362,34 +392,42 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			}
 		}
 
-		// Mark as running. Set LastWakeup here (after all checks pass), not at the
-		// top of the loop, so that a window-skip or condition-skip does not corrupt
-		// the elapsed-time calculation for the next cycle.
+		// Mark as running.
 		now := time.Now().UTC()
 		hb.LastWakeup = &now
 		hb.LastWakeupStatus = "running"
 		hb.PID = os.Getpid()
 		_ = ts.SaveHeartbeat(project, agentName, hb)
 
-		log("waking up — checking crons and running pending tasks")
-
-		// Fire any due cron jobs (enqueues tasks) before processing the queue.
-		if n := fireDueCrons(ts, project, agentName); n > 0 {
-			log("cron: enqueued %d task(s)", n)
+		// Increment wake count (resets each day).
+		today := now.Format("2006-01-02")
+		if today != lastWakeDate {
+			wakeCount = 0
+			lastWakeDate = today
 		}
+		wakeCount++
+
+		// Fire any due cron jobs before processing the queue.
+		cronCount := fireDueCrons(ts, project, agentName)
+
+		cronInfo := ""
+		if cronCount > 0 {
+			cronInfo = fmt.Sprintf(" %s[%d cron]%s", colorYellow, cronCount, colorReset)
+		}
+		agentLog("%s waking up [#%d today]%s",
+			colorCyan+"♥", wakeCount, cronInfo)
 
 		cycleStart := time.Now()
-		if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
-			dur := time.Since(cycleStart).Round(time.Second)
-			fmt.Printf("%s[heartbeat %s/%s]%s %swakeup cycle failed%s after %s — %v\n",
-				colorCyan, project, agentName, colorReset, colorRed, colorReset, dur, err)
+		cycleResult := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb)
+		dur := time.Since(cycleStart).Round(time.Second)
+
+		if cycleResult != nil {
+			agentLog("%s wakeup failed after %s — %v", colorRed+"✗", dur, cycleResult)
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "failed"
 			hb.PID = 0
 		} else {
-			dur := time.Since(cycleStart).Round(time.Second)
-			fmt.Printf("%s[heartbeat %s/%s]%s %swakeup cycle done%s in %s\n",
-				colorCyan, project, agentName, colorReset, colorGreen, colorReset, dur)
+			agentLog("%s wakeup done %sin %s", colorGreen+"✓", colorReset, dur)
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "done"
 			hb.PID = 0
@@ -402,6 +440,13 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 // Tasks within one cycle share the same agent session.
 func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 	ts taskstore.Store, s store.Store, hb *entity.HeartbeatConfig) error {
+
+	// taskLog prints a timestamped, indented line for task-level events.
+	taskLog := func(format string, a ...any) {
+		fmt.Printf("  %s%s%s  %s\n",
+			colorDim, nowStr(), colorReset,
+			fmt.Sprintf(format, a...))
+	}
 
 	r := runner.New(root, ts, s)
 	sessionID := hb.SessionID
@@ -425,8 +470,8 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 
 		// Check cycle duration limit before fetching the next task.
 		if maxDuration > 0 && time.Since(cycleStart) > maxDuration {
-			fmt.Printf("[heartbeat %s/%s] ▶ cycle limit reached (%d task(s), %s elapsed)\n",
-				project, agentName, tasksProcessed, time.Since(cycleStart).Round(time.Second))
+			taskLog("%s ▶ cycle limit reached (%d task(s), %s elapsed)",
+				colorYellow+"⚠", tasksProcessed, time.Since(cycleStart).Round(time.Second))
 			return nil
 		}
 
@@ -475,10 +520,10 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 						msgSection.WriteString("---\n\n")
 					msgSection.WriteString(i18n.InboxReplyHint)
 					prompt = msgSection.String() + prompt
-					fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine (%d unread message(s))\n",
-						project, agentName, len(unread))
+					taskLog("%s ▶ wakeup routine (%d unread message(s))",
+						colorCyan+"▶", len(unread))
 				} else {
-					fmt.Printf("[heartbeat %s/%s] ▶ wakeup routine\n", project, agentName)
+					taskLog("%s ▶ wakeup routine", colorCyan+"▶")
 				}
 
 				now := time.Now().UTC()
@@ -495,7 +540,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 				}
 				// Persist before running so `task confirm-request --id $TASK_ID` works.
 				if addErr := ts.AddTask(project, agentName, wakeupTask); addErr != nil {
-					fmt.Printf("[heartbeat %s/%s] failed to persist wakeup task: %v\n", project, agentName, addErr)
+					taskLog("%s failed to persist wakeup task: %v", colorRed+"✗", addErr)
 				} else {
 					wakeupTask.Status = entity.TaskStatusInProgress
 					wakeupTask.StartedAt = &now
@@ -535,12 +580,12 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 
 		// Check max tasks per cycle limit before processing this task.
 		if hb.MaxTasksPerCycle > 0 && tasksProcessed >= hb.MaxTasksPerCycle {
-			fmt.Printf("[heartbeat %s/%s] ▶ cycle limit reached (%d task(s), %s elapsed)\n",
-				project, agentName, tasksProcessed, time.Since(cycleStart).Round(time.Second))
+			taskLog("%s ▶ cycle limit reached (%d task(s), %s elapsed)",
+				colorYellow+"⚠", tasksProcessed, time.Since(cycleStart).Round(time.Second))
 			return nil
 		}
 
-		fmt.Printf("[heartbeat %s/%s] ▶ task %s  %s\n", project, agentName, task.ID, task.Title)
+		taskLog("%s task %s  %s", colorCyan+"▶", task.ID, task.Title)
 
 		now := time.Now().UTC()
 		task.Status = entity.TaskStatusInProgress
@@ -557,8 +602,8 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			finished := time.Now().UTC()
 			task.FinishedAt = &finished
 			_ = ts.ArchiveTask(project, agentName, task)
-			fmt.Printf("[heartbeat %s/%s] ✗ task %s failed: %v\n", project, agentName, task.ID, err)
-			return fmt.Errorf("[heartbeat %s/%s] task %s failed: %w", project, agentName, task.ID, err)
+			taskLog("%s task %s failed: %v", colorRed+"✗", task.ID, err)
+			return fmt.Errorf("task %s failed: %w", task.ID, err)
 		}
 
 		// Update session ID for the cycle (per-cycle scope by default).
@@ -580,7 +625,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 
 		switch result.Status {
 		case entity.TaskStatusDoneSuccess:
-			fmt.Printf("[heartbeat %s/%s] ✓ task %s done\n", project, agentName, task.ID)
+			taskLog("%s task %s done", colorGreen+"✓", task.ID)
 			_ = ts.ArchiveTask(project, agentName, task)
 			if len(task.OnSuccess) > 0 {
 				_ = fireOnSuccessTriggers(root, project, agentName, task)
@@ -588,7 +633,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 
 		case entity.TaskStatusDoneFailed:
 			task.LastError = result.ErrorMsg
-			fmt.Printf("[heartbeat %s/%s] ✗ task %s failed: %s\n", project, agentName, task.ID, result.ErrorMsg)
+			taskLog("%s task %s failed: %s", colorRed+"✗", task.ID, result.ErrorMsg)
 			if task.RetryCount < task.MaxRetries {
 				task.RetryCount++
 				task.Status = entity.TaskStatusPending
@@ -603,7 +648,7 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			// Archive the task. Human responds via `inbox reply`; agent continues
 			// on next wakeup using session memory.
 			_ = ts.ArchiveTask(project, agentName, task)
-			fmt.Printf("[heartbeat %s/%s] ? task %s done (awaiting reply)\n", project, agentName, task.ID)
+			taskLog("%s task %s done (awaiting reply)", colorYellow+"?", task.ID)
 		}
 
 		tasksProcessed++
@@ -746,8 +791,10 @@ func prevCronTime(sched cron.Schedule, now time.Time) time.Time {
 func runCronOnlyLoop(ctx context.Context, root, project, agentName string,
 	ts taskstore.Store, s store.Store) {
 
-	log := func(format string, a ...any) {
-		fmt.Printf("[cron %s/%s] %s\n", project, agentName,
+	cronLog := func(format string, a ...any) {
+		fmt.Printf("  %s%s%s %s%s/%s%s  %s\n",
+			colorDim, nowStr(), colorReset,
+			colorBold, project, agentName, colorReset,
 			fmt.Sprintf(format, a...))
 	}
 
@@ -766,10 +813,10 @@ func runCronOnlyLoop(ctx context.Context, root, project, agentName string,
 	for {
 		n := fireDueCrons(ts, project, agentName)
 		if n > 0 {
-			log("fired %d cron(s) — running pending tasks", n)
+			cronLog("%s fired %d cron(s) — running pending tasks", colorYellow+"◆", n)
 			hb, _ := ts.GetHeartbeat(project, agentName)
 			if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
-				log("task execution error: %v", err)
+				cronLog("%s task execution error: %v", colorRed+"✗", err)
 			}
 		}
 
@@ -1340,7 +1387,9 @@ func newSchedulerCronCmd() *cobra.Command {
 }
 
 func newSchedulerCronListCmd() *cobra.Command {
-	return &cobra.Command{
+	var format string
+
+	cmd := &cobra.Command{
 		Use:   "list <project>/<agent>",
 		Short: "List all cron jobs for an agent",
 		Args:  cobra.ExactArgs(1),
@@ -1358,10 +1407,19 @@ func newSchedulerCronListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(crons) == 0 {
+			if len(crons) == 0 && format == "table" {
 				fmt.Printf("No crons configured for %s/%s\n", project, agent)
 				return nil
 			}
+
+			if format == "json" || format == "" {
+				if crons == nil {
+					crons = []*entity.Cron{}
+				}
+				return printJSON(crons)
+			}
+
+			// --format table
 			fmt.Printf("Crons for %s/%s:\n", project, agent)
 			for _, c := range crons {
 				status := "enabled"
@@ -1378,6 +1436,9 @@ func newSchedulerCronListCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(&format, "format", "json", "output format: json or table")
+	return cmd
 }
 
 func newSchedulerCronPauseCmd() *cobra.Command {
