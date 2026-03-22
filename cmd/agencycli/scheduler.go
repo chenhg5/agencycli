@@ -197,32 +197,34 @@ func newSchedulerStartCmd() *cobra.Command {
 		lines = append(lines, "")
 		lines = append(lines, fmt.Sprintf("  %sCtrl+C to stop%s", colorDim, colorReset))
 
-		// Compute box width from longest visible content.
-		width := 58
+		// Compute the widest visible content line.
+		maxLen := 0
 		for _, l := range lines {
-			if len(stripANSI(l)) > width {
-				width = len(stripANSI(l))
+			if len(stripANSI(l)) > maxLen {
+				maxLen = len(stripANSI(l))
 			}
 		}
-		width += 2 // small gap between content and border
+		// Box inner width = content + left/right padding
+		boxWidth := maxLen + 4
 
-		pad := func(s string) string {
-			return s + strings.Repeat(" ", width-len(stripANSI(s)))
-		}
-
-		borderTop := fmt.Sprintf("%s┌─ Scheduler %s┐%s", colorBold, strings.Repeat("─", width-len("Scheduler")-4), colorReset)
-		borderMid := fmt.Sprintf("%s├%s┤%s", colorBold, strings.Repeat("─", width), colorReset)
-		borderBot := fmt.Sprintf("%s└%s┘%s", colorBold, strings.Repeat("─", width), colorReset)
+		// Build border lines without ANSI (box-drawing chars don't need color).
+		borderLine := "├" + strings.Repeat("─", boxWidth) + "┤"
+		borderBot := "└" + strings.Repeat("─", boxWidth) + "┘"
 
 		fmt.Println()
-		fmt.Println(borderTop)
-		fmt.Println(borderMid)
+		// Top border: "┌─ Scheduler ────────────────┐"
+		fmt.Println("┌─ Scheduler " + strings.Repeat("─", boxWidth-len("┌─ Scheduler ")) + "┐")
+		fmt.Println(borderLine)
 		for _, line := range lines {
 			if line == "" {
-				fmt.Printf("%s│%s│\n", colorBold, strings.Repeat(" ", width))
+				fmt.Printf("│%s│\n", strings.Repeat(" ", boxWidth))
 				continue
 			}
-			fmt.Printf("%s│%s  %s%s│\n", colorBold, colorReset, pad(line), colorReset)
+			padding := strings.Repeat(" ", maxLen-len(stripANSI(line)))
+			// Left border (dim), content (colored), padding spaces (dim), right border (dim).
+			// The content line already has embedded colors and ends with \033[0m (reset).
+			// We use dim for the static elements to avoid ANSI state issues.
+			fmt.Printf("│  %s%s  │\n", line, padding)
 		}
 		fmt.Println(borderBot)
 		fmt.Println()
