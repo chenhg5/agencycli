@@ -155,24 +155,37 @@ func newSchedulerStartCmd() *cobra.Command {
 				st().Foreground(lipgloss.Color("86")).Render(startedAt))
 
 		if len(heartbeatAgents) > 0 {
-			content = append(content, "")
 			content = append(content,
 				st().Foreground(lipgloss.Color("208")).Bold(true).Render("  ♥")+" "+
 					st().Bold(true).Render(fmt.Sprintf("Heartbeat  (%d agents)", len(heartbeatAgents))))
+			content = append(content, "") // blank line after heartbeat header
+
+			// Pre-compute column widths for table alignment.
+			maxNameLen := 0
+			maxIntvLen := 0
 			for _, k := range heartbeatAgents {
 				hb, _ := ts.GetHeartbeat(k.project, k.agent)
-				status := st().Foreground(lipgloss.Color("82")).Render("  ●")
-				if hb.Paused {
-					status = st().Foreground(lipgloss.Color("226")).Render("  ⏸")
+				if len(k.agent) > maxNameLen {
+					maxNameLen = len(k.agent)
 				}
+				if len(hb.Interval) > maxIntvLen {
+					maxIntvLen = len(hb.Interval)
+				}
+			}
+
+			for _, k := range heartbeatAgents {
+				hb, _ := ts.GetHeartbeat(k.project, k.agent)
+				status := st().Foreground(lipgloss.Color("82")).Render("●")
+				if hb.Paused {
+					status = st().Foreground(lipgloss.Color("226")).Render("⏸")
+				}
+				name := st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("%-*s", maxNameLen, k.agent))
+				intv := st().Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%-*s", maxIntvLen, hb.Interval))
 				window := ""
 				if hb.ActiveHours != "" {
 					window = st().Foreground(lipgloss.Color("244")).Render(fmt.Sprintf("  [%s]", hb.ActiveHours))
 				}
-				line := status +
-					st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("  %-16s", k.agent)) +
-					st().Foreground(lipgloss.Color("86")).Render(hb.Interval) +
-					window
+				line := fmt.Sprintf("  %s  %s  %s%s", status, name, intv, window)
 				content = append(content, line)
 			}
 		}
@@ -182,30 +195,50 @@ func newSchedulerStartCmd() *cobra.Command {
 			content = append(content,
 				st().Foreground(lipgloss.Color("213")).Bold(true).Render("  ⏰")+" "+
 					st().Bold(true).Render(fmt.Sprintf("Cron  (%d agents)", len(cronAgents))))
+			content = append(content, "") // blank line after cron header
+
+			// Pre-compute column widths for cron table.
+			maxNameLen := 0
+			maxSchedLen := 0
 			for _, k := range cronAgents {
 				crons, _ := ts.ListCrons(k.project, k.agent)
 				for _, c := range crons {
 					if c.Enabled {
-						line := st().Foreground(lipgloss.Color("226")).Render("  ●") +
-							st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("  %-16s", k.agent)) +
-							st().Foreground(lipgloss.Color("86")).Render("  "+c.Schedule) +
-							st().Foreground(lipgloss.Color("244")).Render("  " + c.Title)
+						if len(k.agent) > maxNameLen {
+							maxNameLen = len(k.agent)
+						}
+						if len(c.Schedule) > maxSchedLen {
+							maxSchedLen = len(c.Schedule)
+						}
+					}
+				}
+			}
+
+			for _, k := range cronAgents {
+				crons, _ := ts.ListCrons(k.project, k.agent)
+				for _, c := range crons {
+					if c.Enabled {
+						name := st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("%-*s", maxNameLen, k.agent))
+						sched := st().Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%-*s", maxSchedLen, c.Schedule))
+						title := st().Foreground(lipgloss.Color("244")).Render(c.Title)
+						line := fmt.Sprintf("  %s  %s  %s  %s",
+							st().Foreground(lipgloss.Color("226")).Render("●"), name, sched, title)
 						content = append(content, line)
 					}
 				}
 			}
 		}
 
-		content = append(content, "")
 		content = append(content, st().Foreground(lipgloss.Color("244")).Render("  Ctrl+C to stop"))
 
 		// Join content vertically.
 		body := lipgloss.JoinVertical(lipgloss.Top, content...)
 
 		// Wrap in a normal (single-line) border with comfortable padding.
+		// Border color "36" matches overview's bold-cyan (ansiBCyan = \033[1;36m).
 		box := lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("99")).
+			BorderForeground(lipgloss.Color("36")).
 			Padding(1, 2)
 
 		fmt.Println()
