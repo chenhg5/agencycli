@@ -182,10 +182,13 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 		args = append(args, "-e", kv)
 	}
 
-	// 2. API keys: use `-e KEY` (no value) so Docker inherits from the host.
-	//    The token value never appears in the command line or process table.
+	// 2. API keys & provider overrides: use `-e KEY` so Docker copies from the host.
+	//    Values never appear in the docker argv. For ANTHROPIC_BASE_URL,
+	//    ANTHROPIC_AUTH_TOKEN, and ANTHROPIC_MODEL we forward whenever the host
+	//    has the variable defined (even if empty), so Claude Code can target a
+	//    custom gateway; other keys are forwarded only when non-empty.
 	for _, envKey := range wellKnownEnvKeys(model) {
-		if os.Getenv(envKey) != "" {
+		if forwardHostEnvIntoDocker(envKey) {
 			args = append(args, "-e", envKey)
 		}
 	}
@@ -339,6 +342,23 @@ func sandboxEnvVars(model entity.AgentModel) []string {
 // to authenticate. These are forwarded from the host into the container using
 // `-e KEY` (no value in the argument — Docker inherits from host env), so the
 // token value never appears in the docker run command line or process table.
+// anthropicProviderEnvKeys are Claude / Anthropic-related vars that should be
+// passed into Docker whenever set on the host (including empty), so users can
+// switch API base URL, auth token, or model without changing agencycli config.
+var anthropicProviderEnvKeys = map[string]struct{}{
+	"ANTHROPIC_BASE_URL":   {},
+	"ANTHROPIC_AUTH_TOKEN": {},
+	"ANTHROPIC_MODEL":      {},
+}
+
+func forwardHostEnvIntoDocker(envKey string) bool {
+	if _, isProvider := anthropicProviderEnvKeys[envKey]; isProvider {
+		_, set := os.LookupEnv(envKey)
+		return set
+	}
+	return os.Getenv(envKey) != ""
+}
+
 func wellKnownEnvKeys(model entity.AgentModel) []string {
 	// Keys common to all models.
 	common := []string{

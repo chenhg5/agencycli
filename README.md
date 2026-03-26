@@ -172,7 +172,8 @@ agencycli
 
 → **[Full command reference](docs/commands.md)**  
 → **[Workspace layout](docs/workspace-layout.md)**  
-→ **[Docker sandbox](docs/sandbox-design.md)**
+→ **[Docker sandbox](docs/sandbox-design.md)**  
+→ **[HTTP / OpenAI-compatible agent](docs/http-agent.md)**
 
 ## Why not LangGraph / CrewAI / AutoGen?
 

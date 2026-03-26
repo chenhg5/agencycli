@@ -78,7 +78,14 @@ The output format depends on --model:
   codex        →  AGENTS.md (single merged file)
   cursor       →  .cursorrules + .cursor/rules/agencycli.mdc
   gemini       →  GEMINI.md + .agencycli-context/ + .gemini/skills/
-  generic-cli  →  context.md (plain text)`,
+  generic-cli  →  context.md (plain text)
+
+Claude Code (claudecode): the claude subprocess inherits your shell environment on the host.
+With Docker sandbox, credentials and these provider overrides are forwarded from the host when set:
+  ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN), ANTHROPIC_BASE_URL, ANTHROPIC_MODEL
+
+To switch an existing agent to another runtime (e.g. claudecode → codex), use
+  agencycli agent set-model (see agencycli agent set-model --help).`,
 		Example: `  # Hire with a role (recommended)
   agencycli hire --project "my-site" --team "growth" --role "content-writer" \
                --model "claudecode" --name "writer"

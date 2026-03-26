@@ -11,6 +11,7 @@ func newAgentCmd() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newAgentLogCmd(),
+		newAgentSetModelCmd(),
 	)
 	return cmd
 }

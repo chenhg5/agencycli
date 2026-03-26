@@ -83,7 +83,29 @@ agencycli sync                    # entire agency
 # Fire (remove) an agent
 agencycli fire --project my-api --agent dev           # soft delete → .fired/
 agencycli fire --project my-api --agent dev --force   # hard delete
+
+# HTTP / OpenAI-compatible backend (Ollama, LM Studio, custom API)
+agencycli hire --project my-api --team engineering --role developer \
+  --model http-agent --name local-llm \
+  --http-url "http://localhost:11434/v1/chat/completions" \
+  --http-model "llama3.2"
+# See docs/http-agent.md for the full wire format and agent.yaml reference.
 ```
+
+---
+
+## `agent` — per-agent utilities
+
+```bash
+# Change runtime (e.g. Claude Code → Codex): regenerates context, removes the old format’s files
+agencycli agent set-model --project my-api --name dev --model codex
+
+# Switch to http-agent (requires --http-url; same flags as hire)
+agencycli agent set-model --project my-api --name bot --model http-agent \
+  --http-url "http://localhost:11434/v1/chat/completions" --http-model "llama3.2"
+```
+
+`set-model` keeps hire metadata (team, role, `hired_at`, playbook, sandbox, `add_dirs`) but clears `run_command` (so the new model’s default CLI is used) and drops `http_agent` when leaving `http-agent`. If you use a **fixed** Docker `sandbox.docker.image`, verify it matches the new model or clear the image so the default for that model is used.
 
 ---
 

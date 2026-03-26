@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/runner"
 	"github.com/chenhg5/agencycli/internal/store"
@@ -77,6 +76,60 @@ Start the scheduler in the foreground:
 	return cmd
 }
 
+// schedulerStartHeartbeatRow formats one heartbeat agent line for the start banner
+// (overview-style columns, width-capped to boxW).
+func schedulerStartHeartbeatRow(agent string, hb *entity.HeartbeatConfig, maxIntvLen int) string {
+	if hb == nil {
+		return silver("  (no config)")
+	}
+	var icon string
+	if hb.Paused {
+		icon = col(ansiBYellow, "⏸")
+	} else {
+		icon = col(ansiGreen, "▶")
+	}
+	nameStr := bold(padStr(agent, 16))
+	intvStr := col(ansiCyan, padStr(hb.Interval, maxIntvLen))
+	line := fmt.Sprintf("    %s  %s  %s", icon, nameStr, intvStr)
+	if hb.ActiveHours == "" {
+		return line
+	}
+	rem := boxW - visibleLen(line)
+	if rem < 5 {
+		return line
+	}
+	maxInner := rem - 4 // "  [" + "]"
+	if maxInner < 1 {
+		return line
+	}
+	inner := hb.ActiveHours
+	if visibleLen(inner) > maxInner {
+		inner = truncate(hb.ActiveHours, maxInner)
+	}
+	return line + silver("  ["+inner+"]")
+}
+
+// schedulerStartCronRow formats one enabled cron line for the start banner.
+func schedulerStartCronRow(agent, schedule, title string, maxSchedLen int) string {
+	dot := col(ansiBYellow, "●")
+	nameStr := bold(padStr(agent, 16))
+	schedStr := col(ansiCyan, padStr(schedule, maxSchedLen))
+	line := fmt.Sprintf("    %s  %s  %s", dot, nameStr, schedStr)
+	if strings.TrimSpace(title) == "" {
+		return line
+	}
+	rem := boxW - visibleLen(line)
+	if rem < 4 {
+		return line
+	}
+	sep := "  "
+	rem -= visibleLen(sep)
+	if rem < 2 {
+		return line
+	}
+	return line + sep + silver(truncate(title, rem))
+}
+
 // ── scheduler start ───────────────────────────────────────────────────────────
 
 func newSchedulerStartCmd() *cobra.Command {
@@ -138,113 +191,94 @@ func newSchedulerStartCmd() *cobra.Command {
 
 			startedAt := nowStr()
 
-			// ── Render the startup banner with lipgloss ─────────────────────────────────
+			// ── Startup banner (same box/ANSI style as overview) ─────────────────────
 
-			st := lipgloss.NewStyle
+			agencyName := "Agency"
+			if ag, err := s.Agency(); err == nil && strings.TrimSpace(ag.Name) != "" {
+				agencyName = ag.Name
+			}
+			hbN, crN := len(heartbeatAgents), len(cronAgents)
+			rightLabel := fmt.Sprintf("scheduler · %d heartbeat · %d cron", hbN, crN)
 
-			// Build content lines.
-			var content []string
+			maxIntvLen := 0
+			for _, k := range heartbeatAgents {
+				hb, _ := ts.GetHeartbeat(k.project, k.agent)
+				if len(hb.Interval) > maxIntvLen {
+					maxIntvLen = len(hb.Interval)
+				}
+			}
+			if maxIntvLen < 4 {
+				maxIntvLen = 4
+			}
+			if maxIntvLen > 12 {
+				maxIntvLen = 12
+			}
 
-			// Title as first line.
-			content = append(content,
-				st().Foreground(lipgloss.Color("208")).Bold(true).Render("  [ Scheduler ]"))
-
-			// Timestamp.
-			content = append(content,
-				st().Foreground(lipgloss.Color("244")).Render("  Started at ")+
-					st().Foreground(lipgloss.Color("86")).Render(startedAt))
-
-			if len(heartbeatAgents) > 0 {
-				content = append(content, "")
-				content = append(content,
-					st().Foreground(lipgloss.Color("208")).Bold(true).Render("  ♥")+" "+
-						st().Bold(true).Render(fmt.Sprintf("Heartbeat  (%d agents)", len(heartbeatAgents))))
-				content = append(content, "") // blank line after heartbeat header
-
-				// Pre-compute column widths for table alignment.
-				maxNameLen := 0
-				maxIntvLen := 0
-				for _, k := range heartbeatAgents {
-					hb, _ := ts.GetHeartbeat(k.project, k.agent)
-					if len(k.agent) > maxNameLen {
-						maxNameLen = len(k.agent)
-					}
-					if len(hb.Interval) > maxIntvLen {
-						maxIntvLen = len(hb.Interval)
+			maxSchedLen := 0
+			for _, k := range cronAgents {
+				crons, _ := ts.ListCrons(k.project, k.agent)
+				for _, c := range crons {
+					if c.Enabled {
+						if len(c.Schedule) > maxSchedLen {
+							maxSchedLen = len(c.Schedule)
+						}
 					}
 				}
+			}
+			if maxSchedLen < 8 {
+				maxSchedLen = 8
+			}
+			if maxSchedLen > 18 {
+				maxSchedLen = 18
+			}
 
+			fmt.Println()
+			fmt.Println(boxTop(agencyName, rightLabel))
+			fmt.Println(boxBlank())
+			fmt.Println(boxRow(muted("Started at " + startedAt)))
+
+			if len(heartbeatAgents) > 0 {
+				fmt.Println(boxBlank())
+				fmt.Println(secHeader("HEARTBEAT"))
+				fmt.Println(boxBlank())
+				lastProj := ""
 				for _, k := range heartbeatAgents {
+					if k.project != lastProj {
+						lastProj = k.project
+						fmt.Println(boxRow(col(ansiSilver, "  "+lastProj)))
+					}
 					hb, _ := ts.GetHeartbeat(k.project, k.agent)
-					status := st().Foreground(lipgloss.Color("82")).Render("●")
-					if hb.Paused {
-						status = st().Foreground(lipgloss.Color("226")).Render("⏸")
-					}
-					name := st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("%-*s", maxNameLen, k.agent))
-					intv := st().Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%-*s", maxIntvLen, hb.Interval))
-					window := ""
-					if hb.ActiveHours != "" {
-						window = st().Foreground(lipgloss.Color("244")).Render(fmt.Sprintf("  [%s]", hb.ActiveHours))
-					}
-					line := fmt.Sprintf("  %s  %s  %s%s", status, name, intv, window)
-					content = append(content, line)
+					fmt.Println(boxRow(schedulerStartHeartbeatRow(k.agent, hb, maxIntvLen)))
 				}
 			}
 
 			if len(cronAgents) > 0 {
-				content = append(content, "")
-				content = append(content,
-					st().Foreground(lipgloss.Color("213")).Bold(true).Render("  ⏰")+" "+
-						st().Bold(true).Render(fmt.Sprintf("Cron  (%d agents)", len(cronAgents))))
-				content = append(content, "") // blank line after cron header
-
-				// Pre-compute column widths for cron table.
-				maxNameLen := 0
-				maxSchedLen := 0
-				for _, k := range cronAgents {
-					crons, _ := ts.ListCrons(k.project, k.agent)
-					for _, c := range crons {
-						if c.Enabled {
-							if len(k.agent) > maxNameLen {
-								maxNameLen = len(k.agent)
-							}
-							if len(c.Schedule) > maxSchedLen {
-								maxSchedLen = len(c.Schedule)
-							}
-						}
-					}
+				if len(heartbeatAgents) > 0 {
+					fmt.Println(boxSep())
+					fmt.Println(boxBlank())
+				} else {
+					fmt.Println(boxBlank())
 				}
-
+				fmt.Println(secHeader("CRON"))
+				fmt.Println(boxBlank())
+				lastProj := ""
 				for _, k := range cronAgents {
 					crons, _ := ts.ListCrons(k.project, k.agent)
 					for _, c := range crons {
-						if c.Enabled {
-							name := st().Foreground(lipgloss.Color("15")).Bold(true).Render(fmt.Sprintf("%-*s", maxNameLen, k.agent))
-							sched := st().Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%-*s", maxSchedLen, c.Schedule))
-							title := st().Foreground(lipgloss.Color("244")).Render(c.Title)
-							line := fmt.Sprintf("  %s  %s  %s  %s",
-								st().Foreground(lipgloss.Color("226")).Render("●"), name, sched, title)
-							content = append(content, line)
+						if !c.Enabled {
+							continue
 						}
+						if k.project != lastProj {
+							lastProj = k.project
+							fmt.Println(boxRow(col(ansiSilver, "  "+lastProj)))
+						}
+						fmt.Println(boxRow(schedulerStartCronRow(k.agent, c.Schedule, c.Title, maxSchedLen)))
 					}
 				}
 			}
 
-			content = append(content, "")
-			content = append(content, st().Foreground(lipgloss.Color("244")).Render("  Ctrl+C to stop"))
-
-			// Join content vertically.
-			body := lipgloss.JoinVertical(lipgloss.Top, content...)
-
-			// Wrap in a normal (single-line) border with comfortable padding.
-			// Use hex #00CED1 to match overview's bold-cyan (\033[1;36m) closely.
-			box := lipgloss.NewStyle().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color("#00CED1")).
-				Padding(1, 2)
-
-			fmt.Println()
-			fmt.Println(box.Render(body))
+			fmt.Println(boxBlank())
+			fmt.Println(boxBot())
 			fmt.Println()
 
 			var wg sync.WaitGroup

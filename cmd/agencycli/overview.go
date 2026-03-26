@@ -140,7 +140,7 @@ func truncate(s string, maxCols int) string {
 //   ├─────(boxW+2)─────┤   → boxW + 4
 //   │  content(boxW)  │   → 1 + 1 + boxW + 1 + 1 = boxW + 4
 
-const boxW = 74
+const boxW = 64
 
 func boxTop(title, right string) string {
 	mid := fmt.Sprintf(" ◈ %s ", title)
@@ -245,8 +245,113 @@ func fmtDuration(d time.Duration) string {
 
 // ── agent row renderer ────────────────────────────────────────────────────
 
-// renderAgentRow builds an agent-status line and returns exactly boxW visible
-// characters by measuring each component's visible width.
+// formatNextWakeupColored renders "→ HH:MM:SS (duration)" variants so visible
+// width never exceeds maxVis.
+func formatNextWakeupColored(snap hbSnap, maxVis int) string {
+	if snap.nextWakeup.IsZero() || maxVis < 1 {
+		return ""
+	}
+	remaining := time.Until(snap.nextWakeup)
+	timeStr := snap.nextWakeup.Format("15:04:05")
+	withDur := func(dur string) string {
+		return muted("→ ") + col(ansiWhite, timeStr) + silver(" ("+dur+")")
+	}
+	candidates := []string{
+		fmtDuration(remaining),
+	}
+	if remaining >= time.Hour {
+		candidates = append(candidates, fmt.Sprintf("%dh", int(remaining.Hours())))
+	}
+	if remaining >= time.Minute {
+		candidates = append(candidates, fmt.Sprintf("%dm", int(remaining.Minutes())))
+	}
+	for _, dur := range candidates {
+		s := withDur(dur)
+		if visibleLen(s) <= maxVis {
+			return s
+		}
+	}
+	arrow := muted("→ ") + col(ansiWhite, timeStr)
+	if visibleLen(arrow) <= maxVis {
+		return arrow
+	}
+	return ""
+}
+
+// renderHeartbeatSection renders heartbeat / schedule text within avail visible
+// columns (so the full agent row fits boxW).
+func renderHeartbeatSection(snap hbSnap, avail int) string {
+	if avail < 1 {
+		return ""
+	}
+	if !snap.enabled {
+		s := silver("no heartbeat")
+		if visibleLen(s) <= avail {
+			return s
+		}
+		if avail >= 8 {
+			return silver("no pulse")
+		}
+		return silver("—")
+	}
+	if snap.isRunning {
+		s := col(ansiBGreen, "running…")
+		if visibleLen(s) <= avail {
+			return s
+		}
+		return col(ansiBGreen, "run")
+	}
+	if snap.interval == 0 {
+		s := silver("↻" + snap.intervalStr)
+		if visibleLen(s) <= avail {
+			return s
+		}
+		rest := avail - 1
+		if rest < 1 {
+			return silver("↻")
+		}
+		return silver("↻" + truncate(snap.intervalStr, rest))
+	}
+
+	intStr := muted("↻") + col(ansiCyan, snap.intervalStr)
+	intW := visibleLen(intStr)
+	if intW > avail {
+		rest := avail - 1
+		if rest < 1 {
+			return muted("↻")
+		}
+		return muted("↻") + col(ansiCyan, truncate(snap.intervalStr, rest))
+	}
+
+	for barW := 10; barW >= 2; barW -= 2 {
+		slots := avail - intW
+		if slots < 2+barW {
+			continue
+		}
+		afterBar := slots - 2 - barW
+		bar := progressBar(snap.fraction, barW)
+		if afterBar < 2 {
+			return intStr + "  " + bar
+		}
+		nextMax := afterBar - 2
+		nextStr := formatNextWakeupColored(snap, nextMax)
+		if visibleLen(nextStr) <= nextMax {
+			if nextStr == "" {
+				return intStr + "  " + bar
+			}
+			return intStr + "  " + bar + "  " + nextStr
+		}
+	}
+
+	for barW := 10; barW >= 2; barW -= 2 {
+		if avail >= intW+2+barW {
+			return intStr + "  " + progressBar(snap.fraction, barW)
+		}
+	}
+	return intStr
+}
+
+// renderAgentRow builds an agent-status line padded to exactly boxW visible columns.
 func renderAgentRow(name string, meta *entity.AgentMeta, snap hbSnap, taskCount int) string {
 	modelVis := 10
 	modelStr := silver(padStr("—", modelVis))
@@ -258,58 +363,36 @@ func renderAgentRow(name string, meta *entity.AgentMeta, snap hbSnap, taskCount 
 	nameStr := bold(padStr(name, nameVis))
 
 	statusIcon := silver("○")
-	schedStr := silver("no heartbeat")
-	schedVis := 12 // "no heartbeat" visible length
-
 	switch {
 	case !snap.enabled:
-		// already set above
-
+		// keep ○
 	case snap.isRunning:
 		statusIcon = col(ansiBGreen, "▶")
-		schedStr = col(ansiBGreen, "running…")
-		schedVis = 8
-
 	case snap.interval == 0:
 		statusIcon = silver("○")
-		schedStr = silver("↻" + snap.intervalStr)
-		schedVis = 1 + visibleLen(snap.intervalStr)
-
 	default:
 		statusIcon = col(ansiGreen, "▶")
-		intStr := muted("↻") + col(ansiCyan, snap.intervalStr)
-		intVis := 1 + visibleLen(snap.intervalStr) // "↻" + interval
-		bar := progressBar(snap.fraction, 10)
-		barVis := 10
-		nextStr := ""
-		nextVis := 0
-		if !snap.nextWakeup.IsZero() {
-			remaining := time.Until(snap.nextWakeup)
-			timeStr := snap.nextWakeup.Format("15:04:05")
-			durStr := fmtDuration(remaining)
-			nextStr = muted("→ ") + col(ansiWhite, timeStr) + silver(" ("+durStr+")")
-			nextVis = 2 + visibleLen(timeStr) + 2 + visibleLen(durStr) + 2 // "→ " + time + " (" + dur + ")"
-		}
-		schedStr = intStr + "  " + bar + "  " + nextStr
-		schedVis = intVis + 2 + barVis + 2 + nextVis
 	}
 
 	taskTag := ""
-	taskTagVis := 0
 	if taskCount > 0 {
 		taskTag = "  " + col(ansiBYellow, fmt.Sprintf("[%d task%s]", taskCount, plural(taskCount)))
-		taskTagVis = 2 + visibleLen(fmt.Sprintf("[%d task%s]", taskCount, plural(taskCount)))
 	}
 
-	// Build total by concatenation and measure
-	row := fmt.Sprintf("    %s  %s  %s  %s%s", statusIcon, nameStr, modelStr, schedStr, taskTag)
-	rowVis := 4 + visibleLen(statusIcon) + 2 + nameVis + 2 + modelVis + 2 + schedVis + taskTagVis
+	prefix := fmt.Sprintf("    %s  %s  %s  ", statusIcon, nameStr, modelStr)
+	prefixVis := visibleLen(prefix)
+	taskVis := visibleLen(taskTag)
+	avail := boxW - prefixVis - taskVis
+	if avail < 4 {
+		avail = 4
+	}
 
-	// Pad to boxW if needed
+	schedStr := renderHeartbeatSection(snap, avail)
+	row := prefix + schedStr + taskTag
+	rowVis := visibleLen(row)
 	if rowVis < boxW {
 		row += strings.Repeat(" ", boxW-rowVis)
 	}
-
 	return row
 }
 
