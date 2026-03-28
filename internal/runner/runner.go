@@ -10,6 +10,7 @@ package runner
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/sandbox"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/telemetry"
 )
 
 const (
@@ -196,7 +198,9 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	cmd.Stdout = multiOut
 	cmd.Stderr = multiOut
 
+	runStarted := time.Now()
 	runErr := cmd.Run()
+	runFinished := time.Now()
 
 	fmt.Fprintf(logFile, "\n=== exit code: %v  finished: %s ===\n",
 		cmd.ProcessState.ExitCode(), time.Now().UTC().Format(time.RFC3339))
@@ -216,6 +220,10 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	} else {
 		result.Status = entity.TaskStatusDoneSuccess
 	}
+	ec := exitCodeOrZero(cmd)
+	r.recordAgentRun(telemetry.KindExec, project, agentName, "", "", string(model), sandboxLabel,
+		runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
+		logPath, telemetry.FormatExecCommand(executable, args), prompt, outBuf.Bytes())
 	return result, nil
 }
 
@@ -369,7 +377,9 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	cmd.Stdout = multiOut
 	cmd.Stderr = multiOut
 
+	runStarted := time.Now()
 	runErr := cmd.Run()
+	runFinished := time.Now()
 
 	fmt.Fprintf(logFile, "\n=== exit code: %v  finished: %s ===\n",
 		cmd.ProcessState.ExitCode(), time.Now().UTC().Format(time.RFC3339))
@@ -385,20 +395,32 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		result.SessionID = sid
 	}
 
+	ec := exitCodeOrZero(cmd)
+	cmdSummary := telemetry.FormatExecCommand(executable, args)
+
 	// Check for confirmation sentinel (takes priority over exit code).
 	if summary := parseLineSentinel(output, ConfirmSentinel); summary != "" {
 		result.Status = entity.TaskStatusAwaitingConfirmation
 		result.Summary = strings.TrimSpace(summary)
+		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+			runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
+			logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 		return result, nil
 	}
 
 	if runErr != nil {
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = runErr.Error()
+		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+			runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
+			logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 		return result, runErr
 	}
 
 	result.Status = entity.TaskStatusDoneSuccess
+	r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+		runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
+		logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 	return result, nil
 }
 
@@ -412,6 +434,54 @@ func (r *Runner) ResumeTask(project, agentName string, task *entity.Task, confir
 	result, err := r.RunTask(project, agentName, task, sessionID)
 	task.Prompt = original // restore
 	return result, err
+}
+
+func exitCodeOrZero(cmd *exec.Cmd) int {
+	if cmd == nil || cmd.ProcessState == nil {
+		return 0
+	}
+	return cmd.ProcessState.ExitCode()
+}
+
+func httpCommandSummary(url string) string {
+	return telemetry.TruncateCommand("HTTP POST "+strings.TrimSpace(url), 4000)
+}
+
+// recordAgentRun persists a row to .agencycli/agencycli.db; failures are ignored so runs are never blocked.
+func (r *Runner) recordAgentRun(
+	kind string,
+	project, agent string,
+	taskID, taskTitle string,
+	modelNorm, sandbox string,
+	started, finished time.Time,
+	status entity.TaskStatus,
+	exitCode *int,
+	sessionID, errMsg string,
+	absLogPath, cmdSummary, prompt string,
+	stdout []byte,
+) {
+	rec := telemetry.Record{
+		Kind:           kind,
+		StartedAt:      started,
+		FinishedAt:     finished,
+		Project:        project,
+		Agent:          agent,
+		TaskID:         taskID,
+		TaskTitle:      taskTitle,
+		Model:          modelNorm,
+		Sandbox:        sandbox,
+		Status:         string(status),
+		SessionID:      sessionID,
+		ErrorMsg:       errMsg,
+		LogPathRel:     telemetry.RelLogPath(r.root, absLogPath),
+		CommandSummary: telemetry.TruncateCommand(cmdSummary, 4000),
+	}
+	if exitCode != nil {
+		rec.ExitCode = sql.NullInt64{Int64: int64(*exitCode), Valid: true}
+	}
+	rec.PromptBytes, rec.PromptSHA256 = telemetry.PromptFingerprint(prompt)
+	telemetry.ApplyStreamUsage(&rec, telemetry.ParseStreamJSONUsage(stdout))
+	_ = telemetry.Insert(r.root, rec)
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -516,15 +586,26 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	systemPrompt := readAgentContextFile(agentDir)
+	runStarted := time.Now()
 	output, httpErr := httpExec(meta.HTTPAgent, systemPrompt, userPrompt, logFile, false)
+	runFinished := time.Now()
 
 	fmt.Fprintf(logFile, "\n=== finished: %s ===\n", time.Now().UTC().Format(time.RFC3339))
 
 	result := &RunResult{LogPath: logPath}
+	httpSummary := httpCommandSummary(meta.HTTPAgent.URL)
+	modelNorm := string(entity.ModelHTTPAgent)
+	sandboxLabel := "host"
+	if meta.Sandbox != nil && meta.Sandbox.Provider != entity.SandboxNone {
+		sandboxLabel = string(meta.Sandbox.Provider)
+	}
 
 	if httpErr != nil {
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = httpErr.Error()
+		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
+			logPath, httpSummary, userPrompt, []byte(output))
 		return result, nil
 	}
 
@@ -532,6 +613,9 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 	if summary := parseLineSentinel(output, ConfirmSentinel); summary != "" {
 		result.Status = entity.TaskStatusAwaitingConfirmation
 		result.Summary = strings.TrimSpace(summary)
+		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
+			logPath, httpSummary, userPrompt, []byte(output))
 		return result, nil
 	}
 	if sid := parseLineSentinel(output, SessionSentinel); sid != "" {
@@ -539,6 +623,9 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 	}
 
 	result.Status = entity.TaskStatusDoneSuccess
+	r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+		runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
+		logPath, httpSummary, userPrompt, []byte(output))
 	return result, nil
 }
 
@@ -566,20 +653,34 @@ func (r *Runner) execPromptHTTP(agentDir string, meta *entity.AgentMeta, prompt 
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	systemPrompt := readAgentContextFile(agentDir)
+	runStarted := time.Now()
 	output, httpErr := httpExec(meta.HTTPAgent, systemPrompt, prompt, logFile, true)
+	runFinished := time.Now()
 
 	fmt.Fprintf(logFile, "\n=== finished: %s ===\n", time.Now().UTC().Format(time.RFC3339))
 
 	result := &RunResult{LogPath: logPath}
+	httpSummary := httpCommandSummary(meta.HTTPAgent.URL)
+	modelNorm := string(entity.ModelHTTPAgent)
+	sandboxLabel := "host"
+	if meta.Sandbox != nil && meta.Sandbox.Provider != entity.SandboxNone {
+		sandboxLabel = string(meta.Sandbox.Provider)
+	}
 	if httpErr != nil {
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = httpErr.Error()
+		r.recordAgentRun(telemetry.KindExec, meta.Project, meta.Name, "", "", modelNorm, sandboxLabel,
+			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
+			logPath, httpSummary, prompt, []byte(output))
 		return result, nil
 	}
 	if sid := parseLineSentinel(output, SessionSentinel); sid != "" {
 		result.SessionID = sid
 	}
 	result.Status = entity.TaskStatusDoneSuccess
+	r.recordAgentRun(telemetry.KindExec, meta.Project, meta.Name, "", "", modelNorm, sandboxLabel,
+		runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
+		logPath, httpSummary, prompt, []byte(output))
 	return result, nil
 }
 

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -14,6 +12,7 @@ import (
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
+	"github.com/chenhg5/agencycli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -901,18 +900,6 @@ type tokenUsage struct {
 	HasCost           bool // true when total_cost_usd came from the log
 }
 
-type resultUsage struct {
-	InputTokens           int64 `json:"input_tokens"`
-	OutputTokens          int64 `json:"output_tokens"`
-	CacheReadInputTokens  int64 `json:"cache_read_input_tokens"`
-}
-
-type resultLine struct {
-	Type        string      `json:"type"`
-	TotalCostUSD float64    `json:"total_cost_usd"`
-	Usage       resultUsage `json:"usage"`
-}
-
 func newTaskTokensCmd() *cobra.Command {
 	var (
 		project   string
@@ -1088,37 +1075,18 @@ Cost is estimated using Anthropic's Claude pricing (configurable via env):
 // ── token helpers ─────────────────────────────────────────────────────────────
 
 func parseLogTokens(path string) (tokenUsage, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return tokenUsage{}, err
 	}
-	defer f.Close()
-
-	// Prefer the final `result` line which has aggregate token counts and
-	// the exact cost already calculated by the Claude API. Fall back to the
-	// last `assistant` message usage if no result line is present.
-	var result tokenUsage
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 10*1024*1024), 10*1024*1024)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		// Quick filter to skip irrelevant lines without full unmarshal.
-		if len(line) < 10 {
-			continue
-		}
-		var rl resultLine
-		if err := json.Unmarshal(line, &rl); err != nil {
-			continue
-		}
-		if rl.Type == "result" {
-			result.InputTokens = rl.Usage.InputTokens
-			result.OutputTokens = rl.Usage.OutputTokens
-			result.CacheReadTokens = rl.Usage.CacheReadInputTokens
-			result.TotalCostUSD = rl.TotalCostUSD
-			result.HasCost = true
-		}
-	}
-	return result, scanner.Err()
+	u := telemetry.ParseStreamJSONUsage(data)
+	return tokenUsage{
+		InputTokens:     u.InputTokens,
+		OutputTokens:    u.OutputTokens,
+		CacheReadTokens: u.CacheReadTokens,
+		TotalCostUSD:    u.TotalCostUSD,
+		HasCost:         u.SawResult,
+	}, nil
 }
 
 func calcCost(in, out int64, inPricePerM, outPricePerM float64) float64 {

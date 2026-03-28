@@ -77,6 +77,7 @@ func init() {
 		newProjectCmd(),
 		newSandboxCmd(),
 		newOverviewCmd(),
+		newRunsCmd(),
 		newClearCmd(),
 	)
 }
