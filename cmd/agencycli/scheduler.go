@@ -64,8 +64,12 @@ Cron: fires at exact calendar times (crontab syntax).
   When a cron fires it enqueues a Task; the heartbeat loop picks it up.
   If no heartbeat is enabled, the scheduler executes the cron task directly.
 
-Start the scheduler in the foreground:
-  agencycli scheduler start`,
+Start the scheduler in the foreground (all projects with heartbeat/cron enabled):
+  agencycli scheduler start
+
+Limit to one project or one agent:
+  agencycli scheduler start --project my-api
+  agencycli scheduler start --project my-api --agent dev`,
 	}
 	cmd.AddCommand(
 		newSchedulerStartCmd(),
@@ -133,10 +137,15 @@ func schedulerStartCronRow(agent, schedule, title string, maxSchedLen int) strin
 // ── scheduler start ───────────────────────────────────────────────────────────
 
 func newSchedulerStartCmd() *cobra.Command {
-	return &cobra.Command{
+	var startProject, startAgent string
+	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the scheduler (blocks until SIGINT/SIGTERM)",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(startAgent) != "" && strings.TrimSpace(startProject) == "" {
+				return fmt.Errorf("--agent requires --project")
+			}
+
 			root, err := resolveRoot()
 			if err != nil {
 				return err
@@ -152,6 +161,38 @@ func newSchedulerStartCmd() *cobra.Command {
 				return err
 			}
 
+			if p := strings.TrimSpace(startProject); p != "" {
+				found := false
+				for _, x := range projects {
+					if x == p {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("unknown project %q", p)
+				}
+				projects = []string{p}
+			}
+
+			if a := strings.TrimSpace(startAgent); a != "" {
+				p := strings.TrimSpace(startProject)
+				names, err := ts.ListAgents(p)
+				if err != nil {
+					return fmt.Errorf("list agents: %w", err)
+				}
+				found := false
+				for _, n := range names {
+					if n == a {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("agent %q not found in project %q", a, p)
+				}
+			}
+
 			// Collect agents with heartbeat enabled.
 			var heartbeatAgents []agentKey
 			// Collect agents with at least one enabled cron.
@@ -163,6 +204,12 @@ func newSchedulerStartCmd() *cobra.Command {
 					continue
 				}
 				for _, a := range agents {
+					if len(a) > 0 && a[0] == '.' {
+						continue
+					}
+					if want := strings.TrimSpace(startAgent); want != "" && a != want {
+						continue
+					}
 					hb, err := ts.GetHeartbeat(p, a)
 					if err == nil && hb.Enabled {
 						heartbeatAgents = append(heartbeatAgents, agentKey{p, a})
@@ -199,6 +246,13 @@ func newSchedulerStartCmd() *cobra.Command {
 			}
 			hbN, crN := len(heartbeatAgents), len(cronAgents)
 			rightLabel := fmt.Sprintf("scheduler · %d heartbeat · %d cron", hbN, crN)
+			if fp := strings.TrimSpace(startProject); fp != "" {
+				if fa := strings.TrimSpace(startAgent); fa != "" {
+					rightLabel = fmt.Sprintf("%s · %s/%s", rightLabel, fp, fa)
+				} else {
+					rightLabel = fmt.Sprintf("%s · project=%s", rightLabel, fp)
+				}
+			}
 
 			maxIntvLen := 0
 			for _, k := range heartbeatAgents {
@@ -316,6 +370,9 @@ func newSchedulerStartCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&startProject, "project", "", "only run schedulers for agents under this project (default: all projects)")
+	cmd.Flags().StringVar(&startAgent, "agent", "", "only run the scheduler for this agent (requires --project)")
+	return cmd
 }
 
 // runHeartbeatLoop runs the blocking heartbeat loop for a single agent.
