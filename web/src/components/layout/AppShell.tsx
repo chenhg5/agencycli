@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { CommandPalette } from './CommandPalette'
 import { recordVisit } from '../../lib/recent-visits'
+import { apiFetch } from '../../lib/api'
 import {
   navKeyFromPath,
   projectIdFromPath,
@@ -58,6 +58,13 @@ export function AppShell() {
   const crumbs = useBreadcrumbs()
   const [searchOpen, setSearchOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
+  const [appVersion, setAppVersion] = useState('…')
+
+  useEffect(() => {
+    apiFetch<{ version: string }>('/api/v1/health')
+      .then((d) => setAppVersion(d.version || 'dev'))
+      .catch(() => setAppVersion('dev'))
+  }, [])
 
   function toggleSidebar() {
     setCollapsed((v) => {
@@ -82,31 +89,19 @@ export function AppShell() {
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </main>
-        <footer className="flex h-10 shrink-0 items-center border-t border-neutral-200/60 px-6 dark:border-zinc-800/50">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
-              agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">v0.1</span>
-            </span>
-            <div className="flex items-center gap-3">
-              <a
-                href="https://github.com/chenhg5/agencycli/wiki"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
-              >
-                <ExternalLink className="size-3" strokeWidth={1.8} />
-                {t('footer.docs')}
-              </a>
-              <a
-                href="https://github.com/chenhg5/agencycli"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
-              >
-                <ExternalLink className="size-3" strokeWidth={1.8} />
-                GitHub
-              </a>
-            </div>
+        <footer className="flex h-10 w-full shrink-0 items-center justify-between border-t border-neutral-200/60 px-6 dark:border-zinc-800/50">
+          <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
+            agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">{appVersion}</span>
+          </span>
+          <div className="flex items-center gap-3">
+            <a href="https://github.com/chenhg5/agencycli/wiki" target="_blank" rel="noopener noreferrer"
+              className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+              {t('footer.docs')}
+            </a>
+            <a href="https://github.com/chenhg5/agencycli" target="_blank" rel="noopener noreferrer"
+              className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+              GitHub
+            </a>
           </div>
         </footer>
       </div>

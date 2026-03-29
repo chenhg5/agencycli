@@ -91,7 +91,11 @@ func newTaskAddCmd() *cobra.Command {
 			}
 
 			if assignee == "" {
-				assignee = project + "/" + agentName
+				if agentName == "human" {
+					assignee = "human"
+				} else {
+					assignee = project + "/" + agentName
+				}
 			}
 
 			now := time.Now().UTC()

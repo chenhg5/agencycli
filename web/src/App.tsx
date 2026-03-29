@@ -13,6 +13,7 @@ import ProjectMessagesPage from './pages/projects/ProjectMessagesPage'
 import ProjectRunsPage from './pages/projects/ProjectRunsPage'
 import ProjectSchedulePage from './pages/projects/ProjectSchedulePage'
 import ProjectsListPage from './pages/projects/ProjectsListPage'
+import ProjectSettingsPage from './pages/projects/ProjectSettingsPage'
 import ProjectTasksPage from './pages/projects/ProjectTasksPage'
 import TeamDetailPage from './pages/teams/TeamDetailPage'
 import TeamsPage from './pages/teams/TeamsPage'
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="members" element={<ProjectMembersPage />} />
           <Route path="schedule" element={<ProjectSchedulePage />} />
           <Route path="runs" element={<ProjectRunsPage />} />
+          <Route path="settings" element={<ProjectSettingsPage />} />
         </Route>
         <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="skills" element={<SkillsPage />} />

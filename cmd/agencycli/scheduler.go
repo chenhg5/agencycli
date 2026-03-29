@@ -389,8 +389,16 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			fmt.Sprintf(format, a...))
 	}
 
-	// wakeCount tracks how many times this agent has woken up today.
-	// Resets automatically when the date changes.
+	// Persist scheduler start time on first invocation.
+	{
+		hbInit, _ := ts.GetHeartbeat(project, agentName)
+		if hbInit != nil {
+			startedNow := time.Now().UTC()
+			hbInit.SchedulerStartedAt = &startedNow
+			_ = ts.SaveHeartbeat(project, agentName, hbInit)
+		}
+	}
+
 	var wakeCount int
 	lastWakeDate := ""
 	firstCycle := true
@@ -488,15 +496,18 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 				continue
 			}
 
-			nextAt := nextAtStr(projectedNext)
-			if hb.LastWakeup == nil {
-				agentLog("%s sleeping %s before first wakeup — next at %s",
-					colorDim+"○", waitDur.Round(time.Second), nextAt)
-			} else {
-				agentLog("%s sleeping %s — next at %s",
-					colorDim+"○", waitDur.Round(time.Second), nextAt)
-			}
-			select {
+		nextAt := nextAtStr(projectedNext)
+		nextUTC := projectedNext.UTC()
+		hb.NextWakeupAt = &nextUTC
+		_ = ts.SaveHeartbeat(project, agentName, hb)
+		if hb.LastWakeup == nil {
+			agentLog("%s sleeping %s before first wakeup — next at %s",
+				colorDim+"○", waitDur.Round(time.Second), nextAt)
+		} else {
+			agentLog("%s sleeping %s — next at %s",
+				colorDim+"○", waitDur.Round(time.Second), nextAt)
+		}
+		select {
 			case <-ctx.Done():
 				return
 			case <-time.After(waitDur):
@@ -576,6 +587,14 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			lastWakeDate = today
 		}
 		wakeCount++
+		hb.WakeupCount++
+		if hb.WakeupDate != today {
+			hb.WakeupCountToday = 0
+			hb.WakeupDate = today
+		}
+		hb.WakeupCountToday++
+		hb.NextWakeupAt = nil
+		_ = ts.SaveHeartbeat(project, agentName, hb)
 
 		// Fire any due cron jobs before processing the queue.
 		cronCount := fireDueCrons(ts, project, agentName)
@@ -596,11 +615,13 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "failed"
 			hb.PID = 0
+			hb.LastCycleDuration = dur.String()
 		} else {
 			agentLog("%s wakeup done %sin %s", colorGreen+"✓", colorReset, dur)
 			hb, _ = ts.GetHeartbeat(project, agentName)
 			hb.LastWakeupStatus = "done"
 			hb.PID = 0
+			hb.LastCycleDuration = dur.String()
 		}
 		_ = ts.SaveHeartbeat(project, agentName, hb)
 	}

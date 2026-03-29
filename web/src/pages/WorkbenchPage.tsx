@@ -1,40 +1,66 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  Briefcase,
   CheckCircle2,
   ListTodo,
   Mail,
   MessageSquare,
+  Pencil,
   Reply,
   Send,
+  Trash2,
   X,
 } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { apiPost } from '../lib/api'
+import { apiFetch, apiPost } from '../lib/api'
 import { useFormatDateTime } from '../lib/format-datetime'
 import { useApiJson } from '../lib/use-api'
 import {
   MessageDetailModal,
   type MessageDetailModel,
 } from '../components/project/MessageDetailModal'
+import { CreateMessageDialog } from '../components/project/CreateMessageDialog'
+import { CreateTaskDialog } from '../components/project/CreateTaskDialog'
+import {
+  EditTaskModal,
+  TaskDetailModal,
+  type TaskRow as SharedTaskRow,
+  statusColor,
+  priorityLabel,
+  isTerminal,
+  STATUS_KEYS,
+} from '../components/task/TaskModals'
+
+type ProjectAgents = { projectId: string; agents: { name: string }[] }
+
+function useProjectsAgents() {
+  const [data, setData] = useState<ProjectAgents[]>([])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const projects = await apiFetch<{ name: string }[]>('/api/v1/projects')
+        const result: ProjectAgents[] = []
+        for (const p of projects) {
+          try {
+            const agents = await apiFetch<{ name: string }[]>(`/api/v1/projects/${encodeURIComponent(p.name)}/agents`)
+            result.push({ projectId: p.name, agents })
+          } catch { result.push({ projectId: p.name, agents: [] }) }
+        }
+        if (!cancelled) setData(result)
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+  return data
+}
 
 type Tab = 'messages' | 'tasks'
 
 type MessageRow = MessageDetailModel
 
-type TaskRow = {
-  id: string
-  project: string
-  agent: string
-  title: string
-  type?: string
-  priority: number
-  status: string
-  createdAt: string
-  updatedAt: string
-}
+type TaskRow = SharedTaskRow
 
 type Filters = {
   read: 'all' | 'read' | 'unread'
@@ -61,34 +87,6 @@ function preview(body: string, max = 160) {
 const selectCls =
   'h-9 rounded-lg border border-neutral-200/80 bg-white px-3 pr-8 text-sm text-neutral-700 outline-none transition-colors hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600'
 
-const statusColor: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  in_progress: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  awaiting_confirmation: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  blocked: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-  done_success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  done_failed: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-  cancelled: 'bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-500',
-}
-const statusLabel: Record<string, string> = {
-  pending: 'Pending',
-  in_progress: 'Running',
-  awaiting_confirmation: 'Awaiting',
-  blocked: 'Blocked',
-  done_success: 'Done',
-  done_failed: 'Failed',
-  cancelled: 'Cancelled',
-}
-const priorityLabel: Record<number, { text: string; cls: string }> = {
-  0: { text: 'P0', cls: 'text-red-600 dark:text-red-400' },
-  1: { text: 'P1', cls: 'text-amber-600 dark:text-amber-400' },
-  2: { text: 'P2', cls: 'text-sky-600 dark:text-sky-400' },
-  3: { text: 'P3', cls: 'text-neutral-400 dark:text-zinc-600' },
-}
-
-function isTerminal(s: string) {
-  return s === 'done_success' || s === 'done_failed' || s === 'cancelled'
-}
 
 /* ── Inline reply ─────────────────────────────────────────────────────────── */
 
@@ -177,7 +175,7 @@ function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: (
 
 /* ── Messages panel ───────────────────────────────────────────────────────── */
 
-function MessagesPanel() {
+function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [filters, setFilters] = useState<Filters>({ ...defaultFilters })
@@ -185,6 +183,7 @@ function MessagesPanel() {
   const [selected, setSelected] = useState<MessageRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [batchBusy, setBatchBusy] = useState(false)
+  const firstProject = projectsAgents[0]
 
   const queryString = useMemo(() => buildMsgQuery(filters), [filters])
   const state = useApiJson<MessageRow[]>(`/api/v1/workbench/messages${queryString}`, reloadKey)
@@ -263,6 +262,11 @@ function MessagesPanel() {
               <X className="size-3.5" strokeWidth={2} /> {t('messages.resetFilters')}
             </button>
           )}
+          {firstProject && (
+            <div className="ml-auto">
+              <CreateMessageDialog projectId={firstProject.projectId} agents={firstProject.agents} onSent={() => { setReloadKey((k) => k + 1); setChecked(new Set()) }} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -300,6 +304,10 @@ function MessagesPanel() {
         )}
         {state.status === 'ok' && messages.length > 0 && (
           <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-4 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
+              <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('messages.selectAll', { defaultValue: 'Select all' })}</span>
+            </div>
             {messages.map((row) => {
               const unread = !row.readAt
               const archived = Boolean(row.archivedAt)
@@ -377,12 +385,17 @@ function MessagesPanel() {
 
 /* ── Tasks panel ──────────────────────────────────────────────────────────── */
 
-function TasksPanel() {
+function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [statusFilter, setStatusFilter] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [detailRow, setDetailRow] = useState<TaskRow | null>(null)
+  const [editRow, setEditRow] = useState<TaskRow | null>(null)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [batchBusy, setBatchBusy] = useState(false)
+  const firstProject = projectsAgents[0]
 
   const qp = new URLSearchParams()
   if (statusFilter) qp.set('status', statusFilter)
@@ -396,14 +409,61 @@ function TasksPanel() {
     return Array.from(s).sort()
   }, [tasks])
 
-  async function quickCancel(row: TaskRow) {
+  const reload = useCallback(() => { setReloadKey((k) => k + 1); setChecked(new Set()) }, [])
+
+  const allChecked = tasks.length > 0 && checked.size === tasks.length
+  const someChecked = checked.size > 0
+  function toggleAll() { setChecked(allChecked ? new Set() : new Set(tasks.map((t) => t.id))) }
+  function toggleOne(id: string) {
+    setChecked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  function getCheckedRows() { return tasks.filter((t) => checked.has(t.id)) }
+
+  async function batchCancel() {
+    const count = checked.size
+    if (!window.confirm(t('tasks.confirmBatchCancel', { count: String(count) }))) return
+    setBatchBusy(true)
+    try {
+      for (const row of getCheckedRows().filter((r) => !isTerminal(r.status)))
+        await apiPost('/api/v1/tasks/cancel', { project: row.project, agent: row.agent, id: row.id })
+      reload()
+    } finally { setBatchBusy(false) }
+  }
+  async function batchArchive() {
+    setBatchBusy(true)
+    try {
+      for (const row of getCheckedRows())
+        await apiPost('/api/v1/tasks/archive', { project: row.project, agent: row.agent, id: row.id })
+      reload()
+    } finally { setBatchBusy(false) }
+  }
+  async function batchDelete() {
+    const count = checked.size
+    if (!window.confirm(t('tasks.confirmBatchDelete', { count: String(count) }))) return
+    setBatchBusy(true)
+    try {
+      for (const row of getCheckedRows())
+        await apiPost('/api/v1/tasks/delete', { project: row.project, agent: row.agent, id: row.id })
+      reload()
+    } finally { setBatchBusy(false) }
+  }
+
+  async function quickCancel(row: TaskRow, e: React.MouseEvent) {
+    e.stopPropagation()
     if (!window.confirm(t('tasks.confirmCancel'))) return
     await apiPost('/api/v1/tasks/cancel', { project: row.project, agent: row.agent, id: row.id })
-    setReloadKey((k) => k + 1)
+    reload()
   }
-  async function quickArchive(row: TaskRow) {
+  async function quickArchive(row: TaskRow, e: React.MouseEvent) {
+    e.stopPropagation()
     await apiPost('/api/v1/tasks/archive', { project: row.project, agent: row.agent, id: row.id })
-    setReloadKey((k) => k + 1)
+    reload()
+  }
+  async function quickDelete(row: TaskRow, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!window.confirm(t('tasks.confirmDelete'))) return
+    await apiPost('/api/v1/tasks/delete', { project: row.project, agent: row.agent, id: row.id })
+    reload()
   }
 
   return (
@@ -411,18 +471,40 @@ function TasksPanel() {
       {/* Filters */}
       <div className="shrink-0 px-8 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setChecked(new Set()) }} className={selectCls}>
             <option value="">{t('tasks.filterStatus')}: {t('messages.readAll')}</option>
-            {Object.keys(statusLabel).map((s) => <option key={s} value={s}>{statusLabel[s]}</option>)}
+            {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
           </select>
           {projects.length > 1 && (
-            <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={cn(selectCls, 'font-mono')}>
+            <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setChecked(new Set()) }} className={cn(selectCls, 'font-mono')}>
               <option value="">{t('workbench.filterProject')}: {t('workbench.allProjects')}</option>
               {projects.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
+          {firstProject && (
+            <div className="ml-auto">
+              <CreateTaskDialog projectId={firstProject.projectId} agents={firstProject.agents} allProjectsAgents={projectsAgents} onCreated={reload} />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Batch bar */}
+      {someChecked && (
+        <div className="shrink-0 flex items-center gap-4 border-y border-sky-200/80 bg-sky-50/50 px-8 py-3 dark:border-sky-900/30 dark:bg-sky-950/20">
+          <span className="text-sm font-medium text-sky-800 dark:text-sky-300">{t('messages.selected', { count: String(checked.size) })}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={batchBusy} onClick={() => void batchCancel()} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{t('tasks.batchCancel')}</button>
+            <button type="button" disabled={batchBusy} onClick={() => void batchArchive()} className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">{t('tasks.batchArchive')}</button>
+            <button type="button" disabled={batchBusy} onClick={() => void batchDelete()} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">{t('tasks.batchDelete')}</button>
+          </div>
+          <button type="button" onClick={() => setChecked(new Set())} className="ml-auto text-sm text-sky-600 hover:text-sky-800 dark:text-sky-400">{t('forms.cancel')}</button>
+        </div>
+      )}
+
+      {/* Detail / Edit modals */}
+      {editRow && <EditTaskModal task={editRow} onClose={() => setEditRow(null)} onSaved={reload} />}
+      {detailRow && <TaskDetailModal task={detailRow} onClose={() => setDetailRow(null)} onEdit={(r) => { setDetailRow(null); setEditRow(r) }} />}
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-8 pb-8">
@@ -443,16 +525,32 @@ function TasksPanel() {
         )}
         {state.status === 'ok' && tasks.length > 0 && (
           <div className="space-y-3">
+            {/* Select all */}
+            <div className="flex items-center gap-2 px-1">
+              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-4 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
+              <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('messages.selectAll', { defaultValue: 'Select all' })}</span>
+            </div>
+
             {tasks.map((row) => {
               const prio = priorityLabel[row.priority] ?? priorityLabel[2]
               const sCls = statusColor[row.status] ?? statusColor.pending
               const terminal = isTerminal(row.status)
+              const isChecked = checked.has(row.id)
               return (
                 <div
                   key={row.id}
-                  className="group rounded-xl border border-neutral-200/80 bg-white transition-all duration-150 hover:border-neutral-300/60 hover:shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900/20 dark:hover:border-zinc-700/60"
+                  onClick={() => setDetailRow(row)}
+                  className={cn(
+                    'group rounded-xl border transition-all duration-150 cursor-pointer',
+                    isChecked
+                      ? 'border-sky-300 bg-sky-50/50 shadow-sm dark:border-sky-800 dark:bg-sky-900/10'
+                      : 'border-neutral-200/80 bg-white hover:border-neutral-300/60 hover:shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900/20 dark:hover:border-zinc-700/60',
+                  )}
                 >
                   <div className="flex items-start gap-4 px-5 py-4">
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(row.id)} className="size-4 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2.5">
                         <span className={cn('text-xs font-bold', prio.cls)}>{prio.text}</span>
@@ -461,30 +559,56 @@ function TasksPanel() {
                           <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">{row.type}</span>
                         )}
                         <span className={cn('ml-auto inline-block shrink-0 rounded-full px-3 py-0.5 text-[11px] font-semibold', sCls)}>
-                          {statusLabel[row.status] ?? row.status}
+                          {t(`tasks.status.${row.status}`, { defaultValue: row.status })}
                         </span>
                       </div>
+                      {row.prompt && (
+                        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-500 dark:text-zinc-500">
+                          {row.prompt.replace(/\s+/g, ' ').slice(0, 200)}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500 dark:text-zinc-500">
                         <Link
                           to={`/projects/${encodeURIComponent(row.project)}/tasks`}
+                          onClick={(e) => e.stopPropagation()}
                           className="font-mono text-sky-700 underline-offset-2 hover:underline dark:text-sky-400"
                         >
                           {row.project}
                         </Link>
                         <span className="font-mono text-neutral-400 dark:text-zinc-600">{row.agent}</span>
+                        {row.assignee && row.assignee !== row.agent && (
+                          <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                            → {row.assignee}
+                          </span>
+                        )}
                         <span className="text-neutral-400 dark:text-zinc-600">{fmt(row.updatedAt)}</span>
                       </div>
-                      <p className="mt-1 font-mono text-xs text-neutral-300 dark:text-zinc-700">{row.id}</p>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-800/40">
+                  {/* Quick actions */}
+                  <div
+                    className="flex items-center gap-3 border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-800/40"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDetailRow(null); setEditRow(row) }}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20"
+                      >
+                        <Pencil className="size-3" strokeWidth={2} />
+                        {t('tasks.edit')}
+                      </button>
+                    </div>
                     <div className="ml-auto flex items-center gap-2">
                       {!terminal && (
-                        <button type="button" onClick={() => void quickCancel(row)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20">{t('tasks.cancel')}</button>
+                        <button type="button" onClick={(e) => void quickCancel(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20">{t('tasks.cancel')}</button>
                       )}
-                      <button type="button" onClick={() => void quickArchive(row)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800">{t('tasks.archive')}</button>
+                      <button type="button" onClick={(e) => void quickArchive(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800">{t('tasks.archive')}</button>
+                      <button type="button" onClick={(e) => void quickDelete(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+                        <Trash2 className="size-3.5" strokeWidth={1.8} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -536,6 +660,7 @@ function TabButton({
 export default function WorkbenchPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('messages')
+  const projectsAgents = useProjectsAgents()
 
   const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?read=unread', 0)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
@@ -545,9 +670,6 @@ export default function WorkbenchPage() {
       {/* Header */}
       <div className="shrink-0 px-8 pt-6 pb-0">
         <div className="flex items-center gap-3.5">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900/30">
-            <Briefcase className="size-5 text-sky-600 dark:text-sky-400" strokeWidth={1.8} />
-          </div>
           <div>
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{t('workbench.title')}</h1>
             <p className="mt-0.5 text-sm text-neutral-500 dark:text-zinc-500">{t('workbench.subtitle')}</p>
@@ -570,8 +692,8 @@ export default function WorkbenchPage() {
       </div>
 
       {/* Panel */}
-      {tab === 'messages' && <MessagesPanel />}
-      {tab === 'tasks' && <TasksPanel />}
+      {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} />}
+      {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} />}
     </div>
   )
 }

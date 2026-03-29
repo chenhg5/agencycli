@@ -25,11 +25,13 @@ const ctxUserKey contextKey = "auth-user"
 
 // Server serves JSON for one workspace root.
 type Server struct {
-	root   string
-	apiKey string
-	st     store.Store
-	ts     taskstore.Store
-	users  *UserStore
+	root    string
+	apiKey  string
+	version string
+	st      store.Store
+	ts      taskstore.Store
+	users   *UserStore
+	sched   *SchedulerManager
 }
 
 // NewServer builds an API server for the given workspace root.
@@ -41,8 +43,12 @@ func NewServer(root, apiKey string) *Server {
 		st:     store.NewFS(root),
 		ts:     taskstore.New(root),
 		users:  newUserStore(root),
+		sched:  newSchedulerManager(root),
 	}
 }
+
+// SetVersion sets the build version string exposed via /api/v1/health.
+func (s *Server) SetVersion(v string) { s.version = v }
 
 // Handler returns the root HTTP handler (includes optional auth).
 func (s *Server) Handler() http.Handler {
@@ -94,8 +100,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/skills/{name}", s.handlePutSkillPrompt)
 	mux.HandleFunc("POST /api/v1/roles/skills", s.handlePostRoleSkillBind)
 	mux.HandleFunc("POST /api/v1/teams/skills", s.handlePostTeamSkillBind)
+	mux.HandleFunc("POST /api/v1/roles/create", s.handleCreateRole)
+	mux.HandleFunc("POST /api/v1/projects/{name}/hire", s.handleHireAgent)
 	mux.HandleFunc("GET /api/v1/workbench/messages", s.handleWorkbenchMessages)
 	mux.HandleFunc("GET /api/v1/workbench/tasks", s.handleWorkbenchTasks)
+	mux.HandleFunc("GET /api/v1/scheduler/status", s.handleSchedulerStatus)
+	mux.HandleFunc("POST /api/v1/scheduler/start", s.handleSchedulerStart)
+	mux.HandleFunc("POST /api/v1/scheduler/stop", s.handleSchedulerStop)
+	mux.HandleFunc("POST /api/v1/scheduler/wakeup", s.handleSchedulerWakeup)
 	mux.HandleFunc("GET /api/v1/inbox", s.handleInbox)
 	mux.HandleFunc("GET /api/v1/auth/me", s.handleAuthMe)
 	mux.HandleFunc("PUT /api/v1/auth/password", s.handleChangePassword)
@@ -144,7 +156,11 @@ func (s *Server) withTokenAuth(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	v := s.version
+	if v == "" {
+		v = "dev"
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "version": v})
 }
 
 func (s *Server) handleAgency(w http.ResponseWriter, _ *http.Request) {

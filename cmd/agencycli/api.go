@@ -47,6 +47,7 @@ Authorization: Bearer <key>.`,
 			}
 			key := api.ResolveAPIKey(apiKey)
 			srv := api.NewServer(root, key)
+			srv.SetVersion(version)
 			log.Printf("agencycli api listening on http://%s (workspace %s)", addr, root)
 			if key != "" {
 				log.Printf("API key auth enabled (set AGENCYCLI_WEB_API_KEY or --api-key)")

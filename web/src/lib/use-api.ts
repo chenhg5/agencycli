@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './api'
 
 export type ApiState<T> =
@@ -8,15 +8,18 @@ export type ApiState<T> =
 
 export function useApiJson<T>(path: string | null, reloadKey = 0): ApiState<T> {
   const [state, setState] = useState<ApiState<T>>({ status: 'loading' })
+  const prevPath = useRef(path)
 
   useEffect(() => {
     if (path == null) {
       return
     }
     let cancelled = false
-    startTransition(() => {
+    const pathChanged = prevPath.current !== path
+    prevPath.current = path
+    if (pathChanged) {
       setState({ status: 'loading' })
-    })
+    }
     const url = reloadKey ? `${path}${path.includes('?') ? '&' : '?'}_=${reloadKey}` : path
     apiFetch<T>(url)
       .then((data) => {

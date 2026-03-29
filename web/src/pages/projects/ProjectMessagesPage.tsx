@@ -244,12 +244,12 @@ export default function ProjectMessagesPage() {
                   <th className="w-10 px-3 py-2.5 text-center">
                     <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked }} onChange={toggleAll} className="size-3.5 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTime')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColFrom')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTo')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColPreview')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('messages.colStatus')}</th>
-                  <th className="sticky right-0 bg-neutral-50/95 px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-neutral-400 backdrop-blur-sm dark:bg-zinc-900/95 dark:text-zinc-600">
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTime')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColFrom')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTo')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColPreview')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('messages.colStatus')}</th>
+                  <th className="sticky right-0 bg-neutral-50/95 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 backdrop-blur-sm dark:bg-zinc-900/95 dark:text-zinc-600">
                     {t('messages.actions')}
                   </th>
                 </tr>

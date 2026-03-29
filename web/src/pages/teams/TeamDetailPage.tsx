@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Users, Save, ChevronDown, ChevronRight, FileText, Puzzle, Plus, X } from 'lucide-react'
+import { CreateRoleDialog } from '../../components/team/CreateRoleDialog'
 import { cn } from '../../lib/cn'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { apiTeamPath, apiPut, apiPost } from '../../lib/api'
@@ -378,9 +379,18 @@ export default function TeamDetailPage() {
 
             {/* Roles with prompts & skills */}
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
-                {t('prompt.roles')}
-              </h3>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+                  {t('prompt.roles')}
+                </h3>
+                {teamId && (
+                  <CreateRoleDialog
+                    teamPath={teamId}
+                    allSkills={allSkills}
+                    onCreated={() => setReloadKey((k) => k + 1)}
+                  />
+                )}
+              </div>
               {state.data.roles.length > 0 ? (
                 <div className="overflow-hidden rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
                   {state.data.roles.map((r) => (

@@ -117,6 +117,9 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 				if t == nil || isWakeup(t) {
 					continue
 				}
+				if ag != "human" && t.Assignee != "human" {
+				continue
+			}
 				if statusFilter != "" && string(t.Status) != statusFilter {
 					continue
 				}

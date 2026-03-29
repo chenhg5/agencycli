@@ -247,7 +247,7 @@ export default function ProjectRunsPage() {
               <thead>
                 <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
                   {[t('runs.colAgent'), t('runs.colRuns'), t('runs.colInTok'), t('runs.colOutTok'), t('runs.colCost')].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{h}</th>
+                    <th key={h} className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -306,11 +306,11 @@ export default function ProjectRunsPage() {
             <table className="min-w-[700px] w-full">
               <thead>
                 <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStarted')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colAgent')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colKind')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStatus')}</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colTok')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStarted')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colAgent')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colKind')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStatus')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colTok')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">

@@ -637,6 +637,14 @@ type HeartbeatConfig struct {
 	// evaluation: "met", "not_met", or "" (never evaluated).
 	LastConditionStatus string     `yaml:"last_condition_status,omitempty"`
 	LastConditionAt     *time.Time `yaml:"last_condition_at,omitempty"`
+
+	// Scheduler runtime stats (persisted across scheduler restarts).
+	WakeupCount      int        `yaml:"wakeup_count,omitempty"`
+	WakeupCountToday int        `yaml:"wakeup_count_today,omitempty"`
+	WakeupDate       string     `yaml:"wakeup_date,omitempty"`
+	LastCycleDuration string    `yaml:"last_cycle_duration,omitempty"`
+	NextWakeupAt     *time.Time `yaml:"next_wakeup_at,omitempty"`
+	SchedulerStartedAt *time.Time `yaml:"scheduler_started_at,omitempty"`
 }
 
 // ─────────────────────────────────────────────
@@ -655,6 +663,7 @@ type Cron struct {
 
 	LastRun       *time.Time `yaml:"last_run,omitempty"`
 	LastRunStatus string     `yaml:"last_run_status,omitempty"`
+	RunCount      int        `yaml:"run_count,omitempty"`
 }
 
 // ─────────────────────────────────────────────

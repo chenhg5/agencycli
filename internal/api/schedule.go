@@ -82,6 +82,9 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		"lastWakeupStatus":      h.LastWakeupStatus,
 		"sessionId":             h.SessionID,
 		"lastConditionStatus":   h.LastConditionStatus,
+		"wakeupCount":           h.WakeupCount,
+		"wakeupCountToday":      h.WakeupCountToday,
+		"lastCycleDuration":     h.LastCycleDuration,
 	}
 	if h.LastWakeup != nil {
 		out["lastWakeup"] = h.LastWakeup.UTC().Format(time.RFC3339Nano)
@@ -91,6 +94,12 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 	}
 	if h.LastConditionAt != nil {
 		out["lastConditionAt"] = h.LastConditionAt.UTC().Format(time.RFC3339Nano)
+	}
+	if h.NextWakeupAt != nil {
+		out["nextWakeupAt"] = h.NextWakeupAt.UTC().Format(time.RFC3339Nano)
+	}
+	if h.SchedulerStartedAt != nil {
+		out["schedulerStartedAt"] = h.SchedulerStartedAt.UTC().Format(time.RFC3339Nano)
 	}
 	return out
 }
@@ -102,6 +111,7 @@ func cronToJSON(c *entity.Cron) map[string]any {
 		"schedule": c.Schedule,
 		"enabled":  c.Enabled,
 		"prompt":   c.Prompt,
+		"runCount": c.RunCount,
 	}
 	if c.LastRun != nil {
 		out["lastRun"] = c.LastRun.UTC().Format(time.RFC3339Nano)

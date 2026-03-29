@@ -22,7 +22,7 @@ export type NavKey =
   | 'settings'
 
 /** 项目内执行面：`projectNav.*` */
-export type ProjectNavKey = 'tasks' | 'messages' | 'members' | 'schedule' | 'runs'
+export type ProjectNavKey = 'tasks' | 'messages' | 'members' | 'schedule' | 'runs' | 'settings'
 
 export type NavItem = {
   to: string
@@ -58,6 +58,7 @@ export const projectSubNav: ProjectNavItem[] = [
   { segment: 'members', icon: Users },
   { segment: 'schedule', icon: CalendarClock },
   { segment: 'runs', icon: BarChart3 },
+  { segment: 'settings', icon: Settings },
 ]
 
 export function navKeyFromPath(pathname: string): NavKey {
@@ -82,7 +83,7 @@ export function projectIdFromPath(pathname: string): string | null {
 
 export function projectNavKeyFromPath(pathname: string): ProjectNavKey | null {
   const m =
-    /^\/projects\/[^/]+\/(tasks|messages|members|schedule|runs)(?:\/|$)/.exec(pathname)
+    /^\/projects\/[^/]+\/(tasks|messages|members|schedule|runs|settings)(?:\/|$)/.exec(pathname)
   return (m?.[1] as ProjectNavKey) ?? null
 }
 

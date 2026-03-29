@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiPost } from '../../lib/api'
 
@@ -6,18 +6,22 @@ const TASK_TYPES = ['chore', 'feature', 'bug', 'review', 'triage', 'test', 'rese
 
 type AgentOpt = { name: string }
 
+type ProjectAgentsOpt = { projectId: string; agents: AgentOpt[] }
+
 type Props = {
   projectId: string
   agents: AgentOpt[]
+  allProjectsAgents?: ProjectAgentsOpt[]
   onCreated: () => void
 }
 
 const fieldCls =
   'mt-1 w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none transition-colors focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
 
-export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
+export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultAgents, allProjectsAgents, onCreated }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [selectedProject, setSelectedProject] = useState(defaultProjectId)
   const [agent, setAgent] = useState('')
   const [title, setTitle] = useState('')
   const [prompt, setPrompt] = useState('')
@@ -27,8 +31,21 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  const multiProject = Boolean(allProjectsAgents && allProjectsAgents.length > 1)
+
+  const currentAgents = useMemo(() => {
+    if (!allProjectsAgents) return defaultAgents
+    return allProjectsAgents.find((p) => p.projectId === selectedProject)?.agents ?? []
+  }, [allProjectsAgents, selectedProject, defaultAgents])
+
+  const allAgentsFlat = useMemo(() => {
+    if (!allProjectsAgents) return defaultAgents.map((a) => ({ projectId: defaultProjectId, name: a.name }))
+    return allProjectsAgents.flatMap((p) => p.agents.map((a) => ({ projectId: p.projectId, name: a.name })))
+  }, [allProjectsAgents, defaultAgents, defaultProjectId])
+
   function reset() {
-    setAgent(agents[0]?.name ?? '')
+    setSelectedProject(defaultProjectId)
+    setAgent('')
     setTitle('')
     setPrompt('')
     setTaskType('chore')
@@ -40,6 +57,18 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
   function openDialog() {
     reset()
     setOpen(true)
+    setTimeout(() => {
+      const first = allProjectsAgents
+        ? (allProjectsAgents.find((p) => p.projectId === defaultProjectId)?.agents[0]?.name ?? '')
+        : (defaultAgents[0]?.name ?? '')
+      setAgent(first)
+    }, 0)
+  }
+
+  function onProjectChange(proj: string) {
+    setSelectedProject(proj)
+    const projAgents = allProjectsAgents?.find((p) => p.projectId === proj)?.agents ?? []
+    setAgent(projAgents[0]?.name ?? '')
   }
 
   async function onSubmit(e: FormEvent) {
@@ -52,7 +81,7 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
     setBusy(true)
     try {
       await apiPost<{ id: string }>(
-        `/api/v1/projects/${encodeURIComponent(projectId)}/tasks`,
+        `/api/v1/projects/${encodeURIComponent(selectedProject)}/tasks`,
         {
           agent: agent.trim(),
           title: title.trim(),
@@ -76,7 +105,7 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
       <button
         type="button"
         onClick={openDialog}
-        className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-sky-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+        className="rounded-lg border border-sky-600 bg-white px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-500 dark:bg-zinc-900 dark:text-sky-400 dark:hover:bg-zinc-800"
       >
         {t('forms.createTask')}
       </button>
@@ -98,14 +127,23 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
               </h2>
             </div>
             <form onSubmit={onSubmit} className="space-y-3 px-4 py-3">
-              {agents.length === 0 && (
+              {multiProject && (
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('workbench.filterProject')}</span>
+                  <select value={selectedProject} onChange={(e) => onProjectChange(e.target.value)} className={fieldCls}>
+                    {allProjectsAgents!.map((p) => <option key={p.projectId} value={p.projectId}>{p.projectId}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {currentAgents.length === 0 && (
                 <p className="text-sm text-amber-800 dark:text-amber-400">{t('forms.needAgentsForTask')}</p>
               )}
 
               <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('forms.agent')}</span>
-                <select value={agent} onChange={(e) => setAgent(e.target.value)} className={fieldCls} disabled={agents.length === 0}>
-                  {agents.map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
+                <select value={agent} onChange={(e) => setAgent(e.target.value)} className={fieldCls} disabled={currentAgents.length === 0}>
+                  {currentAgents.map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
                 </select>
               </label>
 
@@ -114,7 +152,11 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
                 <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={fieldCls}>
                   <option value="">{t('tasks.assignDefault')}</option>
                   <option value="human">human</option>
-                  {agents.map((a) => <option key={a.name} value={`${projectId}/${a.name}`}>{projectId}/{a.name}</option>)}
+                  {allAgentsFlat.map((a) => (
+                    <option key={`${a.projectId}/${a.name}`} value={`${a.projectId}/${a.name}`}>
+                      {a.projectId}/{a.name}
+                    </option>
+                  ))}
                 </select>
                 <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-600">{t('tasks.assignHint')}</p>
               </label>
@@ -147,7 +189,7 @@ export function CreateTaskDialog({ projectId, agents, onCreated }: Props) {
               {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setOpen(false)} disabled={busy} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-zinc-600">{t('forms.cancel')}</button>
-                <button type="submit" disabled={busy || agents.length === 0} className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">{busy ? t('forms.saving') : t('forms.submit')}</button>
+                <button type="submit" disabled={busy || currentAgents.length === 0} className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">{busy ? t('forms.saving') : t('forms.submit')}</button>
               </div>
             </form>
           </div>
