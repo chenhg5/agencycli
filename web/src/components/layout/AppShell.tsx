@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ChevronRight } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { CommandPalette } from './CommandPalette'
+import { PageTabsProvider } from '../../lib/page-tabs'
 import { recordVisit } from '../../lib/recent-visits'
 import { apiFetch } from '../../lib/api'
 import {
@@ -50,6 +52,38 @@ function useBreadcrumbs(): BreadcrumbSegment[] {
   return [{ label: t(`nav.${key}`) }]
 }
 
+function Breadcrumbs({ crumbs }: { crumbs: BreadcrumbSegment[] }) {
+  return (
+    <nav className="flex min-w-0 items-center gap-0.5 overflow-hidden px-5 py-1.5">
+      {crumbs.map((seg, i) => {
+        const isLast = i === crumbs.length - 1
+        return (
+          <div key={`${seg.label}-${i}`} className="flex items-center gap-0.5">
+            {i > 0 && (
+              <ChevronRight
+                className="mx-0.5 size-3 shrink-0 text-neutral-300 dark:text-zinc-700"
+                strokeWidth={1.8}
+              />
+            )}
+            {seg.to && !isLast ? (
+              <Link
+                to={seg.to}
+                className="truncate rounded-sm px-1 py-0.5 text-[12px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-zinc-500 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
+              >
+                {seg.label}
+              </Link>
+            ) : (
+              <span className="truncate px-1 py-0.5 text-[12px] font-medium text-neutral-700 dark:text-zinc-300">
+                {seg.label}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </nav>
+  )
+}
+
 const SIDEBAR_KEY = 'sidebar-collapsed'
 
 export function AppShell() {
@@ -81,31 +115,36 @@ export function AppShell() {
     }
   }, [pathname, crumbs])
 
+  const pageTitle = crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''
+
   return (
-    <div className="flex h-dvh bg-neutral-50 text-neutral-900 dark:bg-zinc-950 dark:text-zinc-200">
-      <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar breadcrumbs={crumbs} onOpenSearch={() => setSearchOpen(true)} collapsed={collapsed} onToggleSidebar={toggleSidebar} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <Outlet />
-        </main>
-        <footer className="flex h-10 w-full shrink-0 items-center justify-between border-t border-neutral-200/60 px-6 dark:border-zinc-800/50">
-          <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
-            agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">{appVersion}</span>
-          </span>
-          <div className="flex items-center gap-3">
-            <a href="https://github.com/chenhg5/agencycli/wiki" target="_blank" rel="noopener noreferrer"
-              className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
-              {t('footer.docs')}
-            </a>
-            <a href="https://github.com/chenhg5/agencycli" target="_blank" rel="noopener noreferrer"
-              className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
-              GitHub
-            </a>
-          </div>
-        </footer>
+    <PageTabsProvider pageTitle={pageTitle}>
+      <div className="flex h-dvh bg-neutral-50 text-neutral-900 dark:bg-zinc-950 dark:text-zinc-200">
+        <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <TopBar onOpenSearch={() => setSearchOpen(true)} collapsed={collapsed} onToggleSidebar={toggleSidebar} />
+          <Breadcrumbs crumbs={crumbs} />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            <Outlet />
+          </main>
+          <footer className="flex h-10 w-full shrink-0 items-center justify-between border-t border-neutral-200/60 px-6 dark:border-zinc-800/50">
+            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
+              agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">{appVersion}</span>
+            </span>
+            <div className="flex items-center gap-3">
+              <a href="https://github.com/chenhg5/agencycli/wiki" target="_blank" rel="noopener noreferrer"
+                className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+                {t('footer.docs')}
+              </a>
+              <a href="https://github.com/chenhg5/agencycli" target="_blank" rel="noopener noreferrer"
+                className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+                GitHub
+              </a>
+            </div>
+          </footer>
+        </div>
+        <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
       </div>
-      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
-    </div>
+    </PageTabsProvider>
   )
 }

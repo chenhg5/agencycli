@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Users, RefreshCw, Save, ChevronDown, ChevronRight, Bot, BookOpen, Puzzle } from 'lucide-react'
+import { Users, RefreshCw, Save, ChevronDown, ChevronRight, Bot, BookOpen, Puzzle, Check } from 'lucide-react'
 import { HireAgentDialog } from '../../components/project/HireAgentDialog'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -11,6 +11,11 @@ import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 import { apiPost, apiPut } from '../../lib/api'
+
+const AGENT_MODELS = [
+  'claudecode', 'codex', 'cursor', 'gemini',
+  'qoder', 'opencode', 'iflow', 'generic-cli', 'http-agent',
+] as const
 
 type SessionInfo = { sessionId?: string; sessionStartedAt?: string; sessionScope?: string }
 
@@ -22,6 +27,14 @@ type AgentRow = {
   hiredAt: string
 }
 
+type HTTPAgentConfig = {
+  url?: string
+  model?: string
+  api_key?: string
+  timeout?: string
+  stream?: boolean
+}
+
 type AgentContext = {
   contextFile: string
   context: string
@@ -31,6 +44,7 @@ type AgentContext = {
   role: string
   syncedAt: string | null
   skills: string[]
+  httpAgent?: HTTPAgentConfig
 }
 
 function PromptEditor({ label, icon: Icon, apiPath, initialContent }: { label: string; icon: LucideIcon; apiPath: string; initialContent: string }) {
@@ -140,7 +154,112 @@ function SessionPanel({ project, agentName }: { project: string; agentName: stri
   )
 }
 
-function AgentDetail({ project, agentName }: { project: string; agentName: string }) {
+function ModelSelector({ project, agentName, currentModel, currentHttpAgent, onChanged }: {
+  project: string; agentName: string; currentModel: string; currentHttpAgent?: HTTPAgentConfig; onChanged: () => void
+}) {
+  const { t } = useTranslation()
+  const [model, setModel] = useState(currentModel)
+  const [httpUrl, setHttpUrl] = useState(currentHttpAgent?.url ?? '')
+  const [httpModel, setHttpModel] = useState(currentHttpAgent?.model ?? '')
+  const [httpApiKey, setHttpApiKey] = useState(currentHttpAgent?.api_key ?? '')
+  const [httpTimeout, setHttpTimeout] = useState(currentHttpAgent?.timeout ?? '10m')
+  const [httpStream, setHttpStream] = useState(currentHttpAgent?.stream ?? true)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const isHttp = model === 'http-agent'
+  const modelDirty = model !== currentModel
+  const httpDirty = isHttp && (
+    httpUrl !== (currentHttpAgent?.url ?? '') ||
+    httpModel !== (currentHttpAgent?.model ?? '') ||
+    httpApiKey !== (currentHttpAgent?.api_key ?? '') ||
+    httpTimeout !== (currentHttpAgent?.timeout ?? '10m') ||
+    httpStream !== (currentHttpAgent?.stream ?? true)
+  )
+  const dirty = modelDirty || httpDirty
+
+  async function apply() {
+    setBusy(true); setResult(null)
+    try {
+      const body: Record<string, unknown> = { model }
+      if (isHttp) {
+        body.httpUrl = httpUrl
+        body.httpModel = httpModel
+        body.httpApiKey = httpApiKey
+        body.httpTimeout = httpTimeout
+        body.httpStream = httpStream
+      }
+      const res = await apiPost<{ ok: boolean; output: string }>(
+        `/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agentName)}/set-model`,
+        body,
+      )
+      setResult({ ok: true, msg: res.output || t('forms.saved') })
+      onChanged()
+    } catch (e) {
+      setResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
+    } finally { setBusy(false) }
+  }
+
+  const inputCls = 'h-7 rounded-md border border-neutral-200 bg-white px-2 text-xs text-neutral-700 outline-none hover:border-neutral-300 focus:border-sky-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-neutral-500 dark:text-zinc-500">{t('members.model')}:</span>
+        <select
+          value={model}
+          onChange={(e) => { setModel(e.target.value); setResult(null) }}
+          disabled={busy}
+          className={cn(inputCls, 'font-medium')}
+        >
+          {AGENT_MODELS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        {dirty && (
+          <button
+            type="button"
+            onClick={() => void apply()}
+            disabled={busy}
+            className="flex items-center gap-1 rounded-md bg-sky-600 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+          >
+            {busy ? t('forms.saving') : t('forms.apply')}
+          </button>
+        )}
+        {result && (
+          <span className={cn('text-[11px]', result.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>
+            {result.ok && <Check className="mr-0.5 inline size-3" strokeWidth={2} />}
+            {result.msg.split('\n')[0]}
+          </span>
+        )}
+      </div>
+      {isHttp && (
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 pl-0.5 text-xs">
+          <span className="text-neutral-500 dark:text-zinc-500">URL *</span>
+          <input value={httpUrl} onChange={(e) => setHttpUrl(e.target.value)} disabled={busy}
+            placeholder="http://localhost:11434/v1/chat/completions" className={cn(inputCls, 'w-full')} />
+          <span className="text-neutral-500 dark:text-zinc-500">Model</span>
+          <input value={httpModel} onChange={(e) => setHttpModel(e.target.value)} disabled={busy}
+            placeholder="llama3.2, gpt-4o, ..." className={cn(inputCls, 'w-full')} />
+          <span className="text-neutral-500 dark:text-zinc-500">API Key</span>
+          <input value={httpApiKey} onChange={(e) => setHttpApiKey(e.target.value)} disabled={busy}
+            type="password" placeholder="Bearer token" className={cn(inputCls, 'w-full')} />
+          <span className="text-neutral-500 dark:text-zinc-500">Timeout</span>
+          <input value={httpTimeout} onChange={(e) => setHttpTimeout(e.target.value)} disabled={busy}
+            placeholder="10m" className={cn(inputCls, 'w-24')} />
+          <span className="text-neutral-500 dark:text-zinc-500">Stream</span>
+          <label className="flex cursor-pointer items-center gap-1.5">
+            <input type="checkbox" checked={httpStream} onChange={(e) => setHttpStream(e.target.checked)} disabled={busy}
+              className="size-3.5 rounded border-neutral-300 text-sky-600 focus:ring-sky-400" />
+            <span className="text-neutral-500 dark:text-zinc-400">SSE</span>
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AgentDetail({ project, agentName, onModelChanged }: { project: string; agentName: string; onModelChanged?: () => void }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
 
@@ -182,12 +301,21 @@ function AgentDetail({ project, agentName }: { project: string; agentName: strin
   return (
     <div className="space-y-4 pb-2 pt-1">
       {/* Meta */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-neutral-500 dark:text-zinc-500">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-neutral-500 dark:text-zinc-500">
         {ctx.team && <span>{t('prompt.team')}: <span className="font-medium text-neutral-700 dark:text-zinc-300">{ctx.team}</span></span>}
         {ctx.role && <span>{t('prompt.role')}: <span className="font-medium text-neutral-700 dark:text-zinc-300">{ctx.role}</span></span>}
         <span>{t('prompt.contextFile')}: <span className="font-mono text-neutral-700 dark:text-zinc-300">{ctx.contextFile}</span></span>
         {ctx.syncedAt && <span>{t('prompt.lastSync')}: {fmt(ctx.syncedAt)}</span>}
       </div>
+
+      {/* Model selector */}
+      <ModelSelector
+        project={project}
+        agentName={agentName}
+        currentModel={ctx.model}
+        currentHttpAgent={ctx.httpAgent}
+        onChanged={() => { setCtxReload((k) => k + 1); onModelChanged?.() }}
+      />
 
       {/* Skills */}
       {ctx.skills && ctx.skills.length > 0 && (
@@ -344,7 +472,7 @@ export default function ProjectMembersPage() {
                   </button>
                   {isOpen && projectId && (
                     <div className="border-t border-neutral-100 px-4 py-3 dark:border-zinc-800/40">
-                      <AgentDetail project={projectId} agentName={row.name} />
+                      <AgentDetail project={projectId} agentName={row.name} onModelChanged={() => setReloadKey((k) => k + 1)} />
                     </div>
                   )}
                 </div>

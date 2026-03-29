@@ -462,6 +462,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 					// We are currently outside the window: sleep until it opens.
 					nextWake := nextWindowStart(hb)
 					if nextWake > 0 {
+						hb.NextWakeupAt = nil
+						_ = ts.SaveHeartbeat(project, agentName, hb)
 						agentLog("%s outside active window — sleeping %s until window opens at %s",
 							colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
 						select {
@@ -486,6 +488,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			// opens instead so the cycle check handles it correctly without
 			// hammering the agent with back-to-back wakes.
 			if waitDur < time.Second {
+				hb.NextWakeupAt = nil
+				_ = ts.SaveHeartbeat(project, agentName, hb)
 				if hb.LastWakeup == nil {
 					agentLog("%s first wakeup deferred — waiting for active window at %s",
 						colorDim+"○", hb.ActiveHours)
@@ -523,6 +527,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		if !isInActiveWindow(hb) {
 			nextWake := nextWindowStart(hb)
 			if nextWake > 0 {
+				hb.NextWakeupAt = nil
+				_ = ts.SaveHeartbeat(project, agentName, hb)
 				agentLog("%s outside active window — sleeping %s until window opens",
 					colorDim+"○", nextWake.Round(time.Minute))
 				select {

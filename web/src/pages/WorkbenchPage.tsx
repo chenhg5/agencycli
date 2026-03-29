@@ -176,7 +176,7 @@ function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: (
 
 /* ── Messages panel ───────────────────────────────────────────────────────── */
 
-function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
+function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectAgents[]; onMutated?: () => void }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [filters, setFilters] = useState<Filters>({ ...defaultFilters })
@@ -205,12 +205,14 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
   }
   function getCheckedRows() { return messages.filter((m) => checked.has(m.id)) }
 
+  function reloadAndNotify() { setReloadKey((k) => k + 1); onMutated?.() }
+
   async function batchMarkRead() {
     setBatchBusy(true)
     try {
       for (const row of getCheckedRows().filter((r) => !r.readAt))
         await apiPost('/api/v1/messages/mark-read', { mailbox: row.mailbox, id: row.id })
-      setChecked(new Set()); setReloadKey((k) => k + 1)
+      setChecked(new Set()); reloadAndNotify()
     } finally { setBatchBusy(false) }
   }
   async function batchArchive() {
@@ -218,7 +220,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
     try {
       for (const row of getCheckedRows().filter((r) => !r.archivedAt))
         await apiPost('/api/v1/messages/archive', { mailbox: row.mailbox, id: row.id })
-      setChecked(new Set()); setReloadKey((k) => k + 1)
+      setChecked(new Set()); reloadAndNotify()
     } finally { setBatchBusy(false) }
   }
   async function batchDelete() {
@@ -228,19 +230,19 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
     try {
       for (const row of getCheckedRows())
         await apiPost('/api/v1/messages/delete', { mailbox: row.mailbox, id: row.id })
-      setChecked(new Set()); setReloadKey((k) => k + 1)
+      setChecked(new Set()); reloadAndNotify()
     } finally { setBatchBusy(false) }
   }
 
   async function quickMarkRead(row: MessageRow, e: React.MouseEvent) {
     e.stopPropagation()
     await apiPost('/api/v1/messages/mark-read', { mailbox: row.mailbox, id: row.id })
-    setReloadKey((k) => k + 1)
+    reloadAndNotify()
   }
   async function quickArchive(row: MessageRow, e: React.MouseEvent) {
     e.stopPropagation()
     await apiPost('/api/v1/messages/archive', { mailbox: row.mailbox, id: row.id })
-    setReloadKey((k) => k + 1)
+    reloadAndNotify()
   }
 
   return (
@@ -265,7 +267,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
           )}
           {firstProject && (
             <div className="ml-auto">
-              <CreateMessageDialog projectId={firstProject.projectId} agents={firstProject.agents} onSent={() => { setReloadKey((k) => k + 1); setChecked(new Set()) }} />
+              <CreateMessageDialog projectId={firstProject.projectId} agents={firstProject.agents} onSent={() => { reloadAndNotify(); setChecked(new Set()) }} />
             </div>
           )}
         </div>
@@ -286,7 +288,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
         </div>
       )}
 
-      <MessageDetailModal open={selected != null} message={selected} onClose={() => setSelected(null)} onMutated={() => setReloadKey((k) => k + 1)} />
+      <MessageDetailModal open={selected != null} message={selected} onClose={() => setSelected(null)} onMutated={reloadAndNotify} />
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2">
@@ -366,7 +368,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3">
-                      <InlineReply originalFrom={row.from} onSent={() => setReloadKey((k) => k + 1)} />
+                      <InlineReply originalFrom={row.from} onSent={reloadAndNotify} />
                       <div className="ml-auto flex items-center gap-2">
                         {unread && (
                           <button type="button" onClick={(e) => void quickMarkRead(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20">{t('forms.markAsRead')}</button>
@@ -392,7 +394,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
 function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('pending')
   const [projectFilter, setProjectFilter] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [detailRow, setDetailRow] = useState<TaskRow | null>(null)
@@ -667,9 +669,11 @@ export default function WorkbenchPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('messages')
   const projectsAgents = useProjectsAgents()
+  const [badgeKey, setBadgeKey] = useState(0)
 
-  const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?read=unread', 0)
+  const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?read=unread', badgeKey)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
+  const refreshBadge = useCallback(() => setBadgeKey((k) => k + 1), [])
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -698,7 +702,7 @@ export default function WorkbenchPage() {
       </div>
 
       {/* Panel */}
-      {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} />}
+      {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} onMutated={refreshBadge} />}
       {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} />}
     </div>
   )

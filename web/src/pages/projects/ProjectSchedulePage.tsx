@@ -540,10 +540,8 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                     {!isRunningNow && !hb.paused && !hb.lastWakeupStatus && <StatusBadge color="neutral">{t('schedule.waiting')}</StatusBadge>}
                   </td>
                   <td className={tdCls}>
-                    {hb.nextWakeupAt ? (
+                    {hb.nextWakeupAt && new Date(hb.nextWakeupAt) > new Date() ? (
                       <span className="font-mono text-sky-700 dark:text-sky-400">{fmt(hb.nextWakeupAt)}</span>
-                    ) : isRunningNow ? (
-                      <span className="text-neutral-400 dark:text-zinc-600">—</span>
                     ) : '—'}
                   </td>
                   <td className={tdCls}>{hb.lastWakeup ? fmt(hb.lastWakeup) : '—'}</td>

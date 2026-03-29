@@ -196,6 +196,79 @@ func (s *Server) handleRunAgent(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "output": allOutput.String()})
 }
 
+// ── Set Model ────────────────────────────────────────────────────────────────
+
+type setModelBody struct {
+	Model       string `json:"model"`
+	HttpURL     string `json:"httpUrl,omitempty"`
+	HttpModel   string `json:"httpModel,omitempty"`
+	HttpAPIKey  string `json:"httpApiKey,omitempty"`
+	HttpTimeout string `json:"httpTimeout,omitempty"`
+	HttpStream  *bool  `json:"httpStream,omitempty"`
+}
+
+func (s *Server) handleSetModel(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("name")
+	agent := r.PathValue("agent")
+	if project == "" || agent == "" {
+		s.jsonError(w, http.StatusBadRequest, "missing project or agent")
+		return
+	}
+
+	var body setModelBody
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	model := strings.TrimSpace(body.Model)
+	if model == "" {
+		s.jsonError(w, http.StatusBadRequest, "model is required")
+		return
+	}
+
+	args := []string{
+		"--dir", s.root,
+		"agent", "set-model",
+		"--project", project,
+		"--name", agent,
+		"--model", model,
+	}
+
+	if model == "http-agent" {
+		if u := strings.TrimSpace(body.HttpURL); u != "" {
+			args = append(args, "--http-url", u)
+		}
+		if m := strings.TrimSpace(body.HttpModel); m != "" {
+			args = append(args, "--http-model", m)
+		}
+		if k := strings.TrimSpace(body.HttpAPIKey); k != "" {
+			args = append(args, "--http-api-key", k)
+		}
+		if t := strings.TrimSpace(body.HttpTimeout); t != "" {
+			args = append(args, "--http-timeout", t)
+		}
+		if body.HttpStream != nil {
+			if *body.HttpStream {
+				args = append(args, "--http-stream")
+			} else {
+				args = append(args, "--http-stream=false")
+			}
+		}
+	}
+
+	cmd := exec.Command(s.sched.binPath, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("set-model failed: %v\n%s", err, string(out)))
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":     true,
+		"output": string(out),
+	})
+}
+
 // ── Session Reset ────────────────────────────────────────────────────────────
 
 type sessionResetBody struct {

@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronRight, Globe, LogOut, Monitor, Moon, PanelLeft, Search, Settings, Sun } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Globe, LogOut, Monitor, Moon, PanelLeft, Search, Settings, Sun, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { i18n } from '../../i18n'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../theme/ThemeProvider'
-import type { BreadcrumbSegment } from './AppShell'
+import { usePageTabs } from '../../lib/page-tabs'
+import { cn } from '../../lib/cn'
 
 const iconBtn =
   'flex size-7 items-center justify-center rounded-md text-neutral-400 transition-all duration-150 hover:bg-neutral-500/[0.07] hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300'
@@ -128,13 +129,62 @@ function UserMenu() {
   )
 }
 
+function PageTabBar() {
+  const { tabs, activePath, close } = usePageTabs()
+  const navigate = useNavigate()
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (scrollRef.current) scrollRef.current.scrollLeft += e.deltaY
+  }, [])
+
+  if (tabs.length === 0) return null
+
+  return (
+    <div
+      ref={scrollRef}
+      onWheel={handleWheel}
+      className="flex min-w-0 flex-1 items-end gap-0 overflow-x-auto scrollbar-none"
+    >
+      {tabs.map((tab) => {
+        const isActive = tab.path === activePath
+        return (
+          <div
+            key={tab.path}
+            className={cn(
+              'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none',
+              isActive
+                ? 'border-sky-600 text-sky-700 dark:border-sky-400 dark:text-sky-300'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300',
+            )}
+            onClick={() => navigate(tab.path)}
+            title={tab.title}
+          >
+            <span className="truncate">{tab.title}</span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); close(tab.path) }}
+              className={cn(
+                'flex size-4 shrink-0 items-center justify-center rounded transition-colors',
+                isActive
+                  ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700 dark:text-sky-500 dark:hover:bg-sky-900/30'
+                  : 'text-neutral-400 opacity-0 hover:bg-neutral-200 hover:text-neutral-600 group-hover:opacity-100 dark:text-zinc-600 dark:hover:bg-zinc-700',
+              )}
+            >
+              <X className="size-3" strokeWidth={2} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function TopBar({
-  breadcrumbs,
   onOpenSearch,
   collapsed,
   onToggleSidebar,
 }: {
-  breadcrumbs: BreadcrumbSegment[]
   onOpenSearch?: () => void
   collapsed?: boolean
   onToggleSidebar?: () => void
@@ -144,48 +194,24 @@ export function TopBar({
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
 
   return (
-    <header className="flex h-11 w-full shrink-0 items-center justify-between gap-4 border-b border-neutral-200/80 bg-white px-5 dark:border-zinc-800/60 dark:bg-zinc-950">
-      {/* Left */}
-      <nav className="flex min-w-0 items-center gap-0.5 overflow-hidden">
-        {collapsed && onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="mr-2 flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
-            title={t('sidebar.expand')}
-          >
-            <PanelLeft className="size-4" strokeWidth={1.8} />
-          </button>
-        )}
-        {breadcrumbs.map((seg, i) => {
-          const isLast = i === breadcrumbs.length - 1
-          return (
-            <div key={`${seg.label}-${i}`} className="flex items-center gap-0.5">
-              {i > 0 && (
-                <ChevronRight
-                  className="mx-0.5 size-3.5 shrink-0 text-neutral-300 dark:text-zinc-700"
-                  strokeWidth={1.8}
-                />
-              )}
-              {seg.to && !isLast ? (
-                <Link
-                  to={seg.to}
-                  className="truncate rounded-sm px-1.5 py-0.5 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-zinc-500 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-200"
-                >
-                  {seg.label}
-                </Link>
-              ) : (
-                <span className="truncate px-1.5 py-0.5 text-[13px] font-medium text-neutral-900 dark:text-zinc-100">
-                  {seg.label}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </nav>
+    <header className="flex h-11 w-full shrink-0 items-center gap-2 border-b border-neutral-200/80 bg-white px-3 dark:border-zinc-800/60 dark:bg-zinc-950">
+      {/* Sidebar toggle (when collapsed) */}
+      {collapsed && onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
+          title={t('sidebar.expand')}
+        >
+          <PanelLeft className="size-4" strokeWidth={1.8} />
+        </button>
+      )}
+
+      {/* Page tabs */}
+      <PageTabBar />
 
       {/* Right controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           onClick={onOpenSearch}

@@ -205,7 +205,7 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		skills = []string{}
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	resp := map[string]any{
 		"contextFile": contextFile,
 		"context":     string(merged),
 		"wakeup":      string(wakeup),
@@ -214,7 +214,11 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		"role":        meta.Role,
 		"syncedAt":    meta.SyncedAt,
 		"skills":      skills,
-	})
+	}
+	if meta.HTTPAgent != nil {
+		resp["httpAgent"] = meta.HTTPAgent
+	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func contextFileName(model string) string {

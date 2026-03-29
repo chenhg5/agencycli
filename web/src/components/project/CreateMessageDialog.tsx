@@ -44,17 +44,18 @@ export function CreateMessageDialog({ projectId, agents, onSent }: Props) {
     return () => { cancelled = true }
   }, [open])
 
-  const toOptions = useMemo(() => {
+  const allOpts = useMemo(() => {
     const opts: string[] = ['human']
-    for (const a of agents) opts.push(`${projectId}/${a.name}`)
+    if (allMailboxes.length > 0) {
+      for (const mb of allMailboxes) opts.push(mb)
+    } else {
+      for (const a of agents) opts.push(`${projectId}/${a.name}`)
+    }
     return opts
-  }, [agents, projectId])
+  }, [allMailboxes, agents, projectId])
 
-  const fromOptions = useMemo(() => {
-    const opts: string[] = ['human']
-    for (const mb of allMailboxes) opts.push(mb)
-    return opts
-  }, [allMailboxes])
+  const toOptions = allOpts
+  const fromOptions = allOpts
 
   const availableToOptions = useMemo(() => toOptions.filter((o) => !toList.includes(o)), [toOptions, toList])
 
@@ -78,10 +79,10 @@ export function CreateMessageDialog({ projectId, agents, onSent }: Props) {
   }
 
   function selectAllAgents() {
-    const agentMailboxes = agents.map((a) => `${projectId}/${a.name}`)
+    const all = allMailboxes.length > 0 ? allMailboxes : agents.map((a) => `${projectId}/${a.name}`)
     setToList((prev) => {
       const set = new Set(prev)
-      for (const mb of agentMailboxes) set.add(mb)
+      for (const mb of all) set.add(mb)
       return [...set]
     })
   }
@@ -155,7 +156,7 @@ export function CreateMessageDialog({ projectId, agents, onSent }: Props) {
               <div className="text-sm">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-neutral-600 dark:text-zinc-400">{t('forms.to')}</span>
-                  {agents.length > 0 && (
+                  {(allMailboxes.length > 0 || agents.length > 0) && (
                     <button type="button" onClick={selectAllAgents} className="text-[11px] font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400">
                       {t('forms.selectAllAgents')}
                     </button>

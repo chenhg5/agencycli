@@ -66,3 +66,6 @@ button, [role="button"], a, select, label[for], summary, [tabindex]:not([tabinde
 ::-webkit-scrollbar-thumb:hover { background: oklch(0.6 0 0 / 0.4); }
 .dark ::-webkit-scrollbar-thumb { background: oklch(0.4 0 0 / 0.4); }
 .dark ::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0 0 / 0.6); }
+
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
