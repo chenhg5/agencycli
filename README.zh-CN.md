@@ -28,7 +28,7 @@
 
 <p align="center">
   <strong>几分钟内搭建一支自运转的 AI 智能体团队。</strong><br/>
-  一个 CLI，无需服务器。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
+  一个 CLI + 内置 Web 控制台。智能体自主规划、执行、相互通信——你睡着的时候它们也在工作。
 </p>
 
 <p align="center">
@@ -116,8 +116,17 @@ npm install -g @agencycli/agencycli      # npm，无需安装 Go
 
 go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 
-# 从源码构建
+# 从源码构建（含 Web 控制台）
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
+```
+
+### 从源码构建（开发）
+
+```bash
+git clone https://github.com/chenhg5/agencycli
+cd agencycli
+make build          # 构建前端 + Go 二进制 → dist/agencycli
+make install        # 构建并安装到 $GOPATH/bin
 ```
 
 ## 快速开始
@@ -134,11 +143,29 @@ agencycli project apply  --project my-service
 # 3. 启动调度器 — 智能体开始自主运转
 agencycli scheduler start
 
-# 4. 查看状态
+# 4. 打开 Web 控制台 — 在浏览器中管理一切
+agencycli start                   # http://127.0.0.1:27892
+agencycli start --addr 0.0.0.0:8080 --open   # 自定义端口 + 自动打开浏览器
+
+# 5. 命令行查看状态
 agencycli inbox list              # 等待你决策的确认任务
 agencycli inbox messages          # 来自智能体的异步消息
 agencycli task list --project my-service --agent pm
 ```
+
+## Web 控制台
+
+Web 控制台内嵌在二进制文件中——无需额外进程或 Node.js。一条命令启动：
+
+```bash
+agencycli start                          # 默认：127.0.0.1:27892
+agencycli start --addr 0.0.0.0:8080     # 自定义地址
+agencycli start --api-key my-secret     # 带认证
+```
+
+**功能：** 工作台（消息 + 任务）、团队/角色管理、项目成员、调度计划（心跳/Cron/运行状态）、运行记录与 Token 消耗、会话管理、Agent 运行、Prompt 编辑、技能管理——支持多语言（English / 中文 / 繁體中文 / 日本語）和深色模式。
+
+> 本地开发热更新：`agencycli api serve` + `cd web && pnpm dev`。
 
 ## 支持大多数 AI Agent
 
@@ -161,15 +188,19 @@ agencycli 是运行时基础设施，而非 SDK。智能体就是你已经在用
 
 ```
 agencycli
-├── overview                                # 仪表盘：智能体、团队、技能、收件箱一览
-├── create agency / team / role / project   # 搭建组织架构
-├── hire / fire / sync                      # 管理智能体
-├── task add / list / done / confirm-request# 任务队列（7 状态流转）
-├── inbox send / messages / reply / fwd     # 异步消息通信
-├── scheduler start / stop / status         # 心跳调度器
-├── cron add / list / delete                # 定时任务
-├── template pack / info                    # 打包分享配置
-└── --dir <path>                            # 从任意位置操作指定工作区
+├── start                                  # 启动 Web 控制台（API + 前端）
+├── overview                               # CLI 仪表盘
+├── create agency / team / role / project  # 搭建组织架构
+├── hire / fire / sync                     # 管理智能体
+├── task add / list / done / confirm-request # 任务队列（7 状态流转）
+├── run / exec                             # 手动运行 Agent
+├── inbox send / messages / reply / fwd    # 异步消息通信
+├── scheduler start / stop / status        # 心跳调度器
+├── session show / set / reset             # Agent 会话管理
+├── cron add / list / delete               # 定时任务
+├── template pack / info                   # 打包分享配置
+├── api serve                              # 仅 JSON API（开发用）
+└── --dir <path>                           # 从任意位置操作指定工作区
 ```
 
 → **[完整命令参考](docs/commands.md)**  
@@ -186,6 +217,7 @@ agencycli
 | 配置方式 | Markdown + YAML | Python 代码 |
 | 多模型支持 | 任意 CLI，混用自由 | 通常绑定一个 SDK |
 | 上下文管理 | 分层自动合并 | 手动拼接 prompt |
+| Web UI | 内置（单一二进制） | 需要单独部署 |
 | 是否需要服务器 | 否 | 通常需要 |
 
 ## 许可证

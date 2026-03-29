@@ -396,6 +396,26 @@
     "wakeupNow": "立即喚醒",
     "wakingUp": "喚醒中…"
   },
+  "session": {
+    "sessionLabel": "會話",
+    "scopeLabel": "會話範圍",
+    "scopeCycle": "按週期",
+    "scopeTask": "按任務",
+    "noSession": "無會話",
+    "resetSession": "重置會話",
+    "resettingSession": "重置中…",
+    "startedAt": "開始時間",
+    "runAgent": "執行 Agent",
+    "runAgentDesc": "輸入 Prompt 執行 Agent，或執行其下一個待處理任務。",
+    "selectProject": "選擇專案…",
+    "selectAgent": "選擇 Agent…",
+    "run": "執行",
+    "running": "執行中…",
+    "runDone": "執行完成。",
+    "promptOptional": "（可選）",
+    "promptPlaceholder": "輸入給 Agent 的指令 / Prompt…",
+    "promptHint": "如果填寫了 Prompt，會先建立任務再立即執行。留空則執行下一個待處理任務。"
+  },
   "runs": {
     "subtitle": "本專案 Agent 的執行紀錄、Token 消耗與成本彙總。",
     "window": "時間範圍",

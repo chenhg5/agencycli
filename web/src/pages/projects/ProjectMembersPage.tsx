@@ -12,6 +12,8 @@ import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 import { apiPost, apiPut } from '../../lib/api'
 
+type SessionInfo = { sessionId?: string; sessionStartedAt?: string; sessionScope?: string }
+
 type AgentRow = {
   name: string
   model: string
@@ -69,6 +71,70 @@ function PromptEditor({ label, icon: Icon, apiPath, initialContent }: { label: s
         <textarea value={value} onChange={(e) => { setValue(e.target.value); setDirty(true); setSaved(false) }}
           className="block w-full resize-y bg-transparent p-4 font-mono text-[13px] leading-relaxed text-neutral-800 outline-none placeholder:text-neutral-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
           rows={Math.max(6, Math.min(20, value.split('\n').length + 1))} placeholder="Markdown prompt..." />
+      )}
+    </div>
+  )
+}
+
+function SessionPanel({ project, agentName }: { project: string; agentName: string }) {
+  const { t } = useTranslation()
+  const fmt = useFormatDateTime()
+  const hbPath = `/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agentName)}/heartbeat`
+  const [reloadKey, setReloadKey] = useState(0)
+  const state = useApiJson<SessionInfo & Record<string, unknown>>(hbPath, reloadKey)
+  const [resetting, setResetting] = useState(false)
+  const [runResult, setRunResult] = useState<string | null>(null)
+  const [running, setRunning] = useState(false)
+
+  if (state.status !== 'ok') return null
+  const info = state.data
+  const hasSession = !!info.sessionId
+
+  async function doReset() {
+    setResetting(true)
+    try {
+      await apiPost('/api/v1/session/reset', { project, agent: agentName })
+      setReloadKey((k) => k + 1)
+    } catch (e) { alert(String(e)) }
+    finally { setResetting(false) }
+  }
+
+  async function doRun() {
+    setRunning(true); setRunResult(null)
+    try {
+      const res = await apiPost<{ ok: boolean; output: string }>('/api/v1/run', { project, agent: agentName })
+      setRunResult(res.output || t('session.runDone'))
+    } catch (e) { setRunResult(String(e)) }
+    finally { setRunning(false); setReloadKey((k) => k + 1) }
+  }
+
+  return (
+    <div className="rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-900/30">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('session.sessionLabel')}</h4>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+        <span className="text-neutral-500 dark:text-zinc-500">
+          Session ID: {hasSession ? <span className="font-mono text-emerald-700 dark:text-emerald-400" title={info.sessionId}>{info.sessionId!.slice(0, 16)}…</span> : <span className="text-neutral-400 dark:text-zinc-600">{t('session.noSession')}</span>}
+        </span>
+        {info.sessionStartedAt && (
+          <span className="text-neutral-500 dark:text-zinc-500">{t('session.startedAt')}: {fmt(info.sessionStartedAt)}</span>
+        )}
+        <span className="text-neutral-500 dark:text-zinc-500">{t('session.scopeLabel')}: <span className="font-medium text-neutral-700 dark:text-zinc-300">{info.sessionScope === 'task' ? t('session.scopeTask') : t('session.scopeCycle')}</span></span>
+
+        <div className="flex items-center gap-2">
+          {hasSession && (
+            <button type="button" onClick={() => void doReset()} disabled={resetting}
+              className="cursor-pointer rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+              {resetting ? t('session.resettingSession') : t('session.resetSession')}
+            </button>
+          )}
+          <button type="button" onClick={() => void doRun()} disabled={running}
+            className="cursor-pointer rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400">
+            {running ? t('session.running') : t('session.run')}
+          </button>
+        </div>
+      </div>
+      {runResult && (
+        <pre className="mt-2 max-h-36 overflow-auto rounded-md bg-white p-3 font-mono text-xs leading-relaxed text-neutral-600 dark:bg-zinc-800 dark:text-zinc-400">{runResult}</pre>
       )}
     </div>
   )
@@ -143,6 +209,9 @@ function AgentDetail({ project, agentName }: { project: string; agentName: strin
           </div>
         </div>
       )}
+
+      {/* Session info */}
+      <SessionPanel project={project} agentName={agentName} />
 
       {/* Sync button */}
       <div className="flex items-center gap-3">

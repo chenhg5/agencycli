@@ -2,6 +2,7 @@ BINARY     := agencycli
 BUILD_DIR  := dist
 MAIN       := ./cmd/agencycli
 NPM_DIR    := npm
+WEB_DIR    := web
 
 # ── Version info (injected at link time) ──────────────────────────────────────
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -22,21 +23,42 @@ PLATFORMS := \
 	windows/amd64 \
 	windows/arm64
 
-.PHONY: build install clean test lint release release-all $(PLATFORMS)
+.PHONY: build build-go install clean test lint release release-all web web-install web-dev $(PLATFORMS)
+
+# ── Web frontend ──────────────────────────────────────────────────────────────
+
+web-install:
+	@echo "── Installing web dependencies ──────────────────────────────────────"
+	cd $(WEB_DIR) && npm install --prefer-offline
+
+web: web-install
+	@echo "── Building web frontend ────────────────────────────────────────────"
+	cd $(WEB_DIR) && npx vite build
+	@echo "  ✓ $(WEB_DIR)/dist ready (embedded into Go binary via //go:embed)"
+
+web-dev: web-install
+	cd $(WEB_DIR) && npx vite dev
 
 # ── Local build ────────────────────────────────────────────────────────────────
-build:
+
+build-go:
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(MAIN)
-	@echo "Built $(BUILD_DIR)/$(BINARY)  ($(VERSION))"
+	@echo "  ✓ $(BUILD_DIR)/$(BINARY)  ($(VERSION))"
 
-install:
+build: web build-go
+	@echo ""
+	@echo "Build complete: $(BUILD_DIR)/$(BINARY) ($(VERSION))"
+	@echo "  Web console embedded. Run: ./$(BUILD_DIR)/$(BINARY) start"
+
+install: web
 	go install -ldflags "$(LDFLAGS)" $(MAIN)
-	@echo "Installed $(BINARY) $(VERSION)"
+	@echo "Installed $(BINARY) $(VERSION) (with web console)"
 
 # ── Cross-platform release ────────────────────────────────────────────────────
-# Build a single platform:  make linux/amd64
-$(PLATFORMS):
+# Web is built once; each platform embeds the same dist/ via go:embed.
+
+$(PLATFORMS): web
 	$(eval OS   := $(word 1,$(subst /, ,$@)))
 	$(eval ARCH := $(word 2,$(subst /, ,$@)))
 	$(eval EXT  := $(if $(filter windows,$(OS)),.exe,))
@@ -48,7 +70,7 @@ $(PLATFORMS):
 		$(MAIN)
 	@echo "  ✓ $(BUILD_DIR)/$(NAME)"
 
-# Build + archive every platform (creates .tar.gz / .zip for each)
+# Build + archive every platform
 release: $(PLATFORMS)
 	@echo ""
 	@echo "── Packaging archives ───────────────────────────────────────────────"
@@ -64,6 +86,7 @@ release: $(PLATFORMS)
 	@echo "Release $(VERSION) ready in $(BUILD_DIR)/"
 
 # ── Dev helpers ────────────────────────────────────────────────────────────────
+
 test:
 	go test ./...
 
@@ -72,9 +95,10 @@ lint:
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf $(WEB_DIR)/dist $(WEB_DIR)/node_modules/.vite
 
 run: build
-	./$(BUILD_DIR)/$(BINARY)
+	./$(BUILD_DIR)/$(BINARY) start
 
 # Print version that would be stamped into the binary
 version:

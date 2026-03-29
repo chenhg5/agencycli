@@ -396,6 +396,26 @@
     "wakeupNow": "Wakeup",
     "wakingUp": "Waking…"
   },
+  "session": {
+    "sessionLabel": "Session",
+    "scopeLabel": "Scope",
+    "scopeCycle": "Cycle",
+    "scopeTask": "Per-task",
+    "noSession": "No session",
+    "resetSession": "Reset session",
+    "resettingSession": "Resetting…",
+    "startedAt": "Started",
+    "runAgent": "Run Agent",
+    "runAgentDesc": "Run an agent with a custom prompt, or execute its next pending task.",
+    "selectProject": "Select project…",
+    "selectAgent": "Select agent…",
+    "run": "Run",
+    "running": "Running…",
+    "runDone": "Run completed.",
+    "promptOptional": "(optional)",
+    "promptPlaceholder": "Enter the prompt / instructions for the agent…",
+    "promptHint": "If provided, a task will be created and run immediately. If left empty, the next pending task will be executed."
+  },
   "runs": {
     "subtitle": "Token usage and cost for this project’s agents, plus recent runs.",
     "window": "Window",

@@ -396,6 +396,26 @@
     "wakeupNow": "立即唤醒",
     "wakingUp": "唤醒中…"
   },
+  "session": {
+    "sessionLabel": "会话",
+    "scopeLabel": "会话范围",
+    "scopeCycle": "按周期",
+    "scopeTask": "按任务",
+    "noSession": "无会话",
+    "resetSession": "重置会话",
+    "resettingSession": "重置中…",
+    "startedAt": "开始时间",
+    "runAgent": "运行 Agent",
+    "runAgentDesc": "输入 prompt 运行 Agent，或执行其下一个待处理任务。",
+    "selectProject": "选择项目…",
+    "selectAgent": "选择 Agent…",
+    "run": "运行",
+    "running": "运行中…",
+    "runDone": "运行完成。",
+    "promptOptional": "（可选）",
+    "promptPlaceholder": "输入给 Agent 的指令 / Prompt…",
+    "promptHint": "如果填写了 Prompt，会先创建任务再立即运行。留空则执行下一个待处理任务。"
+  },
   "runs": {
     "subtitle": "本项目 Agent 的运行记录、Token 消耗与成本汇总。",
     "window": "时间范围",

@@ -22,6 +22,7 @@ import {
 } from '../components/project/MessageDetailModal'
 import { CreateMessageDialog } from '../components/project/CreateMessageDialog'
 import { CreateTaskDialog } from '../components/project/CreateTaskDialog'
+import { RunAgentDialog } from '../components/project/RunAgentDialog'
 import {
   EditTaskModal,
   TaskDetailModal,
@@ -272,8 +273,10 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
 
       {/* Batch bar */}
       {someChecked && (
-        <div className="shrink-0 flex items-center gap-4 border-y border-sky-200/80 bg-sky-50/50 px-8 py-3 dark:border-sky-900/30 dark:bg-sky-950/20">
+        <div className="shrink-0 flex items-center gap-4 border-y border-sky-200/80 bg-sky-50/50 px-8 py-2.5 dark:border-sky-900/30 dark:bg-sky-950/20">
+          <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
           <span className="text-sm font-medium text-sky-800 dark:text-sky-300">{t('messages.selected', { count: String(checked.size) })}</span>
+          {!allChecked && <button type="button" onClick={toggleAll} className="text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400">{t('messages.selectAll')}</button>}
           <div className="flex items-center gap-2">
             <button type="button" disabled={batchBusy} onClick={() => void batchMarkRead()} className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/40 dark:text-sky-300">{t('messages.batchMarkRead')}</button>
             <button type="button" disabled={batchBusy} onClick={() => void batchArchive()} className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">{t('messages.batchArchive')}</button>
@@ -286,7 +289,7 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
       <MessageDetailModal open={selected != null} message={selected} onClose={() => setSelected(null)} onMutated={() => setReloadKey((k) => k + 1)} />
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
+      <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2">
         {state.status === 'loading' && (
           <div className="flex items-center gap-2 py-20 justify-center">
             <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
@@ -304,9 +307,10 @@ function MessagesPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) 
         )}
         {state.status === 'ok' && messages.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1">
-              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-4 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
-              <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('messages.selectAll', { defaultValue: 'Select all' })}</span>
+            {/* List toolbar */}
+            <div className="flex items-center gap-3 px-1">
+              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
+              <span className="text-xs text-neutral-400 dark:text-zinc-600">{messages.length} {t('workbench.tabMessages').toLowerCase()}</span>
             </div>
             {messages.map((row) => {
               const unread = !row.readAt
@@ -482,7 +486,8 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
             </select>
           )}
           {firstProject && (
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <RunAgentDialog projects={projectsAgents} onDone={reload} />
               <CreateTaskDialog projectId={firstProject.projectId} agents={firstProject.agents} allProjectsAgents={projectsAgents} onCreated={reload} />
             </div>
           )}
@@ -491,8 +496,10 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
 
       {/* Batch bar */}
       {someChecked && (
-        <div className="shrink-0 flex items-center gap-4 border-y border-sky-200/80 bg-sky-50/50 px-8 py-3 dark:border-sky-900/30 dark:bg-sky-950/20">
+        <div className="shrink-0 flex items-center gap-4 border-y border-sky-200/80 bg-sky-50/50 px-8 py-2.5 dark:border-sky-900/30 dark:bg-sky-950/20">
+          <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
           <span className="text-sm font-medium text-sky-800 dark:text-sky-300">{t('messages.selected', { count: String(checked.size) })}</span>
+          {!allChecked && <button type="button" onClick={toggleAll} className="text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400">{t('messages.selectAll')}</button>}
           <div className="flex items-center gap-2">
             <button type="button" disabled={batchBusy} onClick={() => void batchCancel()} className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-40 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{t('tasks.batchCancel')}</button>
             <button type="button" disabled={batchBusy} onClick={() => void batchArchive()} className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">{t('tasks.batchArchive')}</button>
@@ -507,7 +514,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
       {detailRow && <TaskDetailModal task={detailRow} onClose={() => setDetailRow(null)} onEdit={(r) => { setDetailRow(null); setEditRow(r) }} />}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
+      <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2">
         {state.status === 'loading' && (
           <div className="flex items-center gap-2 py-20 justify-center">
             <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
@@ -525,12 +532,11 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
         )}
         {state.status === 'ok' && tasks.length > 0 && (
           <div className="space-y-3">
-            {/* Select all */}
-            <div className="flex items-center gap-2 px-1">
-              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-4 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
-              <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('messages.selectAll', { defaultValue: 'Select all' })}</span>
+            {/* List toolbar */}
+            <div className="flex items-center gap-3 px-1">
+              <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
+              <span className="text-xs text-neutral-400 dark:text-zinc-600">{tasks.length} {t('workbench.tabTasks').toLowerCase()}</span>
             </div>
-
             {tasks.map((row) => {
               const prio = priorityLabel[row.priority] ?? priorityLabel[2]
               const sCls = statusColor[row.status] ?? statusColor.pending
@@ -556,7 +562,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
                         <span className={cn('text-xs font-bold', prio.cls)}>{prio.text}</span>
                         <span className="text-sm font-medium text-neutral-900 dark:text-zinc-100">{row.title}</span>
                         {row.type && (
-                          <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">{row.type}</span>
+                          <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">{t(`forms.taskType.${row.type}`, { defaultValue: row.type })}</span>
                         )}
                         <span className={cn('ml-auto inline-block shrink-0 rounded-full px-3 py-0.5 text-[11px] font-semibold', sCls)}>
                           {t(`tasks.status.${row.status}`, { defaultValue: row.status })}

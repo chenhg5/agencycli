@@ -31,6 +31,19 @@ pnpm dev
 ## 构建
 
 ```bash
-pnpm run build
-pnpm preview
+pnpm run build          # 输出到 dist/
+pnpm preview            # 本地预览
+
+# 或使用根目录 Makefile（自动 npm install + vite build）
+cd .. && make web
+```
+
+## 嵌入到 Go 二进制
+
+`web/embed.go` 使用 `//go:embed all:dist` 将 `dist/` 目录编译进 Go 二进制。
+`agencycli start` 命令在同一端口同时服务 API 和 SPA 前端。
+
+```bash
+cd .. && make build     # 构建前端 + Go 二进制（dist/agencycli）
+./dist/agencycli start  # http://127.0.0.1:27892
 ```

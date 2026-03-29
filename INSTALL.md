@@ -72,6 +72,17 @@ agencycli version
 
 Download from [github.com/chenhg5/agencycli/releases](https://github.com/chenhg5/agencycli/releases) and move to a directory on your `PATH`.
 
+### From source (includes web console)
+
+```bash
+git clone https://github.com/chenhg5/agencycli && cd agencycli
+make build      # builds web frontend + Go binary → dist/agencycli
+# or
+make install    # builds and installs to $GOPATH/bin
+```
+
+> **Requires:** Go 1.22+, Node.js 18+ (for building the web frontend).
+
 ---
 
 ## 2. How context works
@@ -764,7 +775,11 @@ agencycli sync --force                        # force regenerate everything
 
 ─── Start ──────────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler start
-[ ] agencycli overview                 ← dashboard
+[ ] agencycli overview                 ← CLI dashboard
 [ ] agencycli inbox list               ← task confirmations
 [ ] agencycli inbox messages           ← async messages
+
+─── Web console (optional) ─────────────────────────────────────────────────────
+[ ] agencycli start                    ← opens http://127.0.0.1:27892
+[ ] agencycli start --addr 0.0.0.0:8080 --api-key <token>  ← remote access
 ```

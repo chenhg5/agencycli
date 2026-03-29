@@ -396,6 +396,26 @@
     "wakeupNow": "今すぐ起動",
     "wakingUp": "起動中…"
   },
+  "session": {
+    "sessionLabel": "セッション",
+    "scopeLabel": "セッション範囲",
+    "scopeCycle": "サイクル単位",
+    "scopeTask": "タスク単位",
+    "noSession": "セッションなし",
+    "resetSession": "セッションリセット",
+    "resettingSession": "リセット中…",
+    "startedAt": "開始",
+    "runAgent": "エージェント実行",
+    "runAgentDesc": "プロンプトを入力してエージェントを実行、または次の保留タスクを実行します。",
+    "selectProject": "プロジェクトを選択…",
+    "selectAgent": "エージェントを選択…",
+    "run": "実行",
+    "running": "実行中…",
+    "runDone": "実行完了。",
+    "promptOptional": "（任意）",
+    "promptPlaceholder": "エージェントへの指示 / プロンプトを入力…",
+    "promptHint": "プロンプトを入力するとタスクを作成して即時実行します。空欄の場合は次の保留タスクを実行します。"
+  },
   "runs": {
     "subtitle": "このプロジェクトのエージェントの実行履歴、トークン消費、コストの集計。",
     "window": "期間",

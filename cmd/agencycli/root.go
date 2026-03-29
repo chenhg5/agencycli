@@ -80,6 +80,7 @@ func init() {
 		newRunsCmd(),
 		newClearCmd(),
 		newAPICmd(),
+		newStartCmd(),
 	)
 }
 

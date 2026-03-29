@@ -102,6 +102,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/skills", s.handlePostTeamSkillBind)
 	mux.HandleFunc("POST /api/v1/roles/create", s.handleCreateRole)
 	mux.HandleFunc("POST /api/v1/projects/{name}/hire", s.handleHireAgent)
+	mux.HandleFunc("POST /api/v1/run", s.handleRunAgent)
+	mux.HandleFunc("POST /api/v1/session/reset", s.handleSessionReset)
 	mux.HandleFunc("GET /api/v1/workbench/messages", s.handleWorkbenchMessages)
 	mux.HandleFunc("GET /api/v1/workbench/tasks", s.handleWorkbenchTasks)
 	mux.HandleFunc("GET /api/v1/scheduler/status", s.handleSchedulerStatus)

@@ -23,6 +23,7 @@ type HeartbeatRow = {
   lastWakeup?: string; lastWakeupStatus?: string; lastCycleDuration?: string
   wakeupCount?: number; wakeupCountToday?: number; nextWakeupAt?: string
   schedulerStartedAt?: string; lastConditionStatus?: string
+  sessionScope?: string; sessionId?: string; sessionStartedAt?: string
 }
 
 type CronRow = {
@@ -464,7 +465,9 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [waking, setWaking] = useState<string | null>(null)
+  const [resetting, setResetting] = useState<string | null>(null)
   const [wakeErr, setWakeErr] = useState<string | null>(null)
+  const [scopeUpdating, setScopeUpdating] = useState<string | null>(null)
 
   const activeAgents = agents.filter((ag) => ag.heartbeat.enabled)
 
@@ -474,6 +477,22 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
       await apiPost('/api/v1/scheduler/wakeup', { project: projectId, agent: agentName })
     } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
     finally { setWaking(null) }
+  }
+
+  async function doSessionReset(agentName: string) {
+    setResetting(agentName)
+    try {
+      await apiPost('/api/v1/session/reset', { project: projectId, agent: agentName })
+    } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
+    finally { setResetting(null) }
+  }
+
+  async function doScopeChange(agentName: string, scope: string) {
+    setScopeUpdating(agentName)
+    try {
+      await apiPatch(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/heartbeat`, { sessionScope: scope })
+    } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
+    finally { setScopeUpdating(null) }
   }
 
   if (activeAgents.length === 0) {
@@ -489,7 +508,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
     <>
       {wakeErr && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{wakeErr}</p>}
       <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
-        <table className="min-w-[900px] w-full">
+        <table className="min-w-[1100px] w-full">
           <thead>
             <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
               <th className={thCls}>Agent</th>
@@ -499,14 +518,17 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
               <th className={thCls}>{t('schedule.lastDuration')}</th>
               <th className={thCls}>{t('schedule.wakeupCountLabel')}</th>
               <th className={thCls}>{t('schedule.today')}</th>
+              <th className={thCls}>{t('session.sessionLabel')}</th>
+              <th className={thCls}>{t('session.scopeLabel')}</th>
               <th className={thCls}>{t('schedule.conditionLabel')}</th>
-              <th className={cn(thCls, 'text-right')}>{t('messages.actions')}</th>
+              <th className={cn(thCls, 'text-center')}>{t('messages.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
             {activeAgents.map((ag) => {
               const hb = ag.heartbeat
               const isRunningNow = hb.lastWakeupStatus === 'running'
+              const hasSession = !!hb.sessionId
               return (
                 <tr key={ag.name} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
                   <td className={cn(tdCls, 'font-mono font-medium')}>{ag.name}</td>
@@ -529,17 +551,46 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                   <td className={cn(tdCls, 'tabular-nums font-semibold')}>{hb.wakeupCount ?? 0}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>{hb.wakeupCountToday ?? 0}</td>
                   <td className={tdCls}>
+                    {hasSession ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
+                        {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-600">{fmt(hb.sessionStartedAt)}</span>}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('session.noSession')}</span>
+                    )}
+                  </td>
+                  <td className={tdCls}>
+                    <select
+                      value={hb.sessionScope || 'cycle'}
+                      onChange={(e) => void doScopeChange(ag.name, e.target.value)}
+                      disabled={scopeUpdating === ag.name}
+                      className="h-7 cursor-pointer rounded border border-neutral-200 bg-white px-1.5 text-xs outline-none hover:border-neutral-300 focus:border-sky-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    >
+                      <option value="cycle">{t('session.scopeCycle')}</option>
+                      <option value="task">{t('session.scopeTask')}</option>
+                    </select>
+                  </td>
+                  <td className={tdCls}>
                     {hb.wakeupCondition ? (
                       hb.lastConditionStatus === 'met' ? <StatusBadge color="emerald">Met</StatusBadge>
                       : hb.lastConditionStatus === 'not_met' ? <StatusBadge color="amber">Not met</StatusBadge>
                       : <StatusBadge color="neutral">—</StatusBadge>
                     ) : <span className="text-neutral-400 dark:text-zinc-600">—</span>}
                   </td>
-                  <td className={cn(tdCls, 'text-right')}>
-                    <button type="button" disabled={isRunningNow || waking === ag.name} onClick={() => void doWakeup(ag.name)}
-                      className="cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium text-sky-700 opacity-0 transition-all hover:bg-sky-50 disabled:opacity-40 group-hover:opacity-100 dark:text-sky-400 dark:hover:bg-sky-900/20">
-                      {waking === ag.name ? t('schedule.wakingUp') : t('schedule.wakeupNow')}
-                    </button>
+                  <td className={cn(tdCls, 'text-center')}>
+                    <div className="flex items-center justify-center gap-1">
+                      <button type="button" disabled={isRunningNow || waking === ag.name} onClick={() => void doWakeup(ag.name)}
+                        className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-sky-700 opacity-0 transition-all hover:bg-sky-50 disabled:opacity-40 group-hover:opacity-100 dark:text-sky-400 dark:hover:bg-sky-900/20">
+                        {waking === ag.name ? t('schedule.wakingUp') : t('schedule.wakeupNow')}
+                      </button>
+                      {hasSession && (
+                        <button type="button" disabled={resetting === ag.name} onClick={() => void doSessionReset(ag.name)}
+                          className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-amber-600 opacity-0 transition-all hover:bg-amber-50 disabled:opacity-40 group-hover:opacity-100 dark:text-amber-400 dark:hover:bg-amber-900/20">
+                          {resetting === ag.name ? t('session.resettingSession') : t('session.resetSession')}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )

@@ -28,7 +28,7 @@
 
 <p align="center">
   <strong>Spin up a self-managing AI agent team in minutes.</strong><br/>
-  One CLI. No server. Agents that plan, execute, and talk to each other — while you sleep.
+  One CLI + built-in web console. Agents that plan, execute, and talk to each other — while you sleep.
 </p>
 
 <p align="center">
@@ -114,8 +114,17 @@ npm install -g @agencycli/agencycli      # npm, no Go required
 
 go install github.com/chenhg5/agencycli/cmd/agencycli@latest  # Go
 
-# From source
+# From source (includes web console)
 git clone https://github.com/chenhg5/agencycli && cd agencycli && make install
+```
+
+### From source (development)
+
+```bash
+git clone https://github.com/chenhg5/agencycli
+cd agencycli
+make build          # builds web frontend + Go binary → dist/agencycli
+make install        # builds and installs to $GOPATH/bin
 ```
 
 ## Quick start
@@ -132,11 +141,29 @@ agencycli project apply  --project my-service
 # 3. Start the scheduler — agents wake up and run autonomously
 agencycli scheduler start
 
-# 4. Check in
+# 4. Open the web console — manage everything from the browser
+agencycli start                   # http://127.0.0.1:27892
+agencycli start --addr 0.0.0.0:8080 --open   # custom port + auto-open browser
+
+# 5. Check in (CLI)
 agencycli inbox list              # task confirmations waiting for your decision
 agencycli inbox messages          # async messages from agents
 agencycli task list --project my-service --agent pm
 ```
+
+## Web console
+
+The web console is embedded in the binary — no separate process or Node.js required. One command to launch:
+
+```bash
+agencycli start                          # default: 127.0.0.1:27892
+agencycli start --addr 0.0.0.0:8080     # custom address
+agencycli start --api-key my-secret     # with auth
+```
+
+**Capabilities:** workbench (messages + tasks), team/role management, project members, schedule (heartbeat/cron/runtime), run history & token costs, session management, agent run, prompt editing, skills — all with i18n (English / 中文 / 繁體中文 / 日本語) and dark mode.
+
+> For local development with hot-reload: `agencycli api serve` + `cd web && pnpm dev`.
 
 ## Works with any AI coding agent
 
@@ -159,15 +186,19 @@ Mix models freely — your PM can run on Claude, your dev agents on Codex, your 
 
 ```
 agencycli
-├── overview                                # dashboard: agents, teams, skills, inbox
-├── create agency / team / role / project   # scaffold your org
-├── hire / fire / sync                      # manage agents
-├── task add / list / done / confirm-request# task queue (7-state lifecycle)
-├── inbox send / messages / reply / fwd     # async messaging
-├── scheduler start / stop / status         # heartbeat scheduler
-├── cron add / list / delete                # scheduled tasks
-├── template pack / info                    # share your setup
-└── --dir <path>                            # work on any agency from anywhere
+├── start                                  # launch web console (API + frontend)
+├── overview                               # CLI dashboard
+├── create agency / team / role / project  # scaffold your org
+├── hire / fire / sync                     # manage agents
+├── task add / list / done / confirm-request # task queue (7-state lifecycle)
+├── run / exec                             # manual agent execution
+├── inbox send / messages / reply / fwd    # async messaging
+├── scheduler start / stop / status        # heartbeat scheduler
+├── session show / set / reset             # agent session management
+├── cron add / list / delete               # scheduled tasks
+├── template pack / info                   # share your setup
+├── api serve                              # JSON API only (for dev)
+└── --dir <path>                           # work on any agency from anywhere
 ```
 
 → **[Full command reference](docs/commands.md)**  
@@ -185,6 +216,7 @@ Those are frameworks — you write Python to wire agents together. **agencycli i
 | Config format | Markdown + YAML | Python code |
 | Multi-model | Any CLI, mix freely | Usually one SDK |
 | Context management | Layered, auto-merged | Manual prompt assembly |
+| Web UI | Built-in (single binary) | Separate deployment |
 | Server required | No | Often yes |
 
 ## License
