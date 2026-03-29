@@ -1,6 +1,6 @@
 {
   "name": "@agencycli/agencycli",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "AI agent organisation and context management — hire agents into teams, assign tasks, and automate workflows",
   "keywords": [
     "ai-agent",

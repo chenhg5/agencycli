@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -74,7 +73,7 @@ func (m *SchedulerManager) Start(project, agent string) error {
 	cmd := exec.Command(m.binPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcGroup(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
@@ -118,7 +117,7 @@ func (m *SchedulerManager) Stop(project, agent string) error {
 	}
 
 	if proc.cmd.Process != nil {
-		_ = syscall.Kill(-proc.cmd.Process.Pid, syscall.SIGTERM)
+		killProcessGroup(proc.cmd.Process.Pid)
 	}
 
 	select {

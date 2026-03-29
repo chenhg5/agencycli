@@ -1,5 +1,52 @@
 # Changelog
 
+## [v0.2.0] - 2026-03-29
+
+### Added
+
+**Web console (built-in)**
+- Single-binary web console served by `agencycli start` — no separate frontend deployment needed
+- Frontend built with React + TypeScript + Tailwind CSS, embedded via `//go:embed`
+- Workbench page: unified operator hub for messages and tasks with batch operations
+- Full message management: send (multi-recipient), reply, filter (read/unread/archived/from), batch archive/delete
+- Full task management: create, edit (status/priority/type), view detail with execution logs, batch cancel/archive/delete
+- Schedule management: tabbed Heartbeat / Cron / Runtime views with CRUD operations
+- Run management: filterable table with Markdown-rendered conversation logs
+- Agent hiring and role creation from the web UI
+- Project settings page for editing project prompts
+- Skills page for viewing team and agent skills
+- Manual agent wakeup and `agencycli run` from the Workbench
+- Session management: view session ID/scope, switch scope (cycle/task), reset session
+- Scheduler start/stop control from the web UI
+- Authentication: username/password login with JWT tokens, user settings page
+- i18n: English, 简体中文, 繁體中文, 日本語
+- Plane-inspired professional UI: responsive sidebar, card layouts, sticky table columns, global footer
+
+**CLI enhancements**
+- `agencycli start` — unified command serving API + embedded web console on a single port
+- `agencycli run` — manually execute an agent with optional prompt or next pending task
+- `agencycli session reset` — clear agent session
+- `--project` and `--agent` filters for `scheduler start`
+- SQLite telemetry: persistent agent run data with `runs summary` and `runs agents` commands
+- `agent set-model` — change agent model after hiring
+
+**API**
+- `POST /api/v1/run` — trigger agent execution with optional prompt
+- `POST /api/v1/session/reset` — reset agent session
+- `POST /api/v1/roles/create` — create new roles within teams
+- `POST /api/v1/projects/{name}/hire` — hire new agents into projects
+- `GET /api/v1/version` — dynamic version endpoint
+
+**Build & release**
+- Makefile: `web`, `web-install`, `web-dev` targets; `build` now embeds frontend automatically
+- Cross-platform release archives embed the web console
+
+### Changed
+
+- Scheduler startup banner refactored with lipgloss for cleaner terminal rendering
+- Scheduler table columns aligned with proper width handling
+- `inbox send` now requires `--from` flag and validates identities
+
 ## [v0.1.1] - 2026-03-21
 
 ### Added
