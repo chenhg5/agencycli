@@ -1,0 +1,55 @@
+import { useEffect } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppShell } from './components/layout/AppShell'
+import { useAuth } from './lib/auth'
+import LoginPage from './pages/LoginPage'
+import WorkbenchPage from './pages/WorkbenchPage'
+import OverviewPage from './pages/OverviewPage'
+import SettingsPage from './pages/SettingsPage'
+import SkillsPage from './pages/SkillsPage'
+import { ProjectBranch } from './pages/projects/ProjectBranch'
+import ProjectMembersPage from './pages/projects/ProjectMembersPage'
+import ProjectMessagesPage from './pages/projects/ProjectMessagesPage'
+import ProjectRunsPage from './pages/projects/ProjectRunsPage'
+import ProjectSchedulePage from './pages/projects/ProjectSchedulePage'
+import ProjectsListPage from './pages/projects/ProjectsListPage'
+import ProjectTasksPage from './pages/projects/ProjectTasksPage'
+import TeamDetailPage from './pages/teams/TeamDetailPage'
+import TeamsPage from './pages/teams/TeamsPage'
+
+export default function App() {
+  const { token, logout } = useAuth()
+
+  useEffect(() => {
+    const onExpired = () => logout()
+    window.addEventListener('auth-expired', onExpired)
+    return () => window.removeEventListener('auth-expired', onExpired)
+  }, [logout])
+
+  if (!token) {
+    return <LoginPage />
+  }
+
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<OverviewPage />} />
+        <Route path="teams/:teamId" element={<TeamDetailPage />} />
+        <Route path="teams" element={<TeamsPage />} />
+        <Route path="projects" element={<ProjectsListPage />} />
+        <Route path="projects/:projectId" element={<ProjectBranch />}>
+          <Route index element={<Navigate to="tasks" replace />} />
+          <Route path="tasks" element={<ProjectTasksPage />} />
+          <Route path="messages" element={<ProjectMessagesPage />} />
+          <Route path="members" element={<ProjectMembersPage />} />
+          <Route path="schedule" element={<ProjectSchedulePage />} />
+          <Route path="runs" element={<ProjectRunsPage />} />
+        </Route>
+        <Route path="workbench" element={<WorkbenchPage />} />
+        <Route path="skills" element={<SkillsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  )
+}

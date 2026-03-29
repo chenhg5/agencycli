@@ -41,6 +41,9 @@ type Store interface {
 	// Used by task retry to remove a retried task from the archive.
 	OverwriteArchive(project, agent string, tasks []*entity.Task) error
 
+	// DeleteTask removes a task by ID from the active queue or the archive.
+	DeleteTask(project, agent, taskID string) error
+
 	// ClearTasks removes all tasks (active and archived) for the given agent.
 	ClearTasks(project, agent string) error
 

@@ -435,6 +435,44 @@ func (s *FSStore) OverwriteArchive(project, agent string, tasks []*entity.Task) 
 	return writeYAMLAtomic(filepath.Join(dir, archiveFile), tasks)
 }
 
+func (s *FSStore) DeleteTask(project, agent, taskID string) error {
+	tasks, err := s.loadTasks(project, agent)
+	if err != nil {
+		return err
+	}
+	var remaining []*entity.Task
+	removedActive := false
+	for _, t := range tasks {
+		if t.ID == taskID {
+			removedActive = true
+			continue
+		}
+		remaining = append(remaining, t)
+	}
+	if removedActive {
+		return s.saveTasks(project, agent, remaining)
+	}
+
+	archived, err := s.ListArchivedTasks(project, agent)
+	if err != nil {
+		return err
+	}
+	var remainingArchived []*entity.Task
+	removedArch := false
+	for _, t := range archived {
+		if t.ID == taskID {
+			removedArch = true
+			continue
+		}
+		remainingArchived = append(remainingArchived, t)
+	}
+	if removedArch {
+		return s.OverwriteArchive(project, agent, remainingArchived)
+	}
+
+	return fmt.Errorf("task %q not found", taskID)
+}
+
 func (s *FSStore) ClearTasks(project, agent string) error {
 	dir := s.systemDir(project, agent)
 	for _, name := range []string{tasksFile, archiveFile} {

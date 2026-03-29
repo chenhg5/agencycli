@@ -24,6 +24,13 @@ type RunRow struct {
 	HasCost                                    bool
 
 	StartedAt, FinishedAt time.Time
+
+	TaskID, TaskTitle   sql.NullString
+	Model               string
+	CommandSummary      string
+	LogPath             string
+	SessionID           sql.NullString
+	ErrorMsg            sql.NullString
 }
 
 // Summary aggregates for a time window.
@@ -84,7 +91,8 @@ func OpenReadOnly(root string) (*sql.DB, error) {
 func ReadRuns(db *sql.DB, from, to *time.Time, project string) ([]RunRow, error) {
 	q := `SELECT project, agent, kind, status,
 		input_tokens, output_tokens, cache_read_tokens, total_cost_usd, has_cost,
-		started_at, finished_at
+		started_at, finished_at,
+		task_id, task_title, model, command_summary, log_path, session_id, error_msg
 	FROM agent_runs WHERE 1=1`
 	var args []any
 	if from != nil {
@@ -118,6 +126,7 @@ func ReadRuns(db *sql.DB, from, to *time.Time, project string) ([]RunRow, error)
 			&r.Project, &r.Agent, &r.Kind, &r.Status,
 			&inTok, &outTok, &cacheTok, &cost, &hasCost,
 			&startedStr, &finishedStr,
+			&r.TaskID, &r.TaskTitle, &r.Model, &r.CommandSummary, &r.LogPath, &r.SessionID, &r.ErrorMsg,
 		); err != nil {
 			return nil, err
 		}

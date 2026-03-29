@@ -223,22 +223,36 @@ Any participant (human or agent) can send messages to any other. Recipients read
 **Address format:** `human` or `project/agent` (e.g. `cc-connect/pm`, `cc-connect/dev-claude`)
 
 ```bash
-# Send
+# Send (single recipient)
 agencycli inbox send --to cc-connect/pm --subject "Prioritise #55" --body "..."
 agencycli inbox send --from cc-connect/pm --to human --subject "Update" --body "..."
-agencycli inbox send --from cc-connect/pm --to cc-connect/dev-claude \
-  --subject "Extra context" --body "..."
+
+# Group send (repeat --to)
+agencycli inbox send \
+  --to cc-connect/pm --to cc-connect/dev-claude --to human \
+  --subject "All-hands" --body "..."
 
 # Read (human's mailbox by default)
-agencycli inbox messages
-agencycli inbox messages --recipient cc-connect/pm
-agencycli inbox messages --recipient cc-connect/pm --from human      # filter by sender
-agencycli inbox messages --from cc-connect/pm                        # human inbox, only from pm
-agencycli inbox messages --all          # include already-read
-agencycli inbox messages --mark-read    # mark as read after listing
+agencycli inbox messages                                              # unread only
+agencycli inbox messages --recipient cc-connect/pm                   # agent's mailbox
+agencycli inbox messages --from cc-connect/pm                        # filter by sender
+agencycli inbox messages --all                                        # include already-read
+agencycli inbox messages --archived                                   # show archived messages
+agencycli inbox messages --mark-read                                  # mark all as read after listing
 
 # Reply
 agencycli inbox reply <msg-id> --from cc-connect/pm --body "Acknowledged."
+
+# Forward a message to one or more recipients
+agencycli inbox fwd <msg-id> --to cc-connect/dev-claude
+agencycli inbox fwd <msg-id> --to cc-connect/pm --to human --note "FYI"
+
+# Per-message status management
+agencycli inbox read    <msg-id>                    # mark single message as read
+agencycli inbox archive <msg-id>                    # archive (hidden from normal listing)
+agencycli inbox delete  <msg-id>                    # permanently delete
+agencycli inbox rm      <msg-id>                    # alias for delete
+# --recipient flag available on all above to specify mailbox (default: human)
 ```
 
 ### Daemon (heartbeat + wakeup routines)

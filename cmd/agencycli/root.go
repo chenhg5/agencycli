@@ -79,6 +79,7 @@ func init() {
 		newOverviewCmd(),
 		newRunsCmd(),
 		newClearCmd(),
+		newAPICmd(),
 	)
 }
 
