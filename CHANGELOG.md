@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.2.1] - 2026-03-30
+
+### Added
+- Workbench: sent messages view with direction filter (inbox / sent / all)
+- Task completion summary field with notification to task creator
+- Agent model switching (including http-agent) from the web UI
+- Copy-to-clipboard resume command in schedule runtime session column
+- Refresh buttons on all table/filter pages
+- Multi-page tab bar in header for quick page switching
+
+### Fixed
+- Unread message badge not updating after processing messages
+- Scheduler next wakeup time showing stale values outside active window
+- Message dialog recipients only showing one project's agents
+- `forms.save` i18n key not applied in locale files
+- Runs page table cell alignment
+- Task type labels missing i18n support
+
+### Changed
+- Rename "Agency Console" to "AgencyCli" across all locales
+- Workbench tasks panel defaults to showing pending tasks
+- Simplified tab titles to show only the last breadcrumb segment
+- Refresh buttons styled consistently with filter buttons
+
 ## [v0.2.0] - 2026-03-29
 
 ### Added
