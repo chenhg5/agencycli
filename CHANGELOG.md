@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.2.2] - 2026-03-30
+
+### Fixed
+- npm install: Gitee fallback download URL pointed to wrong repository name
+
 ## [v0.2.1] - 2026-03-30
 
 ### Added

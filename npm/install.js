@@ -13,7 +13,7 @@ const VERSION = `v${PACKAGE.version}`;
 const NAME = "agencycli";
 
 const GITHUB_REPO = "chenhg5/agencycli";
-const GITEE_REPO  = "cg33/agencycli";
+const GITEE_REPO  = "cg33/agentorg";
 
 const PLATFORM_MAP = {
   darwin: "darwin",
