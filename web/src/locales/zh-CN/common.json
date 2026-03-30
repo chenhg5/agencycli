@@ -36,7 +36,8 @@
   },
   "footer": {
     "madeWith": "用心打造",
-    "docs": "文档"
+    "docs": "文档",
+    "updateAvailable": "新版本: {{version}}"
   },
   "search": {
     "placeholder": "搜索任务、消息、成员…",
@@ -160,6 +161,9 @@
     "role": "角色（可选）",
     "noRole": "不指定角色",
     "model": "模型",
+    "agentType": "Agent 类型",
+    "apiProvider": "API Provider 配置",
+    "addEnvVar": "添加变量",
     "hiring": "雇佣中…",
     "hire": "雇佣"
   },

@@ -217,6 +217,12 @@ type AgentMeta struct {
 	// HTTPAgent configures an HTTP LLM backend for this agent.
 	// Required (and only used) when Model == "http-agent".
 	HTTPAgent *HTTPAgentConfig `yaml:"http_agent,omitempty"`
+
+	// Env holds per-agent environment variable overrides that are set on the
+	// agent subprocess (e.g. ANTHROPIC_MODEL, ANTHROPIC_BASE_URL, OPENAI_API_KEY).
+	// These are merged with the host environment at runtime, with agent values
+	// taking precedence.
+	Env map[string]string `yaml:"env,omitempty"`
 }
 
 // HTTPAgentConfig configures a custom HTTP LLM backend that speaks the

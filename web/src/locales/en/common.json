@@ -36,7 +36,8 @@
   },
   "footer": {
     "madeWith": "Made with",
-    "docs": "Docs"
+    "docs": "Docs",
+    "updateAvailable": "Update: {{version}}"
   },
   "search": {
     "placeholder": "Search tasks, messages, members…",
@@ -160,6 +161,9 @@
     "role": "Role (optional)",
     "noRole": "No role",
     "model": "Model",
+    "agentType": "Agent Type",
+    "apiProvider": "API Provider",
+    "addEnvVar": "Add variable",
     "hiring": "Hiring…",
     "hire": "Hire"
   },

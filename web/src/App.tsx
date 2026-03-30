@@ -8,6 +8,7 @@ import OverviewPage from './pages/OverviewPage'
 import SettingsPage from './pages/SettingsPage'
 import SkillsPage from './pages/SkillsPage'
 import { ProjectBranch } from './pages/projects/ProjectBranch'
+import ProjectAgentDetailPage from './pages/projects/ProjectAgentDetailPage'
 import ProjectMembersPage from './pages/projects/ProjectMembersPage'
 import ProjectMessagesPage from './pages/projects/ProjectMessagesPage'
 import ProjectRunsPage from './pages/projects/ProjectRunsPage'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="tasks" element={<ProjectTasksPage />} />
           <Route path="messages" element={<ProjectMessagesPage />} />
           <Route path="members" element={<ProjectMembersPage />} />
+          <Route path="members/:agentName" element={<ProjectAgentDetailPage />} />
           <Route path="schedule" element={<ProjectSchedulePage />} />
           <Route path="runs" element={<ProjectRunsPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />

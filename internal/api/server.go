@@ -23,15 +23,23 @@ type contextKey string
 
 const ctxUserKey contextKey = "auth-user"
 
+// UpdateChecker returns latest version info. Set by the caller.
+type UpdateChecker func() (latestVersion, releaseNotes string, hasUpdate bool)
+
+// DaemonStatusFunc returns daemon status as a JSON-friendly map.
+type DaemonStatusFunc func() map[string]any
+
 // Server serves JSON for one workspace root.
 type Server struct {
-	root    string
-	apiKey  string
-	version string
-	st      store.Store
-	ts      taskstore.Store
-	users   *UserStore
-	sched   *SchedulerManager
+	root         string
+	apiKey       string
+	version      string
+	st           store.Store
+	ts           taskstore.Store
+	users        *UserStore
+	sched        *SchedulerManager
+	updateCheck  UpdateChecker
+	daemonStatus DaemonStatusFunc
 }
 
 // NewServer builds an API server for the given workspace root.
@@ -49,6 +57,12 @@ func NewServer(root, apiKey string) *Server {
 
 // SetVersion sets the build version string exposed via /api/v1/health.
 func (s *Server) SetVersion(v string) { s.version = v }
+
+// SetUpdateChecker sets the function used to check for updates.
+func (s *Server) SetUpdateChecker(fn UpdateChecker) { s.updateCheck = fn }
+
+// SetDaemonStatus sets the function used to get daemon status.
+func (s *Server) SetDaemonStatus(fn DaemonStatusFunc) { s.daemonStatus = fn }
 
 // Handler returns the root HTTP handler (includes optional auth).
 func (s *Server) Handler() http.Handler {
@@ -85,6 +99,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents", s.handleProjectAgents)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/context", s.handleGetAgentContext)
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/set-model", s.handleSetModel)
+	mux.HandleFunc("PUT /api/v1/projects/{name}/agents/{agent}/env", s.handlePutAgentEnv)
 	mux.HandleFunc("PUT /api/v1/projects/{name}/agents/{agent}/wakeup", s.handlePutAgentWakeup)
 	mux.HandleFunc("POST /api/v1/projects/{name}/sync", s.handlePostProjectSync)
 	mux.HandleFunc("GET /api/v1/projects/{name}/prompt", s.handleGetProjectPrompt)
@@ -114,6 +129,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/inbox", s.handleInbox)
 	mux.HandleFunc("GET /api/v1/auth/me", s.handleAuthMe)
 	mux.HandleFunc("PUT /api/v1/auth/password", s.handleChangePassword)
+
+	mux.HandleFunc("GET /api/v1/check-update", s.handleCheckUpdate)
+	mux.HandleFunc("GET /api/v1/daemon/status", s.handleDaemonStatus)
 
 	publicMux := http.NewServeMux()
 	publicMux.HandleFunc("POST /api/v1/auth/login", s.handleLogin)
@@ -164,6 +182,32 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		v = "dev"
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "version": v})
+}
+
+func (s *Server) handleCheckUpdate(w http.ResponseWriter, _ *http.Request) {
+	result := map[string]any{
+		"currentVersion": s.version,
+		"hasUpdate":      false,
+	}
+	if s.updateCheck != nil {
+		latest, notes, has := s.updateCheck()
+		result["hasUpdate"] = has
+		if latest != "" {
+			result["latestVersion"] = latest
+		}
+		if notes != "" {
+			result["releaseNotes"] = notes
+		}
+	}
+	_ = json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleDaemonStatus(w http.ResponseWriter, _ *http.Request) {
+	if s.daemonStatus != nil {
+		_ = json.NewEncoder(w).Encode(s.daemonStatus())
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"supported": false, "error": "daemon status not available"})
 }
 
 func (s *Server) handleAgency(w http.ResponseWriter, _ *http.Request) {

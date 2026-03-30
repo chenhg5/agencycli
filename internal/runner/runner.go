@@ -179,6 +179,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	if execDir != "" {
 		cmd.Dir = execDir
 	}
+	cmd.Env = mergeEnv(os.Environ(), meta.Env)
 
 	// When the invoker reads the prompt from stdin, open the prompt file and
 	// pipe it through. For Docker this works because `-i` is always present in
@@ -371,6 +372,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	if execDir != "" {
 		cmd.Dir = execDir
 	}
+	cmd.Env = mergeEnv(os.Environ(), meta.Env)
 
 	var outBuf bytes.Buffer
 	multiOut := io.MultiWriter(&outBuf, logFile)
@@ -691,6 +693,36 @@ func remapPromptFile(args []string, hostPath, containerPath string) []string {
 	out := make([]string, len(args))
 	for i, a := range args {
 		out[i] = strings.ReplaceAll(a, hostPath, containerPath)
+	}
+	return out
+}
+
+// mergeEnv returns a copy of base with the entries in override applied.
+// Keys in override replace matching keys in base (case-sensitive match on
+// the part before '='); new keys are appended.
+func mergeEnv(base []string, override map[string]string) []string {
+	if len(override) == 0 {
+		return base
+	}
+	overKeys := make(map[string]string, len(override))
+	for k, v := range override {
+		overKeys[k] = v
+	}
+	out := make([]string, 0, len(base)+len(override))
+	seen := make(map[string]bool, len(override))
+	for _, entry := range base {
+		k, _, _ := strings.Cut(entry, "=")
+		if v, ok := overKeys[k]; ok {
+			out = append(out, k+"="+v)
+			seen[k] = true
+		} else {
+			out = append(out, entry)
+		}
+	}
+	for k, v := range overKeys {
+		if !seen[k] {
+			out = append(out, k+"="+v)
+		}
 	}
 	return out
 }

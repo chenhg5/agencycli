@@ -36,7 +36,8 @@
   },
   "footer": {
     "madeWith": "こだわりの",
-    "docs": "ドキュメント"
+    "docs": "ドキュメント",
+    "updateAvailable": "更新あり: {{version}}"
   },
   "search": {
     "placeholder": "タスク、メッセージ、メンバーを検索…",
@@ -160,6 +161,9 @@
     "role": "ロール（任意）",
     "noRole": "ロールなし",
     "model": "モデル",
+    "agentType": "Agent タイプ",
+    "apiProvider": "API プロバイダー設定",
+    "addEnvVar": "変数を追加",
     "hiring": "採用中…",
     "hire": "採用"
   },

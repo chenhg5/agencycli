@@ -93,11 +93,16 @@ export function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
   const [appVersion, setAppVersion] = useState('…')
+  const [updateInfo, setUpdateInfo] = useState<{ hasUpdate: boolean; latestVersion?: string } | null>(null)
 
   useEffect(() => {
     apiFetch<{ version: string }>('/api/v1/health')
       .then((d) => setAppVersion(d.version || 'dev'))
       .catch(() => setAppVersion('dev'))
+
+    apiFetch<{ hasUpdate: boolean; latestVersion?: string }>('/api/v1/check-update')
+      .then((d) => setUpdateInfo(d))
+      .catch(() => {})
   }, [])
 
   function toggleSidebar() {
@@ -128,9 +133,21 @@ export function AppShell() {
             <Outlet />
           </main>
           <footer className="flex h-10 w-full shrink-0 items-center justify-between border-t border-neutral-200/60 px-6 dark:border-zinc-800/50">
-            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
-              agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">{appVersion}</span>
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">
+                agencycli <span className="font-mono text-neutral-300 dark:text-zinc-700">{appVersion}</span>
+              </span>
+              {updateInfo?.hasUpdate && updateInfo.latestVersion && (
+                <a
+                  href={`https://github.com/chenhg5/agencycli/releases/tag/${updateInfo.latestVersion}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                >
+                  {t('footer.updateAvailable', { version: updateInfo.latestVersion })}
+                </a>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <a href="https://github.com/chenhg5/agencycli/wiki" target="_blank" rel="noopener noreferrer"
                 className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">

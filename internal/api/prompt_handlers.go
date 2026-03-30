@@ -218,6 +218,9 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 	if meta.HTTPAgent != nil {
 		resp["httpAgent"] = meta.HTTPAgent
 	}
+	if len(meta.Env) > 0 {
+		resp["env"] = meta.Env
+	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
@@ -308,7 +311,7 @@ func (s *Server) handlePostProjectSync(w http.ResponseWriter, r *http.Request) {
 
 	args := []string{"sync", "--dir", s.root, "--project", project}
 	if agentName != "" {
-		args = append(args, "--agent", agentName)
+		args = append(args, "--name", agentName)
 	}
 
 	cmd := exec.Command(bin, args...)

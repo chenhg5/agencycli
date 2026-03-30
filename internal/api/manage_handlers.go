@@ -303,3 +303,51 @@ func (s *Server) handleSessionReset(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "oldSessionId": oldID})
 }
+
+// ── Agent Environment Variables ──────────────────────────────────────────────
+
+type agentEnvBody struct {
+	Env map[string]string `json:"env"`
+}
+
+func (s *Server) handlePutAgentEnv(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("name")
+	agent := r.PathValue("agent")
+
+	var body agentEnvBody
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	meta, err := s.st.AgentMeta(project, agent)
+	if err != nil {
+		if isNotFoundErr(err) {
+			s.jsonError(w, http.StatusNotFound, "agent not found")
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+
+	// Remove empty-value entries
+	cleaned := make(map[string]string)
+	for k, v := range body.Env {
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if k != "" && v != "" {
+			cleaned[k] = v
+		}
+	}
+	if len(cleaned) == 0 {
+		meta.Env = nil
+	} else {
+		meta.Env = cleaned
+	}
+
+	if err := s.st.SaveAgentMeta(project, agent, meta); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "env": meta.Env})
+}

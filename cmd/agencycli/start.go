@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/chenhg5/agencycli/internal/api"
+	"github.com/chenhg5/agencycli/internal/daemon"
 	"github.com/chenhg5/agencycli/web"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +49,24 @@ remote server. For local development with hot-reload, use
   # Auto-open browser
   agencycli start --open`,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			// When started as a daemon, redirect logs to a rotating file.
+			var logCloser func()
+			if logFile := os.Getenv("AGENCYCLI_LOG_FILE"); logFile != "" {
+				maxSize := int64(daemon.DefaultLogMaxSize)
+				if v := os.Getenv("AGENCYCLI_LOG_MAX_SIZE"); v != "" {
+					if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+						maxSize = n
+					}
+				}
+				w, err := daemon.NewRotatingWriter(logFile, maxSize)
+				if err != nil {
+					return fmt.Errorf("open log file %s: %w", logFile, err)
+				}
+				slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})))
+				log.SetOutput(w)
+				logCloser = func() { w.Close() }
+			}
+
 			root, err := resolveRoot()
 			if err != nil {
 				return err
@@ -52,6 +74,8 @@ remote server. For local development with hot-reload, use
 			key := api.ResolveAPIKey(apiKey)
 			srv := api.NewServer(root, key)
 			srv.SetVersion(version)
+			srv.SetUpdateChecker(GetCachedUpdateInfo)
+			srv.SetDaemonStatus(daemonStatusJSON)
 
 			handler := newSPAHandler(srv.Handler())
 
@@ -63,7 +87,11 @@ remote server. For local development with hot-reload, use
 			if open {
 				go openBrowser(url)
 			}
-			if err := http.ListenAndServe(addr, handler); err != nil {
+			err = http.ListenAndServe(addr, handler)
+			if logCloser != nil {
+				logCloser()
+			}
+			if err != nil {
 				return fmt.Errorf("http server: %w", err)
 			}
 			return nil

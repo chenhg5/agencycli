@@ -81,6 +81,9 @@ func init() {
 		newClearCmd(),
 		newAPICmd(),
 		newStartCmd(),
+		newDaemonCmd(),
+		newCheckUpdateCmd(),
+		newUpdateCmd(),
 	)
 }
 
@@ -94,6 +97,7 @@ func resolveRoot() (string, error) {
 }
 
 func main() {
+	checkUpdateAsync()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
