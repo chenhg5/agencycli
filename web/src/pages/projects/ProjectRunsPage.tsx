@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, FileText, X } from 'lucide-react'
+import { BarChart3, FileText, RefreshCw, X } from 'lucide-react'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
 import { cn } from '../../lib/cn'
@@ -138,8 +138,10 @@ export default function ProjectRunsPage() {
     return `/api/v1/telemetry/runs?${p}`
   }, [projectId, windowKey])
 
-  const sumState = useApiJson<TelemetrySummary>(summaryQuery, 0)
-  const runsState = useApiJson<TelemetryRuns>(runsQuery, 0)
+  const [reloadKey, setReloadKey] = useState(0)
+  const refresh = useCallback(() => setReloadKey((k) => k + 1), [])
+  const sumState = useApiJson<TelemetrySummary>(summaryQuery, reloadKey)
+  const runsState = useApiJson<TelemetryRuns>(runsQuery, reloadKey)
 
   const allRuns = runsState.status === 'ok' && runsState.data.available ? runsState.data.runs : []
 
@@ -173,22 +175,28 @@ export default function ProjectRunsPage() {
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{t('projectNav.runs')}</h1>
             <p className="mt-0.5 text-sm text-neutral-500 dark:text-zinc-500">{t('runs.subtitle')}</p>
           </div>
-          <div className="flex items-center gap-1">
-            {windowKeys.map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setWindowKey(k)}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150',
-                  windowKey === k
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800',
-                )}
-              >
-                {t(`runs.window.${k}`)}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {windowKeys.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setWindowKey(k)}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150',
+                    windowKey === k
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800',
+                  )}
+                >
+                  {t(`runs.window.${k}`)}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={refresh} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+              <RefreshCw className="size-3" strokeWidth={2} />
+              {t('api.refresh')}
+            </button>
           </div>
         </div>
       </div>
@@ -254,11 +262,11 @@ export default function ProjectRunsPage() {
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
                 {sumState.data.byAgent.map((a) => (
                   <tr key={`${a.project}/${a.agent}`} className="bg-white transition-colors duration-100 hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-neutral-800 dark:text-zinc-300">{a.project}/{a.agent}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{a.runs}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{fmtNum(a.inputTokens)}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{fmtNum(a.outputTokens)}</td>
-                    <td className="px-4 py-3 text-sm tabular-nums text-neutral-700 dark:text-zinc-400">${a.costUSD.toFixed(4)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center font-mono text-sm text-neutral-800 dark:text-zinc-300">{a.project}/{a.agent}</td>
+                    <td className="px-4 py-3 text-center text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{a.runs}</td>
+                    <td className="px-4 py-3 text-center text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{fmtNum(a.inputTokens)}</td>
+                    <td className="px-4 py-3 text-center text-sm tabular-nums text-neutral-700 dark:text-zinc-400">{fmtNum(a.outputTokens)}</td>
+                    <td className="px-4 py-3 text-center text-sm tabular-nums text-neutral-700 dark:text-zinc-400">${a.costUSD.toFixed(4)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -323,9 +331,9 @@ export default function ProjectRunsPage() {
                       className="cursor-pointer bg-white transition-colors duration-100 hover:bg-sky-50/40 dark:bg-zinc-900/20 dark:hover:bg-sky-900/[0.06]"
                       onClick={() => setSelectedRun(r)}
                     >
-                      <td className="whitespace-nowrap px-4 py-3 text-[13px] text-neutral-500 dark:text-zinc-500">{fmt(r.startedAt)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-[13px] text-neutral-800 dark:text-zinc-300">{r.project}/{r.agent}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3 text-center text-[13px] text-neutral-500 dark:text-zinc-500">{fmt(r.startedAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center font-mono text-[13px] text-neutral-800 dark:text-zinc-300">{r.project}/{r.agent}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center">
                         <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', kl.cls)}>
                           {kl.text}
                         </span>
@@ -333,8 +341,8 @@ export default function ProjectRunsPage() {
                           <span className="ml-1.5 text-[13px] text-neutral-500 dark:text-zinc-500">{r.taskTitle}</span>
                         )}
                       </td>
-                      <td className={cn('whitespace-nowrap px-4 py-3 text-[13px] font-medium', statusCls[r.status] ?? 'text-neutral-600 dark:text-zinc-400')}>{r.status}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-neutral-500 dark:text-zinc-500">
+                      <td className={cn('whitespace-nowrap px-4 py-3 text-center text-[13px] font-medium', statusCls[r.status] ?? 'text-neutral-600 dark:text-zinc-400')}>{r.status}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center text-[13px] tabular-nums text-neutral-500 dark:text-zinc-500">
                         {fmtNum((r.inputTokens ?? 0) + (r.outputTokens ?? 0) + (r.cacheReadTokens ?? 0))}
                       </td>
                     </tr>

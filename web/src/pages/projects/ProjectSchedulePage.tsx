@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  CalendarClock, Heart, Pause, Pencil, Play, Plus, Power,
+  CalendarClock, ClipboardCopy, Heart, Pause, Pencil, Play, Plus, Power,
   Trash2, X, Zap,
 } from 'lucide-react'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
@@ -31,7 +31,7 @@ type CronRow = {
   lastRun?: string; lastRunStatus?: string; runCount?: number
 }
 
-type AgentSchedule = { name: string; heartbeat: HeartbeatRow; crons: CronRow[] }
+type AgentSchedule = { name: string; heartbeat: HeartbeatRow; crons: CronRow[]; model?: string; agentDir?: string }
 type ScheduleResp = { project: string; agents: AgentSchedule[] }
 
 /* ─── shared styles ─── */
@@ -550,9 +550,12 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                   <td className={cn(tdCls, 'tabular-nums')}>{hb.wakeupCountToday ?? 0}</td>
                   <td className={tdCls}>
                     {hasSession ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
-                        {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-600">{fmt(hb.sessionStartedAt)}</span>}
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
+                          {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-600">{fmt(hb.sessionStartedAt)}</span>}
+                        </div>
+                        <CopySessionCmd model={ag.model} sessionId={hb.sessionId!} agentDir={ag.agentDir} />
                       </div>
                     ) : (
                       <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('session.noSession')}</span>
@@ -597,6 +600,44 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
         </table>
       </div>
     </>
+  )
+}
+
+/* ─── copy session command ─── */
+
+function buildResumeCmd(model: string | undefined, sessionId: string, agentDir: string | undefined): string {
+  const cd = agentDir ? `cd ${agentDir} && ` : ''
+  const m = (model ?? '').toLowerCase()
+  if (m.includes('claude'))  return `${cd}claude --resume ${sessionId}`
+  if (m.includes('codex'))   return `${cd}codex exec resume ${sessionId}`
+  if (m.includes('gemini'))  return `${cd}gemini --resume ${sessionId}`
+  if (m.includes('cursor'))  return `${cd}agent --resume ${sessionId}`
+  return `${cd}# session: ${sessionId}`
+}
+
+function CopySessionCmd({ model, sessionId, agentDir }: { model?: string; sessionId: string; agentDir?: string }) {
+  const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+
+  function doCopy() {
+    const cmd = buildResumeCmd(model, sessionId, agentDir)
+    void navigator.clipboard.writeText(cmd).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={doCopy}
+      title={t('schedule.copyResumeCmd')}
+      className="shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+    >
+      {copied
+        ? <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓</span>
+        : <ClipboardCopy className="size-3.5" strokeWidth={2} />}
+    </button>
   )
 }
 

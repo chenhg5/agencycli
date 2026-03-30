@@ -227,6 +227,7 @@ type updateTaskBody struct {
 	Status   *string `json:"status,omitempty"`
 	Priority *int    `json:"priority,omitempty"`
 	Type     *string `json:"type,omitempty"`
+	Summary  *string `json:"summary,omitempty"`
 }
 
 func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
@@ -242,8 +243,8 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "project, agent, and id are required")
 		return
 	}
-	if body.Status == nil && body.Priority == nil && body.Type == nil {
-		s.jsonError(w, http.StatusBadRequest, "at least one of status, priority, or type is required")
+	if body.Status == nil && body.Priority == nil && body.Type == nil && body.Summary == nil {
+		s.jsonError(w, http.StatusBadRequest, "at least one of status, priority, type, or summary is required")
 		return
 	}
 
@@ -289,8 +290,15 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Type = entity.TaskType(typ)
 	}
+	if body.Summary != nil {
+		t.Summary = strings.TrimSpace(*body.Summary)
+	}
 
-	t.UpdatedAt = time.Now().UTC()
+	now := time.Now().UTC()
+	t.UpdatedAt = now
+	if t.Status.IsTerminal() && t.FinishedAt == nil {
+		t.FinishedAt = &now
+	}
 
 	activeTasks, err := s.ts.ListTasks(project, agent)
 	if err != nil {
@@ -331,6 +339,10 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.serverError(w, err)
 			return
 		}
+	}
+
+	if body.Status != nil && t.Status.IsTerminal() && t.CreatedBy != "" {
+		s.notifyTaskDone(t, project, agent)
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
@@ -631,4 +643,37 @@ func (s *Server) handlePostProjectMarkAllMessagesRead(w http.ResponseWriter, r *
 		}
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "mailboxes": mailboxes})
+}
+
+func (s *Server) notifyTaskDone(t *entity.Task, project, agent string) {
+	assignee := t.Assignee
+	if assignee == "" {
+		assignee = project + "/" + agent
+	}
+	if assignee == t.CreatedBy {
+		return
+	}
+
+	statusLabel := "completed"
+	if t.Status == entity.TaskStatusDoneFailed {
+		statusLabel = "failed"
+	} else if t.Status == entity.TaskStatusCancelled {
+		statusLabel = "cancelled"
+	}
+
+	body := fmt.Sprintf("Task **%s** (`%s`) has been marked as **%s** by `%s`.",
+		t.Title, t.ID, statusLabel, assignee)
+	if t.Summary != "" {
+		body += "\n\n**Summary:** " + t.Summary
+	}
+
+	msg := &entity.Message{
+		ID:      entity.NewMessageID(),
+		From:    assignee,
+		To:      t.CreatedBy,
+		Subject: fmt.Sprintf("[Task %s] %s", statusLabel, t.Title),
+		Body:    body,
+		SentAt:  time.Now().UTC(),
+	}
+	_ = s.ts.SendMessage(msg)
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ListFilter, X } from 'lucide-react'
+import { ListFilter, RefreshCw, X } from 'lucide-react'
 import {
   MessageDetailModal,
   type MessageDetailModel,
@@ -184,6 +184,10 @@ export default function ProjectMessagesPage() {
               {t('messages.resetFilters')}
             </button>
           )}
+          <button type="button" onClick={() => { setReloadKey((k) => k + 1); setChecked(new Set()) }} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+            <RefreshCw className="size-3" strokeWidth={2} />
+            {t('api.refresh')}
+          </button>
         </div>
       </div>
 

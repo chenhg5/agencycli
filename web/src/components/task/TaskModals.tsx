@@ -19,6 +19,8 @@ export type TaskRow = {
   archived: boolean
   assignee?: string
   prompt?: string
+  summary?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -66,10 +68,12 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
   const [status, setStatus] = useState(task.status)
   const [priority, setPriority] = useState(task.priority)
   const [taskType, setTaskType] = useState(task.type ?? '')
+  const [summary, setSummary] = useState(task.summary ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const changed = status !== task.status || priority !== task.priority || taskType !== (task.type ?? '')
+  const showSummary = isTerminal(status)
+  const changed = status !== task.status || priority !== task.priority || taskType !== (task.type ?? '') || summary !== (task.summary ?? '')
 
   async function onSave() {
     setErr(null)
@@ -79,6 +83,7 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
       if (status !== task.status) body.status = status
       if (priority !== task.priority) body.priority = priority
       if (taskType !== (task.type ?? '')) body.type = taskType
+      if (summary !== (task.summary ?? '')) body.summary = summary
       await apiPut('/api/v1/tasks/update', body)
       onSaved()
       onClose()
@@ -117,6 +122,23 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
               {['chore', 'feature', 'bug', 'review', 'triage', 'test', 'research'].map((ty) => <option key={ty} value={ty}>{t(`forms.taskType.${ty}`, { defaultValue: ty })}</option>)}
             </select>
           </label>
+          {showSummary && (
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.summary')}</span>
+              <textarea
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                rows={3}
+                placeholder={t('tasks.summaryPlaceholder')}
+                className={cn(fieldCls, 'mt-1')}
+              />
+              {task.createdBy && (
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-600">
+                  {t('tasks.willNotifyCreator', { creator: task.createdBy })}
+                </p>
+              )}
+            </label>
+          )}
           {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-zinc-600">{t('forms.cancel')}</button>
@@ -174,7 +196,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           <InfoCell label={t('tasks.colAssignee')}>{task.assignee === 'human' ? <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">human</span> : <span className="font-mono">{task.agent}</span>}</InfoCell>
           <InfoCell label={t('forms.type')}>{task.type ? t(`forms.taskType.${task.type}`, { defaultValue: task.type }) : '—'}</InfoCell>
           <InfoCell label={t('api.taskColUpdated')}>{fmt(task.updatedAt)}</InfoCell>
-          <InfoCell label={t('tasks.colArchived')}>{task.archived ? t('tasks.yes') : t('tasks.no')}</InfoCell>
+          {task.createdBy && <InfoCell label={t('tasks.createdBy')}><span className="font-mono">{task.createdBy}</span></InfoCell>}
           {matchingRun && (
             <>
               <InfoCell label={t('runs.model')}><span className="font-mono">{matchingRun.model ?? '—'}</span></InfoCell>
@@ -193,6 +215,15 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('forms.prompt')}</span>
             <div className="mt-1.5 overflow-y-auto rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-zinc-800/50 dark:text-zinc-300">
               <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.prompt}</ReactMarkdown></div>
+            </div>
+          </div>
+        )}
+
+        {task.summary && (
+          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-800/40">
+            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">{t('tasks.summary')}</span>
+            <div className="mt-1.5 overflow-y-auto rounded-lg bg-emerald-50 p-3 text-sm text-neutral-700 dark:bg-emerald-900/20 dark:text-zinc-300">
+              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.summary}</ReactMarkdown></div>
             </div>
           </div>
         )}

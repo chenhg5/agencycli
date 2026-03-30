@@ -135,6 +135,8 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 					Priority:  int(t.Priority),
 					Status:    string(t.Status),
 					Archived:  isArchived,
+					Summary:   t.Summary,
+					CreatedBy: t.CreatedBy,
 					CreatedAt: t.CreatedAt,
 					UpdatedAt: t.UpdatedAt,
 				})

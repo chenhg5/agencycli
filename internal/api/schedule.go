@@ -51,11 +51,16 @@ func (s *Server) handleGetProjectSchedule(w http.ResponseWriter, r *http.Request
 			}
 			cronOut = append(cronOut, cronToJSON(c))
 		}
-		sortAgents = append(sortAgents, map[string]any{
+		entry := map[string]any{
 			"name":      ag.Name,
 			"heartbeat": heartbeatToJSON(hb),
 			"crons":     cronOut,
-		})
+		}
+		if meta, err := s.st.AgentMeta(name, ag.Name); err == nil && meta != nil {
+			entry["model"] = string(meta.Model)
+			entry["agentDir"] = s.st.AgentDir(name, ag.Name)
+		}
+		sortAgents = append(sortAgents, entry)
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"project": name,

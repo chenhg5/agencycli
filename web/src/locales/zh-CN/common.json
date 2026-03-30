@@ -126,6 +126,10 @@
     "noRunRecord": "未找到此任务的执行记录。",
     "yes": "是",
     "no": "否",
+    "summary": "处理结果",
+    "summaryPlaceholder": "描述处理结果或留言…",
+    "willNotifyCreator": "保存后将通知任务创建者 {{creator}}。",
+    "createdBy": "创建者",
     "status": {
       "pending": "待处理",
       "in_progress": "运行中",
@@ -227,6 +231,7 @@
   },
   "api": {
     "loading": "加载中…",
+    "refresh": "刷新",
     "loadError": "无法连接 API",
     "hintServe": "在机构工作区根目录运行：agencycli api serve（默认 127.0.0.1:27892，与 Vite 代理一致）。也可用环境变量 VITE_API_BASE / VITE_API_KEY。",
     "noProjects": "暂无项目",
@@ -397,7 +402,8 @@
     "schedulerStartedAt": "启动于",
     "allSchedulers": "所有调度器实例",
     "wakeupNow": "立即唤醒",
-    "wakingUp": "唤醒中…"
+    "wakingUp": "唤醒中…",
+    "copyResumeCmd": "复制恢复会话命令"
   },
   "session": {
     "sessionLabel": "会话",

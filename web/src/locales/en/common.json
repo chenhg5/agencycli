@@ -126,6 +126,10 @@
     "noRunRecord": "No execution record found for this task.",
     "yes": "Yes",
     "no": "No",
+    "summary": "Summary / Result",
+    "summaryPlaceholder": "Describe the outcome or leave a note…",
+    "willNotifyCreator": "A notification will be sent to {{creator}} upon saving.",
+    "createdBy": "Created by",
     "status": {
       "pending": "Pending",
       "in_progress": "Running",
@@ -227,6 +231,7 @@
   },
   "api": {
     "loading": "Loading…",
+    "refresh": "Refresh",
     "loadError": "Could not reach API",
     "hintServe": "From your agency workspace root run: agencycli api serve (default 127.0.0.1:27892, matches the Vite proxy). Optional: VITE_API_BASE / VITE_API_KEY.",
     "noProjects": "No projects yet",
@@ -397,7 +402,8 @@
     "schedulerStartedAt": "started",
     "allSchedulers": "All scheduler instances",
     "wakeupNow": "Wakeup",
-    "wakingUp": "Waking…"
+    "wakingUp": "Waking…",
+    "copyResumeCmd": "Copy resume command"
   },
   "session": {
     "sessionLabel": "Session",

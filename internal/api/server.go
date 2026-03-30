@@ -384,6 +384,8 @@ type taskRow struct {
 	Priority  int       `json:"priority"`
 	Status    string    `json:"status"`
 	Archived  bool      `json:"archived"`
+	Summary   string    `json:"summary,omitempty"`
+	CreatedBy string    `json:"createdBy,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -447,6 +449,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 						Title: t.Title, Type: string(t.Type), Assignee: t.Assignee, Prompt: t.Prompt,
 						Priority: t.Priority,
 						Status: string(t.Status), Archived: false,
+						Summary: t.Summary, CreatedBy: t.CreatedBy,
 						CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
 					})
 				}
@@ -464,6 +467,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 						Title: t.Title, Type: string(t.Type), Assignee: t.Assignee, Prompt: t.Prompt,
 						Priority: t.Priority,
 						Status: string(t.Status), Archived: true,
+						Summary: t.Summary, CreatedBy: t.CreatedBy,
 						CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
 					})
 				}

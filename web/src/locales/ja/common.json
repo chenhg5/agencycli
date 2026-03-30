@@ -126,6 +126,10 @@
     "noRunRecord": "このタスクの実行記録が見つかりません。",
     "yes": "はい",
     "no": "いいえ",
+    "summary": "処理結果",
+    "summaryPlaceholder": "処理結果を入力またはメモを残す…",
+    "willNotifyCreator": "保存後、タスク作成者 {{creator}} に通知されます。",
+    "createdBy": "作成者",
     "status": {
       "pending": "待機中",
       "in_progress": "実行中",
@@ -227,6 +231,7 @@
   },
   "api": {
     "loading": "読み込み中…",
+    "refresh": "更新",
     "loadError": "API に接続できません",
     "hintServe": "機関ワークスペースのルートで実行：agencycli api serve（既定は 127.0.0.1:27892、Vite プロキシと一致）。環境変数 VITE_API_BASE／VITE_API_KEY も利用できます。",
     "noProjects": "プロジェクトはありません",
@@ -397,7 +402,8 @@
     "schedulerStartedAt": "開始",
     "allSchedulers": "すべてのスケジューラー",
     "wakeupNow": "今すぐ起動",
-    "wakingUp": "起動中…"
+    "wakingUp": "起動中…",
+    "copyResumeCmd": "セッション再開コマンドをコピー"
   },
   "session": {
     "sessionLabel": "セッション",
