@@ -3,7 +3,7 @@
     "mainNavigation": "主導航"
   },
   "app": {
-    "name": "Agency Console",
+    "name": "AgencyCli",
     "tagline": "工作區"
   },
   "nav": {
@@ -316,6 +316,9 @@
   "messages": {
     "showArchived": "顯示已封存",
     "filtersTitle": "篩選",
+    "directionAll": "全部訊息",
+    "directionInbox": "收件匣",
+    "directionSent": "已發送",
     "filterRead": "已讀狀態",
     "readAll": "全部",
     "readUnread": "僅未讀",
@@ -469,7 +472,7 @@
     "viewConversation": "對話檢視"
   },
   "auth": {
-    "loginTitle": "登入 Agency Console",
+    "loginTitle": "登入 AgencyCli",
     "loginSubtitle": "請輸入帳號密碼登入系統",
     "username": "使用者名稱",
     "password": "密碼",

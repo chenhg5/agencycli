@@ -3,7 +3,7 @@
     "mainNavigation": "主导航"
   },
   "app": {
-    "name": "Agency Console",
+    "name": "AgencyCli",
     "tagline": "工作区"
   },
   "nav": {
@@ -316,6 +316,9 @@
   "messages": {
     "showArchived": "显示已归档",
     "filtersTitle": "筛选",
+    "directionAll": "全部消息",
+    "directionInbox": "收件箱",
+    "directionSent": "已发送",
     "filterRead": "已读状态",
     "readAll": "全部",
     "readUnread": "仅未读",
@@ -469,7 +472,7 @@
     "viewConversation": "对话视图"
   },
   "auth": {
-    "loginTitle": "登录 Agency Console",
+    "loginTitle": "登录 AgencyCli",
     "loginSubtitle": "请输入账号密码登录系统",
     "username": "用户名",
     "password": "密码",

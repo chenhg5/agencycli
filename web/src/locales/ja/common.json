@@ -3,7 +3,7 @@
     "mainNavigation": "メインナビゲーション"
   },
   "app": {
-    "name": "Agency Console",
+    "name": "AgencyCli",
     "tagline": "ワークスペース"
   },
   "nav": {
@@ -316,6 +316,9 @@
   "messages": {
     "showArchived": "アーカイブを表示",
     "filtersTitle": "絞り込み",
+    "directionAll": "すべてのメッセージ",
+    "directionInbox": "受信トレイ",
+    "directionSent": "送信済み",
     "filterRead": "既読状態",
     "readAll": "すべて",
     "readUnread": "未読のみ",
@@ -469,7 +472,7 @@
     "viewConversation": "会話ビュー"
   },
   "auth": {
-    "loginTitle": "Agency Console にログイン",
+    "loginTitle": "AgencyCli にログイン",
     "loginSubtitle": "ユーザー名とパスワードを入力してください",
     "username": "ユーザー名",
     "password": "パスワード",

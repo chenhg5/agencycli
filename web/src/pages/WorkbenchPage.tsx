@@ -65,15 +65,17 @@ type MessageRow = MessageDetailModel
 type TaskRow = SharedTaskRow
 
 type Filters = {
+  direction: 'all' | 'inbox' | 'sent'
   read: 'all' | 'read' | 'unread'
   archived: 'all' | 'no' | 'yes'
   from: string
 }
 
-const defaultFilters: Filters = { read: 'unread', archived: 'no', from: '' }
+const defaultFilters: Filters = { direction: 'all', read: 'unread', archived: 'no', from: '' }
 
 function buildMsgQuery(f: Filters) {
   const p = new URLSearchParams()
+  if (f.direction !== 'all') p.set('direction', f.direction)
   if (f.read !== 'all') p.set('read', f.read)
   if (f.archived !== 'no') p.set('archived', f.archived)
   if (f.from) p.set('from', f.from)
@@ -192,11 +194,15 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
   const messages = state.status === 'ok' ? (state.data ?? []) : []
 
   function setFilter<K extends keyof Filters>(key: K, val: Filters[K]) {
-    setFilters((prev) => ({ ...prev, [key]: val }))
+    setFilters((prev) => {
+      const next = { ...prev, [key]: val }
+      if (key === 'direction' && val === 'sent') next.read = 'all'
+      return next
+    })
     setChecked(new Set())
   }
   function resetFilters() { setFilters({ ...defaultFilters }); setChecked(new Set()) }
-  const hasFilters = filters.read !== 'all' || filters.archived !== 'no' || filters.from !== ''
+  const hasFilters = filters.direction !== 'all' || filters.read !== 'all' || filters.archived !== 'no' || filters.from !== ''
 
   const allChecked = messages.length > 0 && checked.size === messages.length
   const someChecked = checked.size > 0
@@ -251,6 +257,11 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
       {/* Filters */}
       <div className="shrink-0 px-8 py-4">
         <div className="flex flex-wrap items-center gap-3">
+          <select value={filters.direction} onChange={(e) => setFilter('direction', e.target.value as Filters['direction'])} className={selectCls}>
+            <option value="all">{t('messages.directionAll')}</option>
+            <option value="inbox">{t('messages.directionInbox')}</option>
+            <option value="sent">{t('messages.directionSent')}</option>
+          </select>
           <select value={filters.read} onChange={(e) => setFilter('read', e.target.value as Filters['read'])} className={selectCls}>
             <option value="all">{t('messages.filterRead')}: {t('messages.readAll')}</option>
             <option value="unread">{t('messages.readUnread')}</option>
@@ -320,7 +331,8 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
               <span className="text-xs text-neutral-400 dark:text-zinc-600">{messages.length} {t('workbench.tabMessages').toLowerCase()}</span>
             </div>
             {messages.map((row) => {
-              const unread = !row.readAt
+              const isSent = row.from === 'human'
+              const unread = !isSent && !row.readAt
               const archived = Boolean(row.archivedAt)
               const isChecked = checked.has(row.id)
               return (
@@ -343,6 +355,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-3">
                         {unread && <span className="size-2.5 shrink-0 rounded-full bg-sky-500" />}
+                        {isSent && <span className="size-2.5 shrink-0 rounded-full bg-emerald-400 dark:bg-emerald-600" />}
                         <span className="font-mono text-sm font-semibold text-neutral-800 dark:text-zinc-200">{row.from}</span>
                         <span className="text-xs text-neutral-400 dark:text-zinc-600">→ {row.to}</span>
                         <span className="ml-auto shrink-0 text-xs text-neutral-400 dark:text-zinc-600">{fmt(row.sentAt)}</span>
@@ -352,6 +365,11 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                       )}
                       <p className="mt-1 text-sm leading-relaxed text-neutral-500 dark:text-zinc-500">{preview(row.body)}</p>
                       <div className="mt-2.5 flex items-center gap-2">
+                        {isSent && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            {t('messages.directionSent')}
+                          </span>
+                        )}
                         {unread && (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
                             <span className="size-1.5 rounded-full bg-sky-500" />
@@ -373,7 +391,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3">
-                      <InlineReply originalFrom={row.from} onSent={reloadAndNotify} />
+                      {!isSent && <InlineReply originalFrom={row.from} onSent={reloadAndNotify} />}
                       <div className="ml-auto flex items-center gap-2">
                         {unread && (
                           <button type="button" onClick={(e) => void quickMarkRead(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20">{t('forms.markAsRead')}</button>
@@ -680,7 +698,7 @@ export default function WorkbenchPage() {
   const projectsAgents = useProjectsAgents()
   const [badgeKey, setBadgeKey] = useState(0)
 
-  const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?read=unread', badgeKey)
+  const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?direction=inbox&read=unread', badgeKey)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
   const refreshBadge = useCallback(() => setBadgeKey((k) => k + 1), [])
 

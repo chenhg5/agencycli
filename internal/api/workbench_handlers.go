@@ -26,31 +26,64 @@ func (s *Server) handleWorkbenchMessages(w http.ResponseWriter, r *http.Request)
 		readFilter = "all"
 	}
 	fromQ := strings.TrimSpace(q.Get("from"))
+	direction := strings.TrimSpace(strings.ToLower(q.Get("direction")))
+	if direction == "" {
+		direction = "all"
+	}
 
 	useAll := archivedMode == "all" || archivedMode == "yes"
+	seen := map[string]bool{}
 	var msgs []*msgWithMailbox
-	var err error
 
-	if useAll {
-		raw, e := s.ts.ListAllMessages("human")
-		err = e
-		for _, m := range raw {
-			if m != nil {
-				msgs = append(msgs, &msgWithMailbox{m, "human"})
-			}
+	// Inbox: messages TO human (stored in human mailbox)
+	if direction == "inbox" || direction == "all" {
+		var raw []*entity.Message
+		var err error
+		if useAll {
+			raw, err = s.ts.ListAllMessages("human")
+		} else {
+			raw, err = s.ts.ListMessages("human")
 		}
-	} else {
-		raw, e := s.ts.ListMessages("human")
-		err = e
+		if err != nil {
+			s.serverError(w, err)
+			return
+		}
 		for _, m := range raw {
-			if m != nil {
+			if m != nil && !seen[m.ID] {
+				seen[m.ID] = true
 				msgs = append(msgs, &msgWithMailbox{m, "human"})
 			}
 		}
 	}
-	if err != nil {
-		s.serverError(w, err)
-		return
+
+	// Sent: messages FROM human (stored in each agent's mailbox)
+	if direction == "sent" || direction == "all" {
+		projects, err := s.ts.ListProjects()
+		if err != nil {
+			s.serverError(w, err)
+			return
+		}
+		for _, proj := range projects {
+			agents, err := s.ts.ListAgents(proj)
+			if err != nil {
+				continue
+			}
+			for _, ag := range agents {
+				mailbox := proj + "/" + ag
+				var raw []*entity.Message
+				if useAll {
+					raw, _ = s.ts.ListAllMessages(mailbox)
+				} else {
+					raw, _ = s.ts.ListMessages(mailbox)
+				}
+				for _, m := range raw {
+					if m != nil && m.From == "human" && !seen[m.ID] {
+						seen[m.ID] = true
+						msgs = append(msgs, &msgWithMailbox{m, mailbox})
+					}
+				}
+			}
+		}
 	}
 
 	rows := make([]msgRow, 0, len(msgs))
@@ -79,7 +112,7 @@ func (s *Server) handleWorkbenchMessages(w http.ResponseWriter, r *http.Request)
 			SentAt:     sent,
 			ReadAt:     read,
 			ArchivedAt: arch,
-			Mailbox:    "human",
+			Mailbox:    mw.mailbox,
 		})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].SentAt.After(rows[j].SentAt) })

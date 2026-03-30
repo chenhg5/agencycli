@@ -3,7 +3,7 @@
     "mainNavigation": "Main navigation"
   },
   "app": {
-    "name": "Agency Console",
+    "name": "AgencyCli",
     "tagline": "workspace"
   },
   "nav": {
@@ -316,6 +316,9 @@
   "messages": {
     "showArchived": "Show archived",
     "filtersTitle": "Filters",
+    "directionAll": "All messages",
+    "directionInbox": "Inbox",
+    "directionSent": "Sent",
     "filterRead": "Read state",
     "readAll": "All",
     "readUnread": "Unread only",
@@ -469,7 +472,7 @@
     "viewConversation": "Conversation"
   },
   "auth": {
-    "loginTitle": "Sign in to Agency Console",
+    "loginTitle": "Sign in to AgencyCli",
     "loginSubtitle": "Enter your credentials to continue",
     "username": "Username",
     "password": "Password",
