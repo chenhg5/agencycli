@@ -5,11 +5,26 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
 )
+
+// processAlive checks whether a process with the given PID is still running.
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
 
 func (s *Server) handleGetProjectSchedule(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -35,6 +50,13 @@ func (s *Server) handleGetProjectSchedule(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			s.serverError(w, err)
 			return
+		}
+		// Fix stale "running" status: if the recorded process is no longer alive,
+		// the wakeup/scheduler must have exited without cleanup (crash/kill).
+		if hb.LastWakeupStatus == "running" && hb.PID > 0 && !processAlive(hb.PID) {
+			hb.LastWakeupStatus = "done"
+			hb.PID = 0
+			_ = s.ts.SaveHeartbeat(name, ag.Name, hb)
 		}
 		crons, err := s.ts.ListCrons(name, ag.Name)
 		if err != nil {
@@ -81,6 +103,7 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		"sessionScope":          string(h.SessionScope),
 		"wakeupPrompt":          h.WakeupPrompt,
 		"wakeupCondition":       h.WakeupCondition,
+		"wakeupPreset":          h.WakeupPreset,
 		"maxTasksPerCycle":      h.MaxTasksPerCycle,
 		"maxCycleDuration":      h.MaxCycleDuration,
 		"pid":                   h.PID,
@@ -179,6 +202,7 @@ type patchHeartbeatBody struct {
 	SessionScope     *string `json:"sessionScope,omitempty"`
 	WakeupPrompt     *string `json:"wakeupPrompt,omitempty"`
 	WakeupCondition  *string `json:"wakeupCondition,omitempty"`
+	WakeupPreset     *string `json:"wakeupPreset,omitempty"`
 	MaxTasksPerCycle *int    `json:"maxTasksPerCycle,omitempty"`
 	MaxCycleDuration *string `json:"maxCycleDuration,omitempty"`
 }
@@ -231,6 +255,9 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if body.WakeupCondition != nil {
 		hb.WakeupCondition = *body.WakeupCondition
 	}
+	if body.WakeupPreset != nil {
+		hb.WakeupPreset = strings.TrimSpace(*body.WakeupPreset)
+	}
 	if body.MaxTasksPerCycle != nil {
 		hb.MaxTasksPerCycle = *body.MaxTasksPerCycle
 	}
@@ -248,6 +275,69 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(heartbeatToJSON(hb))
+	// Auto-restart scheduler so config changes take effect immediately.
+	go func() {
+		statuses := s.sched.Status()
+		for _, st := range statuses {
+			if !st.Running {
+				continue
+			}
+			if st.Key == name || st.Key == "all" || st.Key == name+"/"+agent {
+				proj := st.Project
+				ag := st.Agent
+				_ = s.sched.Stop(proj, ag)
+				time.Sleep(500 * time.Millisecond)
+				_ = s.sched.Start(proj, ag)
+				break
+			}
+		}
+	}()
+}
+
+func (s *Server) handleAgentLiveLog(w http.ResponseWriter, r *http.Request) {
+	name, agent, ok := s.parseProjectAgent(w, r)
+	if !ok {
+		return
+	}
+	logDir, err := s.ts.RunLogDir(name, agent)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{"content": "", "path": "", "finished": true})
+		return
+	}
+	// Find latest .log file by name (names start with timestamp).
+	var latest string
+	for i := len(entries) - 1; i >= 0; i-- {
+		if !entries[i].IsDir() && strings.HasSuffix(entries[i].Name(), ".log") {
+			latest = filepath.Join(logDir, entries[i].Name())
+			break
+		}
+	}
+	if latest == "" {
+		_ = json.NewEncoder(w).Encode(map[string]any{"content": "", "path": "", "finished": true})
+		return
+	}
+	data, err := os.ReadFile(latest)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	content := string(data)
+	const maxBytes = 1024 * 1024
+	if len(data) > maxBytes {
+		content = string(data[len(data)-maxBytes:])
+	}
+	// Check if the log has a "=== exit code:" or "=== finished:" line, meaning execution is done.
+	finished := strings.Contains(content, "=== exit code:") || strings.Contains(content, "=== finished:")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"content":  content,
+		"path":     latest,
+		"finished": finished,
+	})
 }
 
 func (s *Server) handlePostCronPause(w http.ResponseWriter, r *http.Request) {

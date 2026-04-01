@@ -150,7 +150,7 @@ function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: (
           autoFocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={4}
+          rows={8}
           placeholder={t('forms.body')}
           className="block w-full resize-y rounded-lg border border-neutral-200 bg-white p-3 text-sm leading-relaxed text-neutral-800 outline-none transition-colors placeholder:text-neutral-400 focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:placeholder:text-zinc-600"
         />

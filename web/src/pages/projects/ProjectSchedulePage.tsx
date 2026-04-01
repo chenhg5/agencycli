@@ -19,6 +19,7 @@ type SchedStatusResp = { schedulers: SchedInstance[] }
 type HeartbeatRow = {
   enabled: boolean; interval: string; paused: boolean
   activeHours?: string; activeDays?: string; wakeupPrompt?: string; wakeupCondition?: string
+  wakeupPreset?: string
   maxTasksPerCycle?: number; maxCycleDuration?: string; pid?: number
   lastWakeup?: string; lastWakeupStatus?: string; lastCycleDuration?: string
   wakeupCount?: number; wakeupCountToday?: number; nextWakeupAt?: string
@@ -206,6 +207,7 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
               <th className={thCls}>{t('schedule.statusLabel')}</th>
               <th className={thCls}>{t('schedule.interval')}</th>
               <th className={thCls}>{t('schedule.activeHours')}</th>
+              <th className={thCls}>{t('schedule.wakeupPreset')}</th>
               <th className={thCls}>{t('schedule.lastWakeup')}</th>
               <th className={thCls}>{t('schedule.wakeupCountLabel')}</th>
               <th className={cn(thCls, 'text-right')}>{t('messages.actions')}</th>
@@ -224,6 +226,13 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
                   </td>
                   <td className={cn(tdCls, 'font-mono')}>{hb.interval || '—'}</td>
                   <td className={tdCls}>{hb.activeHours || '—'}</td>
+                  <td className={tdCls}>
+                    {hb.wakeupPreset ? (
+                      <StatusBadge color={hb.wakeupPreset === 'require_tasks' ? 'sky' : hb.wakeupPreset === 'require_messages' ? 'amber' : 'violet'}>
+                        {t(`schedule.preset${hb.wakeupPreset === 'require_tasks' ? 'RequireTasks' : hb.wakeupPreset === 'require_messages' ? 'RequireMessages' : 'RequireAny'}`)}
+                      </StatusBadge>
+                    ) : <span className="text-neutral-400 dark:text-zinc-600">—</span>}
+                  </td>
                   <td className={tdCls}>{hb.lastWakeup ? fmt(hb.lastWakeup) : '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>
                     {hb.wakeupCount ?? 0}
@@ -250,7 +259,7 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('schedule.restartHint')}</p>
+      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('schedule.configEffectHint')}</p>
 
       {editing && (
         <EditHeartbeatModal projectId={projectId} agentName={editing.name} hb={editing.hb} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged() }} />
@@ -261,44 +270,169 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
 
 function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { projectId: string; agentName: string; hb: HeartbeatRow; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation()
-  const [interval, setInterval] = useState(hb.interval ?? '')
-  const [activeHours, setActiveHours] = useState(hb.activeHours ?? '')
-  const [activeDays, setActiveDays] = useState(hb.activeDays ?? '')
+
+  // Interval: parse "30m" → {num:30, unit:"m"}, "2h" → {num:2, unit:"h"}
+  const parseInterval = (v: string) => {
+    const m = v.match(/^(\d+(?:\.\d+)?)\s*(m|h|s)/)
+    if (m) return { num: parseFloat(m[1]), unit: m[2] }
+    return { num: 30, unit: 'm' }
+  }
+  const iv = parseInterval(hb.interval ?? '30m')
+  const [ivNum, setIvNum] = useState(iv.num)
+  const [ivUnit, setIvUnit] = useState<'m' | 'h'>(iv.unit === 'h' ? 'h' : 'm')
+
+  // Active Hours: parse "09:00-18:00" (split on '-' would break HH:MM-HH:MM)
+  const parseAH = (v: string) => {
+    const m = v.trim().match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/)
+    if (!m) return { start: '', end: '' }
+    const pad = (x: string) => {
+      const p = x.match(/^(\d{1,2}):(\d{2})$/)
+      return p ? `${p[1].padStart(2, '0')}:${p[2]}` : x
+    }
+    return { start: pad(m[1]), end: pad(m[2]) }
+  }
+  const ah = parseAH(hb.activeHours ?? '')
+  const [ahStart, setAhStart] = useState(ah.start)
+  const [ahEnd, setAhEnd] = useState(ah.end)
+
+  // Active Days: parse "Mon,Wed,Fri" or "weekdays"
+  const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const WEEKENDS = ['Sat', 'Sun']
+  const parseDays = (v: string): string[] => {
+    if (!v) return []
+    const lower = v.toLowerCase().trim()
+    if (lower === 'weekdays') return [...WEEKDAYS]
+    if (lower === 'weekends') return [...WEEKENDS]
+    return v.split(',').map((d) => d.trim()).filter((d) => (ALL_DAYS as readonly string[]).includes(d))
+  }
+  const [days, setDays] = useState<string[]>(parseDays(hb.activeDays ?? ''))
+
+  const toggleDay = (d: string) => setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+  const setWeekdays = () => setDays([...WEEKDAYS])
+  const setWeekends = () => setDays([...WEEKENDS])
+  const setAllDays = () => setDays([...ALL_DAYS])
+  const clearDays = () => setDays([])
+
+  // Max Tasks
   const [maxTasks, setMaxTasks] = useState(hb.maxTasksPerCycle ?? 0)
-  const [maxDur, setMaxDur] = useState(hb.maxCycleDuration ?? '')
+
+  // Max Duration
+  const parseDur = (v: string) => {
+    const m = v.match(/^(\d+(?:\.\d+)?)\s*(m|h|s)/)
+    if (m) return { num: parseFloat(m[1]), unit: m[2] }
+    return { num: 0, unit: 'm' }
+  }
+  const md = parseDur(hb.maxCycleDuration ?? '')
+  const [mdNum, setMdNum] = useState(md.num)
+  const [mdUnit, setMdUnit] = useState<'m' | 'h'>(md.unit === 'h' ? 'h' : 'm')
+
+  // Wakeup preset
+  const [wakeupPreset, setWakeupPreset] = useState(hb.wakeupPreset ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const buildDaysString = () => {
+    const sorted = ALL_DAYS.filter((d) => days.includes(d))
+    if (sorted.length === 0) return ''
+    if (sorted.length === 5 && WEEKDAYS.every((d) => sorted.includes(d)) && !sorted.includes('Sat') && !sorted.includes('Sun')) return 'weekdays'
+    if (sorted.length === 2 && sorted.includes('Sat') && sorted.includes('Sun')) return 'weekends'
+    return sorted.join(',')
+  }
 
   async function save() {
     setErr(null); setBusy(true)
     try {
+      const intervalStr = ivNum > 0 ? `${ivNum}${ivUnit}` : ''
+      const activeHoursStr = ahStart && ahEnd ? `${ahStart}-${ahEnd}` : ''
+      const maxDurStr = mdNum > 0 ? `${mdNum}${mdUnit}` : ''
       await apiPatch(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/heartbeat`, {
-        interval: interval.trim() || undefined,
-        activeHours: activeHours.trim(),
-        activeDays: activeDays.trim(),
+        interval: intervalStr || undefined,
+        activeHours: activeHoursStr,
+        activeDays: buildDaysString(),
         maxTasksPerCycle: maxTasks,
-        maxCycleDuration: maxDur.trim(),
+        maxCycleDuration: maxDurStr,
+        wakeupPreset: wakeupPreset,
       })
       onSaved()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
 
+  const chipCls = 'cursor-pointer rounded-md border px-2 py-1 text-xs font-medium transition-colors'
+  const chipActive = 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300'
+  const chipInactive = 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500 dark:hover:border-zinc-600'
+  const shortcutCls = 'cursor-pointer text-[11px] text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !busy && onClose()}>
-      <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('schedule.editHb')} — <span className="font-mono">{agentName}</span></h2>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
-        <div className="space-y-3 px-5 py-4">
-          <Field label={t('schedule.interval')}><input value={interval} onChange={(e) => setInterval(e.target.value)} placeholder="30m, 1h" className={fieldCls} /></Field>
-          <Field label={t('schedule.activeHours')}><input value={activeHours} onChange={(e) => setActiveHours(e.target.value)} placeholder="09:00-18:00" className={fieldCls} /></Field>
-          <Field label={t('schedule.activeDaysLabel')}><input value={activeDays} onChange={(e) => setActiveDays(e.target.value)} placeholder="Mon,Tue,Wed,Thu,Fri" className={fieldCls} /></Field>
+        <div className="space-y-4 px-5 py-4">
+          {/* Interval */}
+          <Field label={t('schedule.interval')}>
+            <div className="flex items-center gap-2">
+              <input type="number" min={1} value={ivNum} onChange={(e) => setIvNum(Number(e.target.value))} className={cn(fieldCls, 'w-24 tabular-nums')} />
+              <select value={ivUnit} onChange={(e) => setIvUnit(e.target.value)} className={cn(fieldCls, 'w-28')}>
+                <option value="m">{t('schedule.unitMinutes')}</option>
+                <option value="h">{t('schedule.unitHours')}</option>
+              </select>
+            </div>
+          </Field>
+
+          {/* Active Hours */}
+          <Field label={t('schedule.activeHours')}>
+            <div className="flex items-center gap-2">
+              <input type="time" value={ahStart} onChange={(e) => setAhStart(e.target.value)} className={cn(fieldCls, 'w-32')} />
+              <span className="text-neutral-400">—</span>
+              <input type="time" value={ahEnd} onChange={(e) => setAhEnd(e.target.value)} className={cn(fieldCls, 'w-32')} />
+            </div>
+          </Field>
+
+          {/* Active Days */}
+          <Field label={t('schedule.activeDaysLabel')}>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_DAYS.map((d) => (
+                <button key={d} type="button" onClick={() => toggleDay(d)} className={cn(chipCls, days.includes(d) ? chipActive : chipInactive)}>{d}</button>
+              ))}
+            </div>
+            <div className="mt-1.5 flex gap-3">
+              <button type="button" onClick={setWeekdays} className={shortcutCls}>{t('schedule.shortcutWeekdays')}</button>
+              <button type="button" onClick={setWeekends} className={shortcutCls}>{t('schedule.shortcutWeekends')}</button>
+              <button type="button" onClick={setAllDays} className={shortcutCls}>{t('schedule.shortcutAll')}</button>
+              <button type="button" onClick={clearDays} className={shortcutCls}>{t('schedule.shortcutClear')}</button>
+            </div>
+          </Field>
+
+          {/* Wakeup preset */}
+          <Field label={t('schedule.wakeupPreset')}>
+            <select value={wakeupPreset} onChange={(e) => setWakeupPreset(e.target.value)} className={fieldCls}>
+              <option value="">{t('schedule.presetNone')}</option>
+              <option value="require_tasks">{t('schedule.presetRequireTasks')}</option>
+              <option value="require_messages">{t('schedule.presetRequireMessages')}</option>
+              <option value="require_any">{t('schedule.presetRequireAny')}</option>
+            </select>
+          </Field>
+
+          {/* Max tasks + duration */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('schedule.maxTasks')}><input type="number" min={0} value={maxTasks} onChange={(e) => setMaxTasks(Number(e.target.value))} className={fieldCls} /></Field>
-            <Field label={t('schedule.maxDuration')}><input value={maxDur} onChange={(e) => setMaxDur(e.target.value)} placeholder="15m, 1h" className={fieldCls} /></Field>
+            <Field label={t('schedule.maxTasks')}>
+              <input type="number" min={0} value={maxTasks} onChange={(e) => setMaxTasks(Number(e.target.value))} className={fieldCls} />
+            </Field>
+            <Field label={t('schedule.maxDuration')}>
+              <div className="flex items-center gap-2">
+                <input type="number" min={0} value={mdNum} onChange={(e) => setMdNum(Number(e.target.value))} className={cn(fieldCls, 'w-20 tabular-nums')} />
+                <select value={mdUnit} onChange={(e) => setMdUnit(e.target.value)} className={cn(fieldCls, 'w-24')}>
+                  <option value="m">{t('schedule.unitMinutes')}</option>
+                  <option value="h">{t('schedule.unitHours')}</option>
+                </select>
+              </div>
+            </Field>
           </div>
+
           {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-zinc-600">{t('forms.cancel')}</button>
@@ -468,6 +602,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   const [resetting, setResetting] = useState<string | null>(null)
   const [wakeErr, setWakeErr] = useState<string | null>(null)
   const [scopeUpdating, setScopeUpdating] = useState<string | null>(null)
+  const [viewingLog, setViewingLog] = useState<string | null>(null)
 
   const activeAgents = agents.filter((ag) => ag.heartbeat.enabled)
 
@@ -591,6 +726,12 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                           {resetting === ag.name ? t('session.resettingSession') : t('session.resetSession')}
                         </button>
                       )}
+                      {isRunningNow && (
+                        <button type="button" onClick={() => setViewingLog(ag.name)}
+                          className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-emerald-700 opacity-0 transition-all hover:bg-emerald-50 group-hover:opacity-100 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                          {t('schedule.viewLog')}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -599,7 +740,64 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
           </tbody>
         </table>
       </div>
+      {viewingLog && <LiveLogModal projectId={projectId} agentName={viewingLog} onClose={() => setViewingLog(null)} />}
     </>
+  )
+}
+
+function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; agentName: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const [content, setContent] = useState('')
+  const [finished, setFinished] = useState(false)
+  const [logPath, setLogPath] = useState('')
+  const scrollRef = useRef<HTMLPreElement>(null)
+
+  useEffect(() => {
+    let active = true
+    const poll = async () => {
+      try {
+        const data = await apiFetch<{ content: string; path: string; finished: boolean }>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/live-log`,
+        )
+        if (!active) return
+        setContent(data.content)
+        setLogPath(data.path)
+        setFinished(data.finished)
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      } catch { /* ignore poll errors */ }
+    }
+    void poll()
+    const iv = setInterval(poll, 2000)
+    return () => { active = false; clearInterval(iv) }
+  }, [projectId, agentName])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+      <div className="flex h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
+              {t('schedule.liveLog')} — <span className="font-mono">{agentName}</span>
+            </h2>
+            {!finished && (
+              <span className="flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                <span className="size-1.5 rounded-full bg-sky-500 animate-pulse" />
+                {t('schedule.running')}
+              </span>
+            )}
+            {finished && <StatusBadge color="emerald">{t('schedule.finished')}</StatusBadge>}
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+        </div>
+        {logPath && <p className="shrink-0 border-b border-neutral-100 px-5 py-1.5 text-[11px] font-mono text-neutral-400 dark:border-zinc-800 dark:text-zinc-600">{logPath}</p>}
+        <pre
+          ref={scrollRef}
+          className="flex-1 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 p-4 font-mono text-xs leading-relaxed text-emerald-400 dark:bg-black"
+        >{content || t('schedule.noLogYet')}</pre>
+      </div>
+    </div>
   )
 }
 
@@ -643,13 +841,14 @@ function CopySessionCmd({ model, sessionId, agentDir }: { model?: string; sessio
 
 /* ─── shared UI ─── */
 
-function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutral' | 'sky' | 'red'; children: React.ReactNode }) {
+function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutral' | 'sky' | 'red' | 'violet'; children: React.ReactNode }) {
   const cls: Record<string, string> = {
     emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
     amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     neutral: 'bg-neutral-100 text-neutral-500 dark:bg-zinc-800 dark:text-zinc-500',
     sky: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
     red: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    violet: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
   }
   return <span className={cn('inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold', cls[color])}>{children}</span>
 }

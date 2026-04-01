@@ -128,7 +128,7 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
               <textarea
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                rows={3}
+                rows={6}
                 placeholder={t('tasks.summaryPlaceholder')}
                 className={cn(fieldCls, 'mt-1')}
               />

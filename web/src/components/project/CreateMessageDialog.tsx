@@ -200,7 +200,7 @@ export function CreateMessageDialog({ projectId, agents, onSent }: Props) {
               {/* Body */}
               <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('forms.body')}</span>
-                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} className={cn(fieldCls, 'mt-1')} />
+                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className={cn(fieldCls, 'mt-1 resize-y')} />
               </label>
 
               {err ? <p className="text-sm text-red-600 dark:text-red-400">{err}</p> : null}

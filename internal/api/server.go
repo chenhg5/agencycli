@@ -81,6 +81,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/heartbeat/resume", s.handlePostHeartbeatResume)
 	mux.HandleFunc("PATCH /api/v1/projects/{name}/agents/{agent}/heartbeat", s.handlePatchHeartbeat)
 	mux.HandleFunc("GET /api/v1/projects/{name}/schedule", s.handleGetProjectSchedule)
+	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/live-log", s.handleAgentLiveLog)
 	mux.HandleFunc("POST /api/v1/messages/delete", s.handlePostDeleteMessage)
 	mux.HandleFunc("POST /api/v1/messages/mark-read", s.handlePostMarkMessageRead)
 	mux.HandleFunc("POST /api/v1/messages/archive", s.handlePostArchiveMessage)

@@ -548,6 +548,21 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			continue
 		}
 
+		// Evaluate built-in preset condition before shell-based condition.
+		if hb.WakeupPreset != "" {
+			met, reason := checkWakeupPreset(hb.WakeupPreset, ts, project, agentName)
+			if !met {
+				agentLog("%s preset condition not met (%s: %s) — skipping cycle, next check in %s",
+					colorYellow+"⏸", hb.WakeupPreset, reason, interval.Round(time.Second))
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(interval):
+				}
+				continue
+			}
+		}
+
 		// Evaluate wakeup condition (if configured).
 		if hb.WakeupCondition != "" {
 			met, output := checkWakeupCondition(
@@ -1261,6 +1276,15 @@ useful for testing and for agent-to-agent wakeup from inside a task.`,
 			hb.PID = os.Getpid()
 			_ = ts.SaveHeartbeat(project, agentName, hb)
 
+			// Ensure cleanup even on panic so status doesn't stay "running" forever.
+			defer func() {
+				if latest, err := ts.GetHeartbeat(project, agentName); err == nil && latest.LastWakeupStatus == "running" {
+					latest.PID = 0
+					latest.LastWakeupStatus = "done"
+					_ = ts.SaveHeartbeat(project, agentName, latest)
+				}
+			}()
+
 			fmt.Printf("[wakeup %s/%s] triggered manually — running full cycle\n", project, agentName)
 
 			if n := fireDueCrons(ts, project, agentName); n > 0 {
@@ -1710,6 +1734,45 @@ func newSchedulerCronDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// checkWakeupPreset evaluates a built-in wakeup preset condition.
+// Returns (true, "") if the condition is met, or (false, reason) if not.
+func checkWakeupPreset(preset string, ts taskstore.Store, project, agentName string) (bool, string) {
+	hasTasks := false
+	hasMessages := false
+
+	tasks, err := ts.ListTasks(project, agentName)
+	if err == nil {
+		for _, t := range tasks {
+			if t.Status == entity.TaskStatusPending {
+				hasTasks = true
+				break
+			}
+		}
+	}
+
+	recipient := project + "/" + agentName
+	unread, err := ts.ListUnreadMessages(recipient)
+	if err == nil && len(unread) > 0 {
+		hasMessages = true
+	}
+
+	switch preset {
+	case "require_tasks":
+		if !hasTasks {
+			return false, "no pending tasks"
+		}
+	case "require_messages":
+		if !hasMessages {
+			return false, "no unread messages"
+		}
+	case "require_any":
+		if !hasTasks && !hasMessages {
+			return false, "no pending tasks and no unread messages"
+		}
+	}
+	return true, ""
 }
 
 // parseProjectAgent splits "project/agent" into project and agent.

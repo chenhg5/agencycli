@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiPost } from '../../lib/api'
+import { cn } from '../../lib/cn'
 
 const TASK_TYPES = ['chore', 'feature', 'bug', 'review', 'triage', 'test', 'research'] as const
 
@@ -168,7 +169,7 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
 
               <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('forms.prompt')}</span>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5} className={fieldCls} />
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={10} className={cn(fieldCls, 'resize-y')} />
               </label>
 
               <div className="grid grid-cols-2 gap-3">

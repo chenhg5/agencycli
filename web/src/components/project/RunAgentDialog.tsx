@@ -85,7 +85,7 @@ export function RunAgentDialog({ projects, onDone }: Props) {
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  rows={5}
+                  rows={10}
                   placeholder={t('session.promptPlaceholder')}
                   className={`${fieldCls} resize-y font-mono text-[13px] leading-relaxed`}
                 />

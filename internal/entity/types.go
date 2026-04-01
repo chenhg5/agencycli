@@ -621,6 +621,14 @@ type HeartbeatConfig struct {
 	//   wakeup_condition: "agencycli --dir $AGENCY_DIR inbox messages --unread-only | grep -q ."
 	WakeupCondition string `yaml:"wakeup_condition,omitempty"`
 
+	// WakeupPreset is a built-in condition evaluated before each wakeup,
+	// checked before WakeupCondition. Supported values:
+	//   ""                      — no preset, always wake (default)
+	//   "require_tasks"         — skip if no pending tasks
+	//   "require_messages"      — skip if no unread messages
+	//   "require_any"           — skip if neither pending tasks nor unread messages
+	WakeupPreset string `yaml:"wakeup_preset,omitempty"`
+
 	// MaxTasksPerCycle limits how many tasks are processed in a single wakeup
 	// cycle before the cycle ends. 0 (default) means unlimited.
 	// Use this to prevent a single wakeup from monopolising the agent on a large queue.
