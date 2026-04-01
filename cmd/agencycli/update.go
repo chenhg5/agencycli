@@ -292,6 +292,32 @@ func fetchLatestPreRelease() (*githubRelease, error) {
 
 // ── version comparison ──────────────────────────────────────
 
+// stripGitDescribe removes the git-describe suffix from a version string.
+// "0.2.2-1-g35f23b5-dirty" → "0.2.2", "0.2.2-1-g35f23b5" → "0.2.2", "0.2.2" → "0.2.2".
+func stripGitDescribe(v string) string {
+	// Pattern: base-N-gHASH[-dirty] where N is commit count and g prefix + hex hash.
+	parts := strings.Split(v, "-")
+	if len(parts) >= 3 && len(parts[len(parts)-1]) >= 2 {
+		// Check for -N-gHASH or -N-gHASH-dirty pattern.
+		for i := 1; i < len(parts)-1; i++ {
+			isNum := true
+			for _, ch := range parts[i] {
+				if ch < '0' || ch > '9' {
+					isNum = false
+					break
+				}
+			}
+			next := parts[i+1]
+			isGitHash := len(next) >= 2 && next[0] == 'g'
+			if isNum && isGitHash {
+				return strings.Join(parts[:i], "-")
+			}
+		}
+	}
+	// Also strip trailing "-dirty".
+	return strings.TrimSuffix(v, "-dirty")
+}
+
 func isNewerVersion(latest, current string) bool {
 	if latest == "" || current == "" {
 		return false
@@ -301,7 +327,7 @@ func isNewerVersion(latest, current string) bool {
 	}
 
 	l := strings.TrimPrefix(latest, "v")
-	c := strings.TrimPrefix(current, "v")
+	c := stripGitDescribe(strings.TrimPrefix(current, "v"))
 
 	lBase, lPre, _ := strings.Cut(l, "-")
 	cBase, cPre, _ := strings.Cut(c, "-")

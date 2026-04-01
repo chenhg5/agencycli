@@ -508,5 +508,13 @@
     "pwdTooShort": "パスワードは6文字以上必要です",
     "pwdMismatch": "パスワードが一致しません",
     "pwdChanged": "パスワードを変更しました"
+  },
+  "assistant": {
+    "title": "AI アシスタント",
+    "subtitle": "agencycli 搭載",
+    "welcome": "こんにちは！エージェンシーの管理をお手伝いします。",
+    "examples": "例：「新しいプロジェクトを作成」「pmにメッセージを送信」",
+    "placeholder": "エージェンシーについて何でも聞いてください...",
+    "clear": "クリア"
   }
 }

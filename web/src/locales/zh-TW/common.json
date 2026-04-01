@@ -508,5 +508,13 @@
     "pwdTooShort": "密碼長度不能少於 6 位",
     "pwdMismatch": "兩次輸入的密碼不一致",
     "pwdChanged": "密碼變更成功"
+  },
+  "assistant": {
+    "title": "AI 助手",
+    "subtitle": "由 agencycli 驅動",
+    "welcome": "你好！我可以幫你管理你的 Agency。",
+    "examples": "試試：「建立一個新專案」或「傳訊息給 pm」",
+    "placeholder": "問我任何關於你的 Agency 的問題...",
+    "clear": "清空"
   }
 }

@@ -52,7 +52,7 @@ type AgentContext = {
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
   claudecode: {
-    keys: ['ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY'],
+    keys: ['ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN'],
     hint: 'e.g. claude-sonnet-4-20250514, claude-opus-4-20250514',
   },
   codex: {
@@ -64,11 +64,11 @@ const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
     hint: 'e.g. gemini-2.5-pro',
   },
   cursor: {
-    keys: ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY'],
+    keys: ['ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY'],
     hint: 'Cursor uses its own auth; env vars are optional overrides',
   },
   opencode: {
-    keys: ['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_BASE_URL'],
+    keys: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_BASE_URL'],
     hint: 'OpenCode supports multiple providers',
   },
 }

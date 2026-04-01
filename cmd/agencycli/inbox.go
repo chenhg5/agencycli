@@ -761,12 +761,12 @@ func newInboxReplyCmd() *cobra.Command {
 
 			sender := from
 			if sender == "" {
-				sender = "human"
+				sender = original.To
 			}
 			reply := &entity.Message{
 				ID:      entity.NewMessageID(),
 				From:    sender,
-				To:      original.From, // reply goes back to the sender
+				To:      original.From,
 				Subject: "Re: " + original.Subject,
 				Body:    body,
 				ReplyTo: msgID,

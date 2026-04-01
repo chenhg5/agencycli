@@ -40,8 +40,10 @@ type ScheduleResp = { project: string; agents: AgentSchedule[] }
 const tabCls = 'cursor-pointer px-4 py-3 text-sm font-medium transition-colors border-b-2'
 const tabActive = 'border-sky-600 text-sky-700 dark:border-sky-400 dark:text-sky-300'
 const tabInactive = 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300'
-const thCls = 'px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600'
-const tdCls = 'whitespace-nowrap px-4 py-3 align-middle text-[13px] text-neutral-700 dark:text-zinc-300'
+const thCls = 'whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600'
+const tdCls = 'whitespace-nowrap px-4 py-3 align-middle text-center text-[13px] text-neutral-700 dark:text-zinc-300'
+const thSticky = 'sticky right-0 z-[2] bg-neutral-50 dark:bg-zinc-900'
+const tdSticky = 'sticky right-0 z-[1] bg-white group-hover:bg-neutral-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
 const selectCls = 'h-8 rounded-md border border-neutral-200/80 bg-white px-2.5 pr-7 text-[13px] text-neutral-700 outline-none hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300'
 const fieldCls = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
 const smallBtn = 'rounded p-1 transition-colors'
@@ -210,7 +212,7 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
               <th className={thCls}>{t('schedule.wakeupPreset')}</th>
               <th className={thCls}>{t('schedule.lastWakeup')}</th>
               <th className={thCls}>{t('schedule.wakeupCountLabel')}</th>
-              <th className={cn(thCls, 'text-right')}>{t('messages.actions')}</th>
+              <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
@@ -238,8 +240,8 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
                     {hb.wakeupCount ?? 0}
                     {(hb.wakeupCountToday ?? 0) > 0 && <span className="ml-1 text-neutral-400 dark:text-zinc-600">({hb.wakeupCountToday} {t('schedule.today')})</span>}
                   </td>
-                  <td className={cn(tdCls, 'text-right')}>
-                    <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <td className={cn(tdCls, tdSticky)}>
+                    <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <button type="button" onClick={() => setEditing({ name: ag.name, hb })} className={cn(smallBtn, 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800')} title={t('tasks.edit')}>
                         <Pencil className="size-3.5" strokeWidth={1.8} />
                       </button>
@@ -507,7 +509,7 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
                 <th className={thCls}>{t('schedule.statusLabel')}</th>
                 <th className={thCls}>{t('schedule.lastRun')}</th>
                 <th className={thCls}>{t('schedule.runCountLabel')}</th>
-                <th className={cn(thCls, 'text-right')}>{t('messages.actions')}</th>
+                <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
@@ -521,8 +523,8 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
                   </td>
                   <td className={tdCls}>{c.lastRun ? fmt(c.lastRun) : '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>{c.runCount ?? 0}</td>
-                  <td className={cn(tdCls, 'text-right')}>
-                    <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <td className={cn(tdCls, tdSticky)}>
+                    <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <button type="button" onClick={() => void toggleCron(agent, c.id, !c.enabled)} className={cn(smallBtn, 'text-neutral-500 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800')} title={c.enabled ? t('schedule.pauseCron') : t('schedule.resumeCron')}>
                         {c.enabled ? <Pause className="size-3.5" strokeWidth={1.8} /> : <Play className="size-3.5" strokeWidth={1.8} />}
                       </button>
@@ -656,7 +658,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
               <th className={thCls}>{t('session.sessionLabel')}</th>
               <th className={thCls}>{t('session.scopeLabel')}</th>
               <th className={thCls}>{t('schedule.conditionLabel')}</th>
-              <th className={cn(thCls, 'text-center')}>{t('messages.actions')}</th>
+              <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
@@ -714,7 +716,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       : <StatusBadge color="neutral">—</StatusBadge>
                     ) : <span className="text-neutral-400 dark:text-zinc-600">—</span>}
                   </td>
-                  <td className={cn(tdCls, 'text-center')}>
+                  <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1">
                       <button type="button" disabled={isRunningNow || waking === ag.name} onClick={() => void doWakeup(ag.name)}
                         className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-sky-700 opacity-0 transition-all hover:bg-sky-50 disabled:opacity-40 group-hover:opacity-100 dark:text-sky-400 dark:hover:bg-sky-900/20">

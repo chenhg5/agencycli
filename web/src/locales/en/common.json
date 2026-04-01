@@ -508,5 +508,13 @@
     "pwdTooShort": "Password must be at least 6 characters",
     "pwdMismatch": "Passwords do not match",
     "pwdChanged": "Password changed successfully"
+  },
+  "assistant": {
+    "title": "AI Assistant",
+    "subtitle": "Powered by agencycli",
+    "welcome": "Hi! I can help you manage your agency.",
+    "examples": "Try: \"Create a new project\" or \"Send a message to pm\"",
+    "placeholder": "Ask me anything about your agency...",
+    "clear": "Clear"
   }
 }
