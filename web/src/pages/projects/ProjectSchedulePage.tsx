@@ -6,6 +6,7 @@ import {
   Trash2, X, Zap,
 } from 'lucide-react'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
+import { ConversationLog } from '../../components/ui/ConversationLog'
 import { cn } from '../../lib/cn'
 import { apiFetch, apiDelete, apiPatch, apiPost } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
@@ -751,8 +752,7 @@ function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; ag
   const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [finished, setFinished] = useState(false)
-  const [logPath, setLogPath] = useState('')
-  const scrollRef = useRef<HTMLPreElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
@@ -763,7 +763,6 @@ function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; ag
         )
         if (!active) return
         setContent(data.content)
-        setLogPath(data.path)
         setFinished(data.finished)
         if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -777,11 +776,11 @@ function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; ag
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
-      <div className="flex h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[90vh] w-full max-w-4xl flex-col rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
-              {t('schedule.liveLog')} — <span className="font-mono">{agentName}</span>
+              <span className="font-mono">{agentName}</span>
             </h2>
             {!finished && (
               <span className="flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
@@ -793,11 +792,9 @@ function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; ag
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
-        {logPath && <p className="shrink-0 border-b border-neutral-100 px-5 py-1.5 text-[11px] font-mono text-neutral-400 dark:border-zinc-800 dark:text-zinc-600">{logPath}</p>}
-        <pre
-          ref={scrollRef}
-          className="flex-1 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 p-4 font-mono text-xs leading-relaxed text-emerald-400 dark:bg-black"
-        >{content || t('schedule.noLogYet')}</pre>
+        <div ref={scrollRef} className="flex-1 overflow-auto px-5 py-4">
+          {content ? <ConversationLog content={content} /> : <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('schedule.noLogYet')}</p>}
+        </div>
       </div>
     </div>
   )
