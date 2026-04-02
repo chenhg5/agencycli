@@ -515,7 +515,7 @@ Outside the active window the scheduler shows `⏸ outside active window — nex
 **What happens on each wakeup:**
 1. Any unread inbox messages are prepended to the prompt automatically
 2. All pending tasks are executed in priority order (0=critical → 3=low)
-3. If the queue is empty and a `wakeup.md` exists (in `.agencycli-context/`), it runs as the autonomous routine
+3. If the queue is empty and a `wakeup.md` exists (in `.agencycli/context/`), it runs as the autonomous routine
 
 ---
 
@@ -528,7 +528,7 @@ When the agent wakes up with an empty task queue, the scheduler sends it a wakeu
 The detailed routine (what to check, what commands to run) belongs in the **role prompt** (`teams/<team>/roles/<role>/prompt.md`), which is baked into `CLAUDE.md` and loaded once per session. The `wakeup.md` then only needs to be a short trigger:
 
 ```bash
-$EDITOR projects/my-api/agents/dev/.agencycli-context/wakeup.md
+$EDITOR projects/my-api/agents/dev/.agencycli/context/wakeup.md
 ```
 
 **English trigger example:**
@@ -569,7 +569,7 @@ Then register the wakeup trigger file:
 agencycli scheduler heartbeat \
   --project my-api \
   --agent   dev \
-  --wakeup-prompt-file projects/my-api/agents/dev/.agencycli-context/wakeup.md
+  --wakeup-prompt-file projects/my-api/agents/dev/.agencycli/context/wakeup.md
 ```
 
 ---
@@ -770,7 +770,7 @@ agencycli sync --force                        # force regenerate everything
 
 ─── Heartbeat ──────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --enable --interval 30m
-[ ] Write projects/my-app/agents/dev/.agencycli-context/wakeup.md
+[ ] Write projects/my-app/agents/dev/.agencycli/context/wakeup.md
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --wakeup-prompt-file ...
 
 ─── Start ──────────────────────────────────────────────────────────────────────

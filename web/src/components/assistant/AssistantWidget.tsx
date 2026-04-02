@@ -12,7 +12,14 @@ type ChatMsg =
 
 const STORAGE_KEY = 'assistant-btn-pos'
 function loadPos(): { x: number; y: number } | null {
-  try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : null } catch { return null }
+  try {
+    const v = localStorage.getItem(STORAGE_KEY)
+    if (!v) return null
+    const p = JSON.parse(v) as { x: number; y: number }
+    if (typeof p.x !== 'number' || typeof p.y !== 'number' || isNaN(p.x) || isNaN(p.y)) return null
+    if (p.x < 0 || p.y < 0 || p.x > window.innerWidth - 20 || p.y > window.innerHeight - 20) return null
+    return p
+  } catch { return null }
 }
 
 function extractSummary(rawLog: string): string {
@@ -56,8 +63,10 @@ export default function AssistantWidget() {
   const didDrag = useRef(false)
 
   useEffect(() => {
-    if (pos.x < 0) setPos({ x: window.innerWidth - 68, y: window.innerHeight - 120 })
-  }, [pos.x])
+    if (pos.x < 0 || pos.x > window.innerWidth - 20 || pos.y < 0 || pos.y > window.innerHeight - 20) {
+      setPos({ x: window.innerWidth - 68, y: window.innerHeight - 120 })
+    }
+  }, [pos.x, pos.y])
 
   function onPointerDown(e: RPointerEvent<HTMLButtonElement>) {
     dragging.current = true
@@ -111,7 +120,10 @@ export default function AssistantWidget() {
     let accumulated = ''
     try {
       const token = getStoredToken()
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       const res = await fetch(`${apiBase()}/api/v1/assistant/chat`, {

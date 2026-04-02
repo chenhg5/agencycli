@@ -288,7 +288,7 @@ Each heartbeat cycle: if pending tasks exist → run highest-priority task; if q
 
 A playbook (`wakeup.md`) defines what an agent does when its task queue is empty. Store in `agent-playbooks/` and reference from `project.yaml` via `playbook:`.
 
-`project apply` copies `agent-playbooks/<playbook>` → `agents/<name>/wakeup.md` and sets `wakeup_prompt: "@wakeup.md"` in `heartbeat.yaml`.
+`project apply` copies `agent-playbooks/<playbook>` → `agents/<name>/.agencycli/context/wakeup.md` and sets `wakeup_prompt: "@.agencycli/context/wakeup.md"` in `heartbeat.yaml`.
 
 Typical wakeup.md patterns:
 - Check injected unread messages (auto-prepended — no `inbox messages` call needed)
@@ -385,7 +385,12 @@ agencycli version
         <agent>/
           CLAUDE.md           ← merged context (claudecode)
           .claude/skills/     ← deployed skill files
-          wakeup.md           ← autonomous routine (installed by project apply)
+          .agencycli/
+            context/
+              agency.md       ← agency-level prompt
+              role-<team>-<role>.md
+              project-<project>.md
+              wakeup.md       ← autonomous routine (installed by project apply)
           heartbeat.yaml      ← set by project apply or scheduler heartbeat
           crons.yaml          ← set by project apply or cron add
           tasks.yaml          ← active tasks

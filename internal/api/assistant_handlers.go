@@ -2,7 +2,9 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -34,17 +36,70 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	skill := s.loadAssistantSkill()
+	prompt := buildAssistantPrompt(skill, s.root, body.History, msg)
+
+	wantStream := strings.Contains(r.Header.Get("Accept"), "text/event-stream")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+
+	if wantStream {
+		s.assistantStream(w, ctx, prompt)
+	} else {
+		s.assistantJSON(w, ctx, prompt)
+	}
+}
+
+func (s *Server) assistantJSON(w http.ResponseWriter, ctx context.Context, prompt string) {
+	cliPath, cliArgs := s.resolveAssistantCLI()
+	if cliPath == "" {
+		s.jsonError(w, http.StatusInternalServerError, "no supported AI CLI found (tried: claude, codex, gemini)")
+		return
+	}
+	// For JSON mode, use --print for plain text output.
+	args := make([]string, 0, len(cliArgs))
+	for _, a := range cliArgs {
+		if a == "--output-format" || a == "stream-json" {
+			continue
+		}
+		args = append(args, a)
+	}
+	if cliPath != "" {
+		base := filepath.Base(cliPath)
+		if base == "claude" || base == "gemini" {
+			hasP := false
+			for _, a := range args {
+				if a == "--print" {
+					hasP = true
+					break
+				}
+			}
+			if !hasP {
+				args = append([]string{"--print"}, args...)
+			}
+		}
+	}
+	cmd := exec.CommandContext(ctx, cliPath, args...)
+	cmd.Dir = s.root
+	cmd.Env = os.Environ()
+	cmd.Stdin = strings.NewReader(prompt)
+	out, err := cmd.CombinedOutput()
+	if err != nil && len(out) == 0 {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("assistant error: %v", err))
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"response": strings.TrimSpace(string(out)),
+	})
+}
+
+func (s *Server) assistantStream(w http.ResponseWriter, ctx context.Context, prompt string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		s.jsonError(w, http.StatusInternalServerError, "streaming not supported")
 		return
 	}
-
-	skill := s.loadAssistantSkill()
-	prompt := buildAssistantPrompt(skill, s.root, body.History, msg)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
-	defer cancel()
 
 	cliPath, cliArgs := s.resolveAssistantCLI()
 	if cliPath == "" {
@@ -62,7 +117,8 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("pipe: %v", err))
 		return
 	}
-	cmd.Stderr = cmd.Stdout
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
 		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("start: %v", err))
@@ -74,6 +130,7 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
+	lineCount := 0
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 	for scanner.Scan() {
@@ -81,18 +138,41 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
+		lineCount++
 		fmt.Fprintf(w, "data: %s\n\n", line)
 		flusher.Flush()
 	}
 
-	_ = cmd.Wait()
+	exitErr := cmd.Wait()
+
+	if lineCount == 0 {
+		errMsg := strings.TrimSpace(stderrBuf.String())
+		if errMsg == "" && exitErr != nil {
+			errMsg = exitErr.Error()
+		}
+		if errMsg == "" {
+			errMsg = "CLI produced no output"
+		}
+		errJSON := fmt.Sprintf(`{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Error: %s\n\nCommand: %s %s"}]}}`,
+			strings.ReplaceAll(errMsg, `"`, `\"`),
+			filepath.Base(cliPath),
+			strings.Join(cliArgs, " "))
+		fmt.Fprintf(w, "data: %s\n\n", errJSON)
+		flusher.Flush()
+	}
+
 	fmt.Fprintf(w, "data: {\"type\":\"done\"}\n\n")
 	flusher.Flush()
 }
 
 func (s *Server) resolveAssistantCLI() (string, []string) {
 	if path, err := exec.LookPath("claude"); err == nil {
-		return path, []string{"-p", "-", "--output-format", "stream-json"}
+		return path, []string{
+			"-p", "-",
+			"--output-format", "stream-json", "--verbose",
+			"--allowedTools", "Bash(command:*)", "Read", "Write", "Edit",
+			"Glob", "Grep", "WebSearch", "WebFetch",
+		}
 	}
 	if path, err := exec.LookPath("codex"); err == nil {
 		return path, []string{"exec", "-q", "-"}
@@ -105,6 +185,7 @@ func (s *Server) resolveAssistantCLI() (string, []string) {
 
 func (s *Server) loadAssistantSkill() string {
 	candidates := []string{
+		filepath.Join(s.root, "SKILL.md"),
 		filepath.Join(s.root, "skills", "agencycli", "SKILL.md"),
 		filepath.Join(os.Getenv("HOME"), ".claude", "skills", "agencycli", "SKILL.md"),
 		filepath.Join(os.Getenv("HOME"), ".cursor", "skills-cursor", "agencycli", "SKILL.md"),
