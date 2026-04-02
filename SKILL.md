@@ -402,6 +402,25 @@ agencycli version
 
 ---
 
+## Context compression
+
+Long-running agents accumulate context that may degrade quality. Each CLI has built-in auto-compression:
+
+| Agent | Mechanism | Default | Configuration |
+|-------|-----------|---------|---------------|
+| **Claude Code** | auto-compact | ~90% of context window | Env vars: `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` (threshold %, recommend 70-80), `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (effective token window size) |
+| **Codex** | auto-compact | ~90% of context window | Config key `model_auto_compact_token_limit` in codex config |
+| **Gemini** | auto-compress | 70% of context window | `chatCompression.contextPercentageThreshold` (0-1) in `.gemini/settings.json` |
+
+Set per-agent env vars via the Web UI (Agent → API Provider) or directly in `agent.yaml`:
+
+```yaml
+env:
+  CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "75"
+```
+
+---
+
 ## Tips for agents
 
 1. Always use `--dir <workspace>` if you are not inside the agency directory.

@@ -52,16 +52,19 @@ type AgentContext = {
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
   claudecode: {
-    keys: ['ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN'],
-    hint: 'e.g. claude-sonnet-4-20250514, claude-opus-4-20250514',
+    keys: [
+      'ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+      'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE', 'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+    ],
+    hint: 'AUTOCOMPACT_PCT: auto-compact threshold % (default 90, recommend 70-80); AUTO_COMPACT_WINDOW: effective token window size',
   },
   codex: {
     keys: ['OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_BASE_URL'],
-    hint: 'e.g. o3, gpt-4.1',
+    hint: 'Auto-compact: config model_auto_compact_token_limit in codex config',
   },
   gemini: {
     keys: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_CLOUD_PROJECT'],
-    hint: 'e.g. gemini-2.5-pro',
+    hint: 'Auto-compress: set chatCompression.contextPercentageThreshold (0-1) in .gemini/settings.json',
   },
   cursor: {
     keys: ['ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY'],
