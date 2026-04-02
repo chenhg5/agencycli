@@ -172,8 +172,13 @@ func (o *openCodeInvoker) ParseSessionID(_ string) string { return "" }
 type cursorInvoker struct{}
 
 func (c *cursorInvoker) Args(promptFile, sessionID string) []string {
-	// `agent --print --output-format stream-json` reads the prompt from stdin.
-	args := []string{"agent", "--print", "--output-format", "stream-json"}
+	args := []string{
+		"agent",
+		"--print",
+		"--output-format", "stream-json",
+		"--force",
+		"--trust",
+	}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}

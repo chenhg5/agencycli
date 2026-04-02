@@ -127,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/docs/{id}", s.handleDocsGet)
 	mux.HandleFunc("POST /api/v1/docs", s.handleDocsAdd)
 	mux.HandleFunc("PUT /api/v1/docs/{id}", s.handleDocsUpdate)
+	mux.HandleFunc("GET /api/v1/docs/{id}/download", s.handleDocsDownload)
 	mux.HandleFunc("DELETE /api/v1/docs/{id}", s.handleDocsDelete)
 	mux.HandleFunc("GET /api/v1/workbench/messages", s.handleWorkbenchMessages)
 	mux.HandleFunc("GET /api/v1/workbench/tasks", s.handleWorkbenchTasks)
@@ -151,7 +152,9 @@ func (s *Server) Handler() http.Handler {
 
 func withJSONHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if !strings.HasSuffix(r.URL.Path, "/download") {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -697,17 +697,14 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			// The wakeup task is persisted to tasks.yaml so that the agent can
 			// call `task confirm-request --id $TASK_ID` without hitting "not found".
 			//
-			// NOTE: When WakeupPrompt points to a file (e.g., "@.agencycli/context/wakeup.md"),
-			// we do NOT read the file content here. The wakeup.md is already imported
-			// via CLAUDE.md (@.agencycli/context/wakeup.md), so the agent has access to it.
-			// We just send a short trigger to start the wakeup routine.
+			// When WakeupPrompt is a file reference (e.g. "@.agencycli/context/wakeup.md"),
+			// the content is already included in the agent's system prompt via CLAUDE.md
+			// @import, so we only send a short trigger that directs the agent to follow it.
 			var prompt string
 			if hb.WakeupPrompt != "" {
 				if strings.HasPrefix(hb.WakeupPrompt, "@") {
-					// File reference: wakeup content is in CLAUDE.md via @import, use short trigger.
-					prompt = i18n.DefaultTrigger
+					prompt = i18n.WakeupFileTrigger
 				} else {
-					// Inline text: use as-is.
 					prompt = hb.WakeupPrompt
 				}
 			} else {
@@ -882,10 +879,11 @@ func agentDir(root, project, agentName string) string {
 
 // wakeupI18n holds the auto-generated strings injected around the wakeup prompt.
 type wakeupI18n struct {
-	InboxHeader    string // section heading for unread-message block
-	InboxIntro     string // sentence before the message list
-	InboxReplyHint string // hint line showing how to reply
-	DefaultTrigger string // used when wakeup_prompt is empty
+	InboxHeader      string // section heading for unread-message block
+	InboxIntro       string // sentence before the message list
+	InboxReplyHint   string // hint line showing how to reply
+	DefaultTrigger   string // used when wakeup_prompt is empty and no file reference
+	WakeupFileTrigger string // used when wakeup_prompt references a file (already in CLAUDE.md)
 }
 
 // wakeupStrings returns the localised strings for the given lang code.
@@ -894,17 +892,19 @@ func wakeupStrings(lang string) wakeupI18n {
 	switch lang {
 	case "zh":
 		return wakeupI18n{
-			InboxHeader:    "## 📬 未读消息\n\n",
-			InboxIntro:     "你收到了以下消息，请在本次唤醒中处理：\n\n",
-			InboxReplyHint: "如需回复某条消息：\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
-			DefaultTrigger: "执行你的唤醒例程。检查待处理任务、未读消息及计划中的工作事项。如需了解具体例程，请参阅你的角色上下文。",
+			InboxHeader:       "## 📬 未读消息\n\n",
+			InboxIntro:        "你收到了以下消息，请在本次唤醒中处理：\n\n",
+			InboxReplyHint:    "如需回复某条消息：\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
+			DefaultTrigger:    "执行你的唤醒例程。检查待处理任务、未读消息及计划中的工作事项。",
+			WakeupFileTrigger: "你已被唤醒。请严格按照你的 wakeup.md 中定义的唤醒流程，逐步执行所有步骤。不要跳过任何步骤。",
 		}
 	default: // "en"
 		return wakeupI18n{
-			InboxHeader:    "## 📬 Unread Messages\n\n",
-			InboxIntro:     "You have the following unread messages. Please handle them in this wakeup cycle:\n\n",
-			InboxReplyHint: "To reply to a message:\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
-			DefaultTrigger: "Execute your wakeup routine. Check pending tasks, unread messages, and your scheduled activities. Refer to your role context for the detailed routine.",
+			InboxHeader:       "## 📬 Unread Messages\n\n",
+			InboxIntro:        "You have the following unread messages. Please handle them in this wakeup cycle:\n\n",
+			InboxReplyHint:    "To reply to a message:\n  agencycli --dir $AGENCY_DIR inbox reply <msg-id> --body \"...\"\n\n",
+			DefaultTrigger:    "Execute your wakeup routine. Check pending tasks, unread messages, and your scheduled activities.",
+			WakeupFileTrigger: "You have been woken up. Follow the wakeup routine defined in your wakeup.md step by step. Do not skip any steps.",
 		}
 	}
 }

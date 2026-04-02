@@ -15,10 +15,25 @@ type StreamUsage struct {
 	TotalCostUSD float64
 }
 
+// streamResultUsage handles both Claude (snake_case) and Cursor (camelCase) field names.
 type streamResultUsage struct {
+	// Claude Code format
 	InputTokens          int64 `json:"input_tokens"`
 	OutputTokens         int64 `json:"output_tokens"`
 	CacheReadInputTokens int64 `json:"cache_read_input_tokens"`
+	// Cursor format
+	InputTokensCC    int64 `json:"inputTokens"`
+	OutputTokensCC   int64 `json:"outputTokens"`
+	CacheReadCC      int64 `json:"cacheReadTokens"`
+}
+
+func (u streamResultUsage) input() int64  { return coalesce(u.InputTokens, u.InputTokensCC) }
+func (u streamResultUsage) output() int64 { return coalesce(u.OutputTokens, u.OutputTokensCC) }
+func (u streamResultUsage) cache() int64  { return coalesce(u.CacheReadInputTokens, u.CacheReadCC) }
+
+func coalesce(a, b int64) int64 {
+	if a != 0 { return a }
+	return b
 }
 
 type streamResultLine struct {
@@ -27,7 +42,7 @@ type streamResultLine struct {
 	Usage        streamResultUsage `json:"usage"`
 }
 
-// ParseStreamJSONUsage scans newline-delimited JSON (e.g. Claude --output-format stream-json).
+// ParseStreamJSONUsage scans newline-delimited JSON (e.g. Claude/Cursor --output-format stream-json).
 // The final line with type "result" wins (same semantics as task tokens parsing).
 func ParseStreamJSONUsage(data []byte) StreamUsage {
 	var out StreamUsage
@@ -42,9 +57,9 @@ func ParseStreamJSONUsage(data []byte) StreamUsage {
 		}
 		if rl.Type == "result" {
 			out.SawResult = true
-			out.InputTokens = rl.Usage.InputTokens
-			out.OutputTokens = rl.Usage.OutputTokens
-			out.CacheReadTokens = rl.Usage.CacheReadInputTokens
+			out.InputTokens = rl.Usage.input()
+			out.OutputTokens = rl.Usage.output()
+			out.CacheReadTokens = rl.Usage.cache()
 			out.TotalCostUSD = rl.TotalCostUSD
 		}
 	}

@@ -252,7 +252,11 @@
     "moveTo": "移动到...",
     "edit": "编辑",
     "save": "保存",
-    "cancel": "取消"
+    "cancel": "取消",
+    "download": "下载",
+    "searchResults": "搜索结果",
+    "collapseSidebar": "收起目录",
+    "expandSidebar": "展开目录"
   },
   "api": {
     "loading": "加载中…",

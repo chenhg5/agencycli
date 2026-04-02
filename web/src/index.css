@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -59,6 +60,41 @@ body {
 button, [role="button"], a, select, label[for], summary, [tabindex]:not([tabindex="-1"]) {
   cursor: pointer;
 }
+
+/* ── Syntax highlighting (highlight.js) ────────────────────────────── */
+/* Light theme — GitHub-inspired */
+.hljs { color: #24292f; background: transparent; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #cf222e; }
+.hljs-string, .hljs-attr { color: #0a3069; }
+.hljs-comment, .hljs-quote { color: #6e7781; font-style: italic; }
+.hljs-number, .hljs-literal { color: #0550ae; }
+.hljs-function .hljs-title, .hljs-title.function_ { color: #8250df; }
+.hljs-type, .hljs-title.class_ { color: #953800; }
+.hljs-variable, .hljs-template-variable { color: #953800; }
+.hljs-meta { color: #6e7781; }
+.hljs-tag { color: #116329; }
+.hljs-name { color: #116329; }
+.hljs-attribute { color: #0550ae; }
+.hljs-symbol, .hljs-bullet { color: #0550ae; }
+.hljs-addition { color: #116329; background: #dafbe1; }
+.hljs-deletion { color: #82071e; background: #ffebe9; }
+
+/* Dark theme overrides */
+.dark .hljs { color: #c9d1d9; }
+.dark .hljs-keyword, .dark .hljs-selector-tag, .dark .hljs-built_in { color: #ff7b72; }
+.dark .hljs-string, .dark .hljs-attr { color: #a5d6ff; }
+.dark .hljs-comment, .dark .hljs-quote { color: #8b949e; font-style: italic; }
+.dark .hljs-number, .dark .hljs-literal { color: #79c0ff; }
+.dark .hljs-function .hljs-title, .dark .hljs-title.function_ { color: #d2a8ff; }
+.dark .hljs-type, .dark .hljs-title.class_ { color: #ffa657; }
+.dark .hljs-variable, .dark .hljs-template-variable { color: #ffa657; }
+.dark .hljs-meta { color: #8b949e; }
+.dark .hljs-tag { color: #7ee787; }
+.dark .hljs-name { color: #7ee787; }
+.dark .hljs-attribute { color: #79c0ff; }
+.dark .hljs-symbol, .dark .hljs-bullet { color: #79c0ff; }
+.dark .hljs-addition { color: #aff5b4; background: #033a16; }
+.dark .hljs-deletion { color: #ffdcd7; background: #67060c; }
 
 /* Scrollbar — thin, unobtrusive */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

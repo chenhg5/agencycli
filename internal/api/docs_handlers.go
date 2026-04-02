@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/chenhg5/agencycli/internal/store"
@@ -119,6 +121,10 @@ func (s *Server) handleDocsAdd(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "createdBy is required")
 		return
 	}
+	if _, err := os.Stat(body.FilePath); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "file not found: "+body.FilePath)
+		return
+	}
 
 	ds := store.NewDocsStore(s.root)
 	entry := &store.DocEntry{
@@ -178,6 +184,29 @@ func (s *Server) handleDocsUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	doc, _ := ds.Get(id)
 	_ = json.NewEncoder(w).Encode(doc)
+}
+
+func (s *Server) handleDocsDownload(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	ds := store.NewDocsStore(s.root)
+	doc, err := ds.Get(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	data, err := os.ReadFile(doc.FilePath)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	filename := filepath.Base(doc.FilePath)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	w.Write(data)
 }
 
 func (s *Server) handleDocsDelete(w http.ResponseWriter, r *http.Request) {

@@ -252,7 +252,11 @@
     "moveTo": "Move to...",
     "edit": "Edit",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "download": "Download",
+    "searchResults": "Search results",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "api": {
     "loading": "Loading…",

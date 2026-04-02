@@ -52,7 +52,7 @@ export default function App() {
         </Route>
         <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="skills" element={<SkillsPage />} />
-        <Route path="docs" element={<DocsPage />} />
+        <Route path="docs/*" element={<DocsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

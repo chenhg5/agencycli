@@ -252,7 +252,11 @@
     "moveTo": "移動先...",
     "edit": "編集",
     "save": "保存",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "download": "ダウンロード",
+    "searchResults": "検索結果",
+    "collapseSidebar": "サイドバーを閉じる",
+    "expandSidebar": "サイドバーを開く"
   },
   "api": {
     "loading": "読み込み中…",

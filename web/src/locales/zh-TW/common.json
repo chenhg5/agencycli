@@ -252,7 +252,11 @@
     "moveTo": "移動到...",
     "edit": "編輯",
     "save": "儲存",
-    "cancel": "取消"
+    "cancel": "取消",
+    "download": "下載",
+    "searchResults": "搜尋結果",
+    "collapseSidebar": "收起目錄",
+    "expandSidebar": "展開目錄"
   },
   "api": {
     "loading": "載入中…",

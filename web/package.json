@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "cmdk": "^1.1.1",
     "i18next": "^26.0.1",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -19,6 +20,7 @@
     "react-i18next": "^17.0.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.2",
+    "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0"
   },
