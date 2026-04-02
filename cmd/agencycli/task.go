@@ -90,11 +90,19 @@ func newTaskAddCmd() *cobra.Command {
 				return fmt.Errorf("--prompt or --prompt-file is required")
 			}
 
-			if assignee == "" {
-				if agentName == "human" {
-					assignee = "human"
+		if assignee == "" {
+			if agentName == "human" {
+				assignee = "human"
+			} else {
+				assignee = project + "/" + agentName
+			}
+		}
+
+			if !cmd.Flags().Changed("created-by") {
+				if assignee == "human" {
+					createdBy = project + "/" + agentName
 				} else {
-					assignee = project + "/" + agentName
+					createdBy = "human"
 				}
 			}
 
