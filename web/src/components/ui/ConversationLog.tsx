@@ -209,7 +209,7 @@ function ToolInputDisplay({ input }: { input: unknown }) {
   }
   return (
     <details className="mt-1">
-      <summary className="text-[11px] text-neutral-400 hover:text-neutral-600 dark:text-zinc-600 dark:hover:text-zinc-400">
+      <summary className="text-[11px] text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400">
         展开参数
       </summary>
       <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-neutral-500 dark:text-zinc-500">{str}</pre>
@@ -222,7 +222,7 @@ export function ConversationLog({ content }: { content: string }) {
   const items = useMemo(() => parseLog(content), [content])
 
   if (items.length === 0) {
-    return <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('runs.logEmpty')}</p>
+    return <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.logEmpty')}</p>
   }
 
   return (
@@ -231,7 +231,7 @@ export function ConversationLog({ content }: { content: string }) {
         switch (item.kind) {
           case 'header':
             return (
-              <div key={i} className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-zinc-600">
+              <div key={i} className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-zinc-500">
                 <Terminal className="size-3 shrink-0" strokeWidth={1.5} />
                 <span className="font-mono">{item.text}</span>
               </div>
@@ -240,7 +240,7 @@ export function ConversationLog({ content }: { content: string }) {
           case 'system':
             return (
               <div key={i} className="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-1.5 dark:bg-zinc-800/40">
-                <Info className="size-3.5 shrink-0 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
+                <Info className="size-3.5 shrink-0 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
                 <span className="text-xs text-neutral-500 dark:text-zinc-500">{item.text}</span>
               </div>
             )
@@ -303,7 +303,7 @@ export function ConversationLog({ content }: { content: string }) {
                   'min-w-0 flex-1 rounded-md border px-3 py-2',
                   item.isError
                     ? 'border-red-200/60 bg-red-50/50 dark:border-red-800/30 dark:bg-red-900/10'
-                    : 'border-neutral-200/60 bg-neutral-50/50 dark:border-zinc-800/40 dark:bg-zinc-800/20',
+                    : 'border-neutral-200/60 bg-neutral-50/50 dark:border-zinc-700/40 dark:bg-zinc-800/20',
                 )}>
                   <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-neutral-600 dark:text-zinc-400">
                     {truncateStr(item.content, 2000)}
@@ -328,10 +328,10 @@ export function ConversationLog({ content }: { content: string }) {
                   <p className="text-xs font-semibold text-neutral-700 dark:text-zinc-300">
                     {item.isError ? 'Error' : 'Result'}
                     {item.turns != null && (
-                      <span className="ml-2 font-normal text-neutral-400 dark:text-zinc-600">{item.turns} turns</span>
+                      <span className="ml-2 font-normal text-neutral-400 dark:text-zinc-500">{item.turns} turns</span>
                     )}
                     {item.cost != null && (
-                      <span className="ml-2 font-normal text-neutral-400 dark:text-zinc-600">${item.cost.toFixed(4)}</span>
+                      <span className="ml-2 font-normal text-neutral-400 dark:text-zinc-500">${item.cost.toFixed(4)}</span>
                     )}
                   </p>
                   <MdBlock text={item.text} className="mt-1" />

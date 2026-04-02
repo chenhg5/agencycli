@@ -193,7 +193,7 @@ export default function ProjectRunsPage() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={refresh} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+            <button type="button" onClick={refresh} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
               <RefreshCw className="size-3" strokeWidth={2} />
               {t('api.refresh')}
             </button>
@@ -218,7 +218,7 @@ export default function ProjectRunsPage() {
               <BarChart3 className="size-6 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
             </div>
             <p className="text-base font-medium text-neutral-700 dark:text-zinc-300">{t('runs.noDbTitle')}</p>
-            <p className="mt-1 text-sm text-neutral-400 dark:text-zinc-600">{t('runs.noDbBody')}</p>
+            <p className="mt-1 text-sm text-neutral-400 dark:text-zinc-500">{t('runs.noDbBody')}</p>
           </div>
         )}
 
@@ -235,9 +235,9 @@ export default function ProjectRunsPage() {
             ).map(([key, val, shouldFmt]) => (
               <div
                 key={key}
-                className="rounded-lg border border-neutral-200/80 bg-white px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-900/40"
+                className="rounded-lg border border-neutral-200/80 bg-white px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-900/40"
               >
-                <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
                   {t(`runs.metric.${key}`)}
                 </p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-neutral-900 dark:text-zinc-100">
@@ -250,12 +250,12 @@ export default function ProjectRunsPage() {
 
         {/* By agent breakdown */}
         {sumState.status === 'ok' && sumState.data.available && sumState.data.byAgent.length > 0 && (
-          <div className="mb-5 overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+          <div className="mb-5 overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-full w-full">
               <thead>
-                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
                   {[t('runs.colAgent'), t('runs.colRuns'), t('runs.colInTok'), t('runs.colOutTok'), t('runs.colCost')].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{h}</th>
+                    <th key={h} className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -276,10 +276,10 @@ export default function ProjectRunsPage() {
 
         {/* Recent runs */}
         <div className="flex flex-col gap-3 pb-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+          <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
             {t('runs.recentTitle')}
             {filteredRuns.length !== allRuns.length && (
-              <span className="ml-2 text-neutral-300 dark:text-zinc-700">
+              <span className="ml-2 text-neutral-300 dark:text-zinc-500">
                 {filteredRuns.length}/{allRuns.length}
               </span>
             )}
@@ -307,18 +307,18 @@ export default function ProjectRunsPage() {
           </div>
         </div>
         {runsState.status === 'ok' && runsState.data.available && filteredRuns.length === 0 && (
-          <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('runs.noRuns')}</p>
+          <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.noRuns')}</p>
         )}
         {runsState.status === 'ok' && runsState.data.available && filteredRuns.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[700px] w-full">
               <thead>
-                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStarted')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colAgent')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colKind')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colStatus')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.colTok')}</th>
+                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.colStarted')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.colAgent')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.colKind')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.colStatus')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.colTok')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
@@ -375,51 +375,51 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh]">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-fade-in dark:bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl animate-scale-in dark:border-zinc-800/80 dark:bg-zinc-900">
+      <div className="relative w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl animate-scale-in dark:border-zinc-700/80 dark:bg-zinc-900">
         {/* Modal header */}
-        <div className="flex items-center justify-between border-b border-neutral-200/80 px-5 py-3 dark:border-zinc-800/60">
+        <div className="flex items-center justify-between border-b border-neutral-200/80 px-5 py-3 dark:border-zinc-700/60">
           <div className="flex items-center gap-3">
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', kl.cls)}>{kl.text}</span>
             <span className="font-mono text-sm font-medium text-neutral-900 dark:text-zinc-100">{run.project}/{run.agent}</span>
             <span className={cn('text-sm font-medium', statusCls[run.status] ?? 'text-neutral-600')}>{run.status}</span>
           </div>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300">
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300">
             <X className="size-4" strokeWidth={2} />
           </button>
         </div>
 
         {/* Info grid */}
-        <div className="shrink-0 grid grid-cols-2 gap-x-6 gap-y-2 border-b border-neutral-100 px-5 py-3 text-sm dark:border-zinc-800/40 sm:grid-cols-3">
+        <div className="shrink-0 grid grid-cols-2 gap-x-6 gap-y-2 border-b border-neutral-100 px-5 py-3 text-sm dark:border-zinc-700/40 sm:grid-cols-3">
           <div>
-            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.colStarted')}</span>
+            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.colStarted')}</span>
             <p className="text-neutral-800 dark:text-zinc-200">{fmt(run.startedAt)}</p>
           </div>
           <div>
-            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.finished')}</span>
+            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.finished')}</span>
             <p className="text-neutral-800 dark:text-zinc-200">{fmt(run.finishedAt)}</p>
           </div>
           {run.model && (
             <div>
-              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.model')}</span>
+              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.model')}</span>
               <p className="font-mono text-neutral-800 dark:text-zinc-200">{run.model}</p>
             </div>
           )}
           <div>
-            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.colTok')}</span>
+            <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.colTok')}</span>
             <p className="tabular-nums text-neutral-800 dark:text-zinc-200">
               {fmtNum((run.inputTokens ?? 0) + (run.outputTokens ?? 0) + (run.cacheReadTokens ?? 0))}
-              {run.costUSD != null && <span className="ml-1.5 text-neutral-400 dark:text-zinc-600">(${run.costUSD.toFixed(4)})</span>}
+              {run.costUSD != null && <span className="ml-1.5 text-neutral-400 dark:text-zinc-500">(${run.costUSD.toFixed(4)})</span>}
             </p>
           </div>
           {run.taskTitle && (
             <div className="col-span-2">
-              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.taskLabel')}</span>
+              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.taskLabel')}</span>
               <p className="text-neutral-800 dark:text-zinc-200">{run.taskTitle}</p>
             </div>
           )}
           {run.command && (
             <div className="col-span-full">
-              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{t('runs.command')}</span>
+              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.command')}</span>
               <p className="truncate font-mono text-xs text-neutral-600 dark:text-zinc-400">{run.command}</p>
             </div>
           )}
@@ -434,8 +434,8 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
         {/* Log content */}
         <div className="flex-1 overflow-y-auto">
           <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
-            <FileText className="size-3.5 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+            <FileText className="size-3.5 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
               {t('runs.logTitle')}
             </span>
           </div>
@@ -447,7 +447,7 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
               </div>
             )}
             {hasLog && logState.status === 'error' && (
-              <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('runs.logNotFound')}</p>
+              <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.logNotFound')}</p>
             )}
             {hasLog && logState.status === 'ok' && (
               <>
@@ -458,7 +458,7 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
               </>
             )}
             {!hasLog && (
-              <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('runs.noLog')}</p>
+              <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.noLog')}</p>
             )}
           </div>
         </div>

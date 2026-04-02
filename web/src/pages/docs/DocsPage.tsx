@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   BookOpen, ChevronRight, ChevronDown, FileText, FolderOpen, Folder,
-  Plus, Search, ArrowLeft, Pencil, Trash2, FolderInput, X, Save,
+  Plus, Search, ArrowLeft, Pencil, Trash2, X, Save,
 } from 'lucide-react'
 import { apiFetch, apiPost } from '../../lib/api'
 
@@ -132,7 +132,7 @@ export default function DocsPage() {
               </button>
             )}
             {visibleDocs.length === 0 ? (
-              <p className="text-sm text-neutral-400 dark:text-zinc-600 py-12 text-center">{t('docs.noDocuments')}</p>
+              <p className="text-sm text-neutral-400 dark:text-zinc-500 py-12 text-center">{t('docs.noDocuments')}</p>
             ) : (
               <div className="grid gap-2">
                 {visibleDocs.map(d => (
@@ -148,7 +148,7 @@ export default function DocsPage() {
                       {d.description && (
                         <p className="mt-1 text-xs text-neutral-500 dark:text-zinc-500 line-clamp-2">{d.description}</p>
                       )}
-                      <div className="mt-1.5 flex items-center gap-3 text-[10px] text-neutral-400 dark:text-zinc-600">
+                      <div className="mt-1.5 flex items-center gap-3 text-[10px] text-neutral-400 dark:text-zinc-500">
                         <span>{d.createdBy}</span>
                         <span>{new Date(d.createdAt).toLocaleDateString()}</span>
                         {d.tags?.map(tag => (
@@ -255,7 +255,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated }: {
           ) : (
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100 truncate">{doc.title}</h2>
           )}
-          <p className="text-[10px] text-neutral-400 dark:text-zinc-600 truncate mt-0.5">
+          <p className="text-[10px] text-neutral-400 dark:text-zinc-500 truncate mt-0.5">
             {doc.index} · {doc.createdBy} · {new Date(doc.createdAt).toLocaleDateString()}
           </p>
         </div>

@@ -10,21 +10,21 @@ import {
 import { cn } from '../../lib/cn'
 
 const linkBase =
-  'group relative flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] font-medium transition-all duration-150 outline-none select-none'
+  'group relative flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-all duration-150 outline-none select-none'
 const linkIdle =
-  'text-neutral-600 hover:bg-neutral-500/[0.07] hover:text-neutral-900 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100'
+  'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100'
 const linkActive =
-  'bg-sky-500/[0.10] text-sky-700 dark:bg-sky-400/[0.12] dark:text-sky-300'
+  'bg-neutral-100 text-neutral-900 dark:bg-zinc-800/70 dark:text-zinc-100'
 
 const linkCollapsed =
   'group relative flex items-center justify-center rounded-md p-2 transition-all duration-150 outline-none select-none'
 
 const subLinkBase =
-  'group relative flex items-center gap-2 rounded-md py-[5px] pl-2.5 pr-2 text-[12.5px] font-medium transition-all duration-150 outline-none select-none'
+  'group relative flex items-center gap-2 rounded-lg py-[5px] pl-2.5 pr-2 text-[12.5px] font-medium transition-all duration-150 outline-none select-none'
 const subLinkIdle =
-  'text-neutral-500 hover:bg-neutral-500/[0.06] hover:text-neutral-800 dark:text-zinc-500 dark:hover:bg-white/[0.05] dark:hover:text-zinc-200'
+  'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-200'
 const subActive =
-  'bg-sky-500/[0.10] text-sky-700 dark:bg-sky-400/[0.12] dark:text-sky-300'
+  'bg-neutral-100 text-neutral-900 dark:bg-zinc-800/70 dark:text-zinc-100'
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation()
@@ -34,12 +34,12 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col border-r border-neutral-200/80 bg-white transition-[width] duration-200 dark:border-zinc-800/70 dark:bg-zinc-950',
+        'flex shrink-0 flex-col border-r border-neutral-200/80 bg-white transition-[width] duration-200 dark:border-zinc-700/60 dark:bg-zinc-900',
         collapsed ? 'w-[3.5rem]' : 'w-[14.5rem]',
       )}
     >
       {/* Brand */}
-      <div className={cn('flex h-11 items-center border-b border-neutral-200/80 dark:border-zinc-800/70', collapsed ? 'justify-center px-2' : 'px-4')}>
+      <div className={cn('flex h-11 items-center border-b border-neutral-200/80 dark:border-zinc-700/60', collapsed ? 'justify-center px-2' : 'px-4')}>
         {collapsed ? (
           <span
             className="text-lg font-bold tracking-tight text-sky-600 dark:text-sky-400"
@@ -79,8 +79,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                 className={cn(
                   linkCollapsed,
                   active
-                    ? 'bg-sky-500/[0.10] text-sky-700 dark:bg-sky-400/[0.12] dark:text-sky-300'
-                    : 'text-neutral-500 hover:bg-neutral-500/[0.07] hover:text-neutral-900 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-100',
+                    ? 'bg-neutral-100 text-neutral-900 dark:bg-zinc-800/70 dark:text-zinc-100'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-zinc-500 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100',
                 )}
                 title={t(`nav.${navKey}`)}
               >
@@ -104,8 +104,8 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               </NavLink>
 
               {showProjectNest && (
-                <div className="mt-0.5 ml-[18px] border-l border-neutral-200/70 pl-2.5 dark:border-zinc-800/60 animate-fade-in">
-                  <p className="truncate px-2.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+                <div className="mt-0.5 ml-[18px] border-l border-neutral-200/70 pl-2.5 dark:border-zinc-700/60 animate-fade-in">
+                  <p className="truncate px-2.5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
                     {projectId}
                   </p>
                   <div className="space-y-px">
@@ -136,14 +136,14 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       </nav>
 
       {/* Collapse / expand toggle at bottom */}
-      <div className={cn('flex h-10 shrink-0 items-center border-t border-neutral-200/60 dark:border-zinc-800/50', collapsed ? 'justify-center px-1.5' : 'px-2')}>
+      <div className={cn('flex h-10 shrink-0 items-center border-t border-neutral-200/60 dark:border-zinc-700/50', collapsed ? 'justify-center px-1.5' : 'px-2')}>
         <button
           type="button"
           onClick={onToggle}
           className={cn(
             'flex w-full items-center rounded-md transition-colors hover:bg-neutral-100 dark:hover:bg-zinc-800',
             collapsed
-              ? 'justify-center p-1.5 text-neutral-400 dark:text-zinc-600'
+              ? 'justify-center p-1.5 text-neutral-400 dark:text-zinc-500'
               : 'gap-2.5 px-2.5 py-[5px] text-[13px] font-medium text-neutral-500 dark:text-zinc-500',
           )}
           title={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}

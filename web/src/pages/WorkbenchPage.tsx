@@ -273,11 +273,11 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
             <option value="all">{t('messages.archivedAll')}</option>
           </select>
           {hasFilters && (
-            <button type="button" onClick={resetFilters} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+            <button type="button" onClick={resetFilters} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
               <X className="size-3.5" strokeWidth={2} /> {t('messages.resetFilters')}
             </button>
           )}
-          <button type="button" onClick={() => reloadAndNotify()} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+          <button type="button" onClick={() => reloadAndNotify()} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
             <RefreshCw className="size-3" strokeWidth={2} />
             {t('api.refresh')}
           </button>
@@ -320,7 +320,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
               <Mail className="size-7 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
             </div>
             <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('workbench.emptyMessages')}</p>
-            <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-600">{t('workbench.emptyMessagesHint')}</p>
+            <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">{t('workbench.emptyMessagesHint')}</p>
           </div>
         )}
         {state.status === 'ok' && messages.length > 0 && (
@@ -328,7 +328,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
             {/* List toolbar */}
             <div className="flex items-center gap-3 px-1">
               <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
-              <span className="text-xs text-neutral-400 dark:text-zinc-600">{messages.length} {t('workbench.tabMessages').toLowerCase()}</span>
+              <span className="text-xs text-neutral-400 dark:text-zinc-500">{messages.length} {t('workbench.tabMessages').toLowerCase()}</span>
             </div>
             {messages.map((row) => {
               const isSent = row.from === 'human'
@@ -345,7 +345,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                       ? 'border-sky-300 bg-sky-50/50 shadow-sm dark:border-sky-800 dark:bg-sky-900/10'
                       : unread
                         ? 'border-sky-200/60 bg-sky-50/20 hover:border-sky-300/60 hover:bg-sky-50/40 hover:shadow-sm dark:border-sky-900/30 dark:bg-sky-900/[0.04] dark:hover:bg-sky-900/10'
-                        : 'border-neutral-200/80 bg-white hover:border-neutral-300/60 hover:bg-neutral-50/60 hover:shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30',
+                        : 'border-neutral-200/80 bg-white hover:border-neutral-300/60 hover:bg-neutral-50/60 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30',
                   )}
                 >
                   <div className="flex items-start gap-4 px-5 py-4">
@@ -357,8 +357,8 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                         {unread && <span className="size-2.5 shrink-0 rounded-full bg-sky-500" />}
                         {isSent && <span className="size-2.5 shrink-0 rounded-full bg-emerald-400 dark:bg-emerald-600" />}
                         <span className="font-mono text-sm font-semibold text-neutral-800 dark:text-zinc-200">{row.from}</span>
-                        <span className="text-xs text-neutral-400 dark:text-zinc-600">→ {row.to}</span>
-                        <span className="ml-auto shrink-0 text-xs text-neutral-400 dark:text-zinc-600">{fmt(row.sentAt)}</span>
+                        <span className="text-xs text-neutral-400 dark:text-zinc-500">→ {row.to}</span>
+                        <span className="ml-auto shrink-0 text-xs text-neutral-400 dark:text-zinc-500">{fmt(row.sentAt)}</span>
                       </div>
                       {row.subject && (
                         <p className="mt-1.5 text-sm font-medium text-neutral-900 dark:text-zinc-100">{row.subject}</p>
@@ -387,7 +387,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
 
                   {/* Quick actions */}
                   <div
-                    className="border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-800/40"
+                    className="border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-700/40"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3">
@@ -510,7 +510,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
               {projects.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           )}
-          <button type="button" onClick={reload} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+          <button type="button" onClick={reload} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
             <RefreshCw className="size-3" strokeWidth={2} />
             {t('api.refresh')}
           </button>
@@ -556,7 +556,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
               <ListTodo className="size-7 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
             </div>
             <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('workbench.emptyTasks')}</p>
-            <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-600">{t('workbench.emptyTasksHint')}</p>
+            <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">{t('workbench.emptyTasksHint')}</p>
           </div>
         )}
         {state.status === 'ok' && tasks.length > 0 && (
@@ -564,7 +564,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
             {/* List toolbar */}
             <div className="flex items-center gap-3 px-1">
               <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
-              <span className="text-xs text-neutral-400 dark:text-zinc-600">{tasks.length} {t('workbench.tabTasks').toLowerCase()}</span>
+              <span className="text-xs text-neutral-400 dark:text-zinc-500">{tasks.length} {t('workbench.tabTasks').toLowerCase()}</span>
             </div>
             {tasks.map((row) => {
               const prio = priorityLabel[row.priority] ?? priorityLabel[2]
@@ -579,7 +579,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
                     'group rounded-xl border transition-all duration-150 cursor-pointer',
                     isChecked
                       ? 'border-sky-300 bg-sky-50/50 shadow-sm dark:border-sky-800 dark:bg-sky-900/10'
-                      : 'border-neutral-200/80 bg-white hover:border-neutral-300/60 hover:shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900/20 dark:hover:border-zinc-700/60',
+                      : 'border-neutral-200/80 bg-white hover:border-neutral-300/60 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/20 dark:hover:border-zinc-700/60',
                   )}
                 >
                   <div className="flex items-start gap-4 px-5 py-4">
@@ -610,20 +610,20 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
                         >
                           {row.project}
                         </Link>
-                        <span className="font-mono text-neutral-400 dark:text-zinc-600">{row.agent}</span>
+                        <span className="font-mono text-neutral-400 dark:text-zinc-500">{row.agent}</span>
                         {row.assignee && row.assignee !== row.agent && (
                           <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
                             → {row.assignee}
                           </span>
                         )}
-                        <span className="text-neutral-400 dark:text-zinc-600">{fmt(row.updatedAt)}</span>
+                        <span className="text-neutral-400 dark:text-zinc-500">{fmt(row.updatedAt)}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Quick actions */}
                   <div
-                    className="flex items-center gap-3 border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-800/40"
+                    className="flex items-center gap-3 border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-700/40"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-2">
@@ -715,7 +715,7 @@ export default function WorkbenchPage() {
       </div>
 
       {/* Tabs — Plane-style border-b-2 underline */}
-      <div className="shrink-0 border-b border-neutral-200/80 px-8 dark:border-zinc-800/50">
+      <div className="shrink-0 border-b border-neutral-200/80 px-8 dark:border-zinc-700/50">
         <div className="-mb-px flex gap-1">
           <TabButton active={tab === 'messages'} onClick={() => setTab('messages')} badge={unreadMsgs}>
             <MessageSquare className="size-4" strokeWidth={1.8} />

@@ -68,10 +68,10 @@ function InlinePromptEditor({
   }, [])
 
   return (
-    <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
-      <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-800/40">
+    <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-700/40">
         <div className="flex items-center gap-2">
-          <FileText className="size-4 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
+          <FileText className="size-4 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
           <span className="text-sm font-medium text-neutral-700 dark:text-zinc-300">{label}</span>
           {dirty && <span className="text-[10px] text-amber-500">●</span>}
           {saved && <span className="text-[10px] text-emerald-500">{t('prompt.saved')}</span>}
@@ -84,7 +84,7 @@ function InlinePromptEditor({
               'rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
               preview
                 ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
-                : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-600 dark:hover:text-zinc-400',
+                : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400',
             )}
           >
             {preview ? t('prompt.edit') : t('prompt.preview')}
@@ -229,7 +229,7 @@ function RolePromptRow({
   }, [teamPath, role.name, onSkillsChanged])
 
   return (
-    <div className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-800/40">
+    <div className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-700/40">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -245,7 +245,7 @@ function RolePromptRow({
             )}
           </div>
           {role.description && (
-            <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-600">{role.description}</p>
+            <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-500">{role.description}</p>
           )}
         </div>
         {open
@@ -339,20 +339,20 @@ export default function TeamDetailPage() {
         {state.status === 'ok' && (
           <div className="space-y-5">
             {/* Team info */}
-            <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+            <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
               <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{state.data.name}</h2>
               {state.data.description && (
                 <p className="mt-1.5 text-sm text-neutral-500 dark:text-zinc-500">{state.data.description}</p>
               )}
               {state.data.parent && (
-                <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-600">
+                <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-500">
                   parent: <span className="font-mono">{state.data.parent}</span>
                 </p>
               )}
             </div>
 
             {/* Team skills */}
-            <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+            <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
               <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-zinc-100">
                 <Puzzle className="size-4 text-amber-500" strokeWidth={1.8} />
                 {t('skill.teamSkills')}
@@ -380,7 +380,7 @@ export default function TeamDetailPage() {
             {/* Roles with prompts & skills */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
                   {t('prompt.roles')}
                 </h3>
                 {teamId && (
@@ -392,7 +392,7 @@ export default function TeamDetailPage() {
                 )}
               </div>
               {state.data.roles.length > 0 ? (
-                <div className="overflow-hidden rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
+                <div className="overflow-hidden rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
                   {state.data.roles.map((r) => (
                     <RolePromptRow
                       key={r.name}
@@ -405,8 +405,8 @@ export default function TeamDetailPage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Users className="mb-2 size-8 text-neutral-300 dark:text-zinc-700" strokeWidth={1.5} />
-                  <p className="text-sm text-neutral-400 dark:text-zinc-600">{t('teams.detailPlaceholderBody')}</p>
+                  <Users className="mb-2 size-8 text-neutral-300 dark:text-zinc-500" strokeWidth={1.5} />
+                  <p className="text-sm text-neutral-400 dark:text-zinc-500">{t('teams.detailPlaceholderBody')}</p>
                 </div>
               )}
             </div>

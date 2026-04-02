@@ -80,7 +80,7 @@ export function RunAgentDialog({ projects, onDone }: Props) {
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-neutral-700 dark:text-zinc-300">
-                  Prompt <span className="text-xs font-normal text-neutral-400 dark:text-zinc-600">{t('session.promptOptional')}</span>
+                  Prompt <span className="text-xs font-normal text-neutral-400 dark:text-zinc-500">{t('session.promptOptional')}</span>
                 </label>
                 <textarea
                   value={prompt}
@@ -89,7 +89,7 @@ export function RunAgentDialog({ projects, onDone }: Props) {
                   placeholder={t('session.promptPlaceholder')}
                   className={`${fieldCls} resize-y font-mono text-[13px] leading-relaxed`}
                 />
-                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-600">{t('session.promptHint')}</p>
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('session.promptHint')}</p>
               </div>
 
               {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">{error}</p>}

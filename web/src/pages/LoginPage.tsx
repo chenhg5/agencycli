@@ -48,7 +48,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900">
           {error && (
             <div className="mb-4 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
               {error}

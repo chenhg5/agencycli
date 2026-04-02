@@ -105,7 +105,7 @@ function UserMenu() {
         <div className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           <div className="border-b border-neutral-100 px-3 py-2 dark:border-zinc-700">
             <p className="text-sm font-medium text-neutral-900 dark:text-zinc-100">{user?.username}</p>
-            <p className="text-xs text-neutral-400 dark:text-zinc-600">{user?.role}</p>
+            <p className="text-xs text-neutral-400 dark:text-zinc-500">{user?.role}</p>
           </div>
           <Link
             to="/settings"
@@ -154,7 +154,7 @@ function PageTabBar() {
             className={cn(
               'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none',
               isActive
-                ? 'border-sky-600 text-sky-700 dark:border-sky-400 dark:text-sky-300'
+                ? 'border-neutral-900 text-neutral-900 dark:border-zinc-200 dark:text-zinc-200'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300',
             )}
             onClick={() => navigate(tab.path)}
@@ -167,8 +167,8 @@ function PageTabBar() {
               className={cn(
                 'flex size-4 shrink-0 items-center justify-center rounded transition-colors',
                 isActive
-                  ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700 dark:text-sky-500 dark:hover:bg-sky-900/30'
-                  : 'text-neutral-400 opacity-0 hover:bg-neutral-200 hover:text-neutral-600 group-hover:opacity-100 dark:text-zinc-600 dark:hover:bg-zinc-700',
+                  ? 'text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-700'
+                  : 'text-neutral-400 opacity-0 hover:bg-neutral-200 hover:text-neutral-600 group-hover:opacity-100 dark:text-zinc-500 dark:hover:bg-zinc-700',
               )}
             >
               <X className="size-3" strokeWidth={2} />
@@ -194,13 +194,13 @@ export function TopBar({
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
 
   return (
-    <header className="flex h-11 w-full shrink-0 items-center gap-2 border-b border-neutral-200/80 bg-white px-3 dark:border-zinc-800/60 dark:bg-zinc-950">
+    <header className="flex h-11 w-full shrink-0 items-center gap-2 border-b border-neutral-200/80 bg-white px-3 dark:border-zinc-700/60 dark:bg-zinc-900">
       {/* Sidebar toggle (when collapsed) */}
       {collapsed && onToggleSidebar && (
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
           title={t('sidebar.expand')}
         >
           <PanelLeft className="size-4" strokeWidth={1.8} />
@@ -212,14 +212,14 @@ export function TopBar({
 
       {/* Right controls */}
       <div className="flex shrink-0 items-center gap-1">
-        <button
+          <button
           type="button"
           onClick={onOpenSearch}
-          className="flex h-7 w-40 max-w-[32vw] items-center gap-1.5 rounded-md border border-neutral-200/80 bg-neutral-50/60 px-2 text-left text-[11px] text-neutral-400 transition-all duration-150 hover:border-neutral-300 dark:border-zinc-800/50 dark:bg-zinc-900/30 dark:text-zinc-600 dark:hover:border-zinc-700"
+          className="flex h-7 w-40 max-w-[32vw] items-center gap-1.5 rounded-lg border border-neutral-200/80 bg-neutral-50/60 px-2 text-left text-[11px] text-neutral-400 transition-all duration-150 hover:border-neutral-300 dark:border-zinc-700/50 dark:bg-zinc-800/40 dark:text-zinc-500 dark:hover:border-zinc-600"
         >
           <Search className="size-3 shrink-0 opacity-50" strokeWidth={2} />
           <span className="flex-1 truncate">{t('search.placeholder')}</span>
-          <kbd className="ml-auto hidden rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[9px] text-neutral-400 sm:inline dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-600">
+          <kbd className="ml-auto hidden rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[9px] text-neutral-400 sm:inline dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">
             ⌘K
           </kbd>
         </button>

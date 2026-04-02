@@ -32,7 +32,7 @@ export default function TeamsPage() {
       {state.status === 'error' && (
         <PlaceholderCard title={t('api.loadError')}>
           <p className="text-[13px]">{state.error.message}</p>
-          <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-600">{t('api.hintServe')}</p>
+          <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-500">{t('api.hintServe')}</p>
         </PlaceholderCard>
       )}
       {state.status === 'ok' && state.data.length === 0 && (
@@ -41,7 +41,7 @@ export default function TeamsPage() {
             <Users className="size-7 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
           </div>
           <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('teams.placeholderTitle')}</p>
-          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-600">{t('api.noTeams')}</p>
+          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">{t('api.noTeams')}</p>
         </div>
       )}
       {state.status === 'ok' && state.data.length > 0 && (
@@ -50,7 +50,7 @@ export default function TeamsPage() {
             <Link
               key={row.path}
               to={`/teams/${encodeURIComponent(row.path)}`}
-              className="group flex flex-col justify-between rounded-xl border border-neutral-200/80 bg-white p-5 transition-all duration-150 hover:border-sky-300/60 hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900/30 dark:hover:border-sky-800/40"
+              className="group flex flex-col justify-between rounded-xl border border-neutral-200/80 bg-white p-5 transition-all duration-150 hover:border-sky-300/60 hover:shadow-md dark:border-zinc-700/60 dark:bg-zinc-900/30 dark:hover:border-sky-800/40"
             >
               <div>
                 <div className="flex items-center gap-2.5">
@@ -59,14 +59,14 @@ export default function TeamsPage() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">{row.name}</h3>
-                    <p className="font-mono text-xs text-neutral-400 dark:text-zinc-600">{row.path}</p>
+                    <p className="font-mono text-xs text-neutral-400 dark:text-zinc-500">{row.path}</p>
                   </div>
                 </div>
                 {row.description && (
                   <p className="mt-2.5 text-sm leading-relaxed text-neutral-500 dark:text-zinc-500 line-clamp-2">{row.description}</p>
                 )}
                 {row.parent && (
-                  <p className="mt-1.5 text-xs text-neutral-400 dark:text-zinc-600">
+                  <p className="mt-1.5 text-xs text-neutral-400 dark:text-zinc-500">
                     parent: <span className="font-mono">{row.parent}</span>
                   </p>
                 )}

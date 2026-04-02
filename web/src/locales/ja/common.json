@@ -164,6 +164,7 @@
     "model": "モデル",
     "agentType": "Agent タイプ",
     "apiProvider": "API プロバイダー設定",
+    "configuration": "設定",
     "addEnvVar": "変数を追加",
     "hiring": "採用中…",
     "hire": "採用"

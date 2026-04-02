@@ -164,6 +164,7 @@
     "model": "Model",
     "agentType": "Agent Type",
     "apiProvider": "API Provider",
+    "configuration": "Configuration",
     "addEnvVar": "Add variable",
     "hiring": "Hiring…",
     "hire": "Hire"

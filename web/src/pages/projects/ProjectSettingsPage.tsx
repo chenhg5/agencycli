@@ -34,8 +34,8 @@ export default function ProjectSettingsPage() {
         <div className="space-y-6">
           {/* Basic info */}
           {detail && (
-            <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
-              <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-800/40">
+            <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+              <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
                 <h2 className="text-sm font-semibold text-neutral-800 dark:text-zinc-200">{t('projectSettings.basicInfo')}</h2>
               </div>
               <dl className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
@@ -90,10 +90,10 @@ function PromptEditor({ label, apiPath, initialContent }: { label: string; apiPa
   const change = useCallback((v: string) => { setValue(v); setDirty(true); setSaved(false) }, [])
 
   return (
-    <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
-      <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-zinc-800/40">
+    <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
         <div className="flex items-center gap-2">
-          <FileText className="size-4 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
+          <FileText className="size-4 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
           <span className="text-sm font-semibold text-neutral-800 dark:text-zinc-200">{label}</span>
           {dirty && <span className="text-[10px] text-amber-500">●</span>}
           {saved && <span className="text-[10px] text-emerald-500">{t('prompt.saved')}</span>}
@@ -101,7 +101,7 @@ function PromptEditor({ label, apiPath, initialContent }: { label: string; apiPa
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setPreview((p) => !p)} className={cn(
             'rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
-            preview ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-600 dark:hover:text-zinc-400',
+            preview ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400',
           )}>
             {preview ? t('prompt.edit') : t('prompt.preview')}
           </button>

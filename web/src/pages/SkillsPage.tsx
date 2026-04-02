@@ -39,7 +39,7 @@ function SkillItem({ skill }: { skill: SkillRow }) {
   }, [skill.name, content])
 
   return (
-    <div className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-800/40">
+    <div className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-700/40">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -49,7 +49,7 @@ function SkillItem({ skill }: { skill: SkillRow }) {
         <div className="min-w-0 flex-1">
           <p className="font-mono text-sm font-medium text-neutral-900 dark:text-zinc-100">{skill.name}</p>
           {skill.description && (
-            <p className="mt-0.5 truncate text-xs text-neutral-400 dark:text-zinc-600">{skill.description}</p>
+            <p className="mt-0.5 truncate text-xs text-neutral-400 dark:text-zinc-500">{skill.description}</p>
           )}
         </div>
         {open
@@ -69,10 +69,10 @@ function SkillItem({ skill }: { skill: SkillRow }) {
             <p className="py-2 text-xs text-red-500">{detailState.error.message}</p>
           )}
           {detailState.status === 'ok' && (
-            <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
-              <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-800/40">
+            <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+              <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-700/40">
                 <div className="flex items-center gap-2">
-                  <BookOpen className="size-4 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
+                  <BookOpen className="size-4 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
                   <span className="text-sm font-medium text-neutral-700 dark:text-zinc-300">SKILL.md</span>
                   {dirty && <span className="text-[10px] text-amber-500">●</span>}
                   {saved && <span className="text-[10px] text-emerald-500">{t('prompt.saved')}</span>}
@@ -85,7 +85,7 @@ function SkillItem({ skill }: { skill: SkillRow }) {
                       'rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
                       preview
                         ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
-                        : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-600 dark:hover:text-zinc-400',
+                        : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400',
                     )}
                   >
                     {preview ? t('prompt.edit') : t('prompt.preview')}
@@ -157,7 +157,7 @@ export default function SkillsPage() {
         </div>
       )}
       {skills.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
+        <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
           {skills.map((sk) => (
             <SkillItem key={sk.name} skill={sk} />
           ))}

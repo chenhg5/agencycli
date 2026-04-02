@@ -111,7 +111,7 @@ export function MessageDetailModal({ open, message, onClose, onMutated }: Props)
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-4 py-3 dark:border-zinc-800/60">
+        <div className="flex items-start justify-between gap-3 border-b border-neutral-100 px-4 py-3 dark:border-zinc-700/60">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 id="msg-detail-title" className="text-[13px] font-semibold text-neutral-900 dark:text-zinc-100">
@@ -128,7 +128,7 @@ export function MessageDetailModal({ open, message, onClose, onMutated }: Props)
                 </span>
               )}
             </div>
-            <p className="mt-0.5 font-mono text-[10.5px] text-neutral-400 dark:text-zinc-600">{m.id}</p>
+            <p className="mt-0.5 font-mono text-[10.5px] text-neutral-400 dark:text-zinc-500">{m.id}</p>
           </div>
           <button
             type="button"
@@ -145,20 +145,20 @@ export function MessageDetailModal({ open, message, onClose, onMutated }: Props)
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-neutral-600 dark:text-zinc-400">
             <span>
-              <span className="text-neutral-400 dark:text-zinc-600">{t('forms.from')}:</span>{' '}
+              <span className="text-neutral-400 dark:text-zinc-500">{t('forms.from')}:</span>{' '}
               <span className="font-mono text-neutral-800 dark:text-zinc-200">{m.from}</span>
             </span>
             <span>
-              <span className="text-neutral-400 dark:text-zinc-600">{t('forms.to')}:</span>{' '}
+              <span className="text-neutral-400 dark:text-zinc-500">{t('forms.to')}:</span>{' '}
               <span className="font-mono text-neutral-800 dark:text-zinc-200">{m.to}</span>
             </span>
             <span>
-              <span className="text-neutral-400 dark:text-zinc-600">{t('forms.mailbox')}:</span>{' '}
+              <span className="text-neutral-400 dark:text-zinc-500">{t('forms.mailbox')}:</span>{' '}
               <span className="font-mono">{m.mailbox}</span>
             </span>
           </div>
 
-          <p className="text-[11px] text-neutral-400 dark:text-zinc-600">
+          <p className="text-[11px] text-neutral-400 dark:text-zinc-500">
             {t('forms.sentAt')}: {fmt(m.sentAt)}
             {effectiveReadAt ? (
               <>{' · '}{t('forms.readAt')}: {fmt(effectiveReadAt)}</>
@@ -171,13 +171,13 @@ export function MessageDetailModal({ open, message, onClose, onMutated }: Props)
             <p className="text-[13px] font-medium text-neutral-900 dark:text-zinc-100">{m.subject}</p>
           )}
 
-          <pre className="whitespace-pre-wrap break-words rounded-lg border border-neutral-100 bg-neutral-50/50 p-3 font-sans text-[12.5px] leading-relaxed text-neutral-800 dark:border-zinc-800/40 dark:bg-zinc-800/30 dark:text-zinc-200">
+          <pre className="whitespace-pre-wrap break-words rounded-lg border border-neutral-100 bg-neutral-50/50 p-3 font-sans text-[12.5px] leading-relaxed text-neutral-800 dark:border-zinc-700/40 dark:bg-zinc-800/30 dark:text-zinc-200">
             {m.body}
           </pre>
         </div>
 
         {/* Footer actions */}
-        <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-4 py-2.5 dark:border-zinc-800/60">
+        <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-4 py-2.5 dark:border-zinc-700/60">
           {isUnread && (
             <button type="button" disabled={busy != null} onClick={() => void markRead()} className={`${actionBtn} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300`}>
               {busy === 'read' ? t('forms.working') : t('forms.markAsRead')}

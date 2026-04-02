@@ -164,6 +164,7 @@
     "model": "模型",
     "agentType": "Agent 類型",
     "apiProvider": "API Provider 設定",
+    "configuration": "設定",
     "addEnvVar": "新增變數",
     "hiring": "僱用中…",
     "hire": "僱用"

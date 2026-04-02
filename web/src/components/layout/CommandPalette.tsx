@@ -108,22 +108,22 @@ export function CommandPalette({
       {/* Panel */}
       <div className="relative w-full max-w-lg animate-scale-in">
         <Command
-          className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl dark:border-zinc-800/80 dark:bg-zinc-900"
+          className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl dark:border-zinc-700/80 dark:bg-zinc-900"
           label={t('search.placeholder')}
         >
-          <div className="flex items-center gap-2 border-b border-neutral-200/80 px-4 dark:border-zinc-800/60">
-            <Search className="size-4 shrink-0 text-neutral-400 dark:text-zinc-600" strokeWidth={2} />
+          <div className="flex items-center gap-2 border-b border-neutral-200/80 px-4 dark:border-zinc-700/60">
+            <Search className="size-4 shrink-0 text-neutral-400 dark:text-zinc-500" strokeWidth={2} />
             <Command.Input
               autoFocus
               placeholder={t('search.placeholder')}
               className="h-12 w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-zinc-100 dark:placeholder:text-zinc-600"
             />
-            <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-600">
+            <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">
               ESC
             </kbd>
           </div>
           <Command.List className="max-h-72 overflow-y-auto p-2">
-            <Command.Empty className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-600">
+            <Command.Empty className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">
               {t('search.noResults')}
             </Command.Empty>
             {[...groups.entries()].map(([group, groupItems]) => (

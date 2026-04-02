@@ -30,7 +30,7 @@ export default function ProjectsListPage() {
       {state.status === 'error' && (
         <PlaceholderCard title={t('api.loadError')}>
           <p className="text-[13px]">{state.error.message}</p>
-          <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-600">{t('api.hintServe')}</p>
+          <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-zinc-500">{t('api.hintServe')}</p>
         </PlaceholderCard>
       )}
       {state.status === 'ok' && state.data.length === 0 && (
@@ -39,7 +39,7 @@ export default function ProjectsListPage() {
             <FolderKanban className="size-7 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
           </div>
           <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('projects.emptyTitle')}</p>
-          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-600">{t('api.noProjects')}</p>
+          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">{t('api.noProjects')}</p>
         </div>
       )}
       {state.status === 'ok' && state.data.length > 0 && (
@@ -48,7 +48,7 @@ export default function ProjectsListPage() {
             <Link
               key={p.name}
               to={`/projects/${encodeURIComponent(p.name)}/tasks`}
-              className="group flex flex-col justify-between rounded-xl border border-neutral-200/80 bg-white p-5 transition-all duration-150 hover:border-sky-300/60 hover:shadow-md dark:border-zinc-800/60 dark:bg-zinc-900/30 dark:hover:border-sky-800/40"
+              className="group flex flex-col justify-between rounded-xl border border-neutral-200/80 bg-white p-5 transition-all duration-150 hover:border-sky-300/60 hover:shadow-md dark:border-zinc-700/60 dark:bg-zinc-900/30 dark:hover:border-sky-800/40"
             >
               <div>
                 <div className="flex items-center gap-2.5">
@@ -61,7 +61,7 @@ export default function ProjectsListPage() {
                   <p className="mt-2.5 text-sm leading-relaxed text-neutral-500 dark:text-zinc-500 line-clamp-2">{p.description}</p>
                 )}
                 {p.repo && (
-                  <p className="mt-1.5 truncate font-mono text-xs text-neutral-400 dark:text-zinc-600">{p.repo}</p>
+                  <p className="mt-1.5 truncate font-mono text-xs text-neutral-400 dark:text-zinc-500">{p.repo}</p>
                 )}
               </div>
               <div className="mt-4 flex items-center justify-end">

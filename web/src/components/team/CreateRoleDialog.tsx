@@ -87,7 +87,7 @@ export function CreateRoleDialog({ teamPath, allSkills, onCreated }: Props) {
               <h2 id="create-role-title" className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
                 {t('teams.createRole')}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-600">
+              <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-500">
                 {t('teams.createRoleDesc', { team: teamPath })}
               </p>
             </div>

@@ -3,7 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft, RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
+  Settings2, Users, UserCog, FileCode, Clock, Activity,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
@@ -89,16 +92,16 @@ function PromptEditor({ label, icon: Icon, apiPath, initialContent }: { label: s
     catch (e) { alert(String(e)) } finally { setSaving(false) }
   }, [apiPath, value])
   return (
-    <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-800/60 dark:bg-zinc-900/40">
-      <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-800/40">
+    <div className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-2.5 dark:border-zinc-700/40">
         <div className="flex items-center gap-2">
-          <Icon className="size-4 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
+          <Icon className="size-4 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
           <span className="text-sm font-medium text-neutral-700 dark:text-zinc-300">{label}</span>
           {dirty && <span className="text-[10px] text-amber-500">●</span>}
           {saved && <span className="text-[10px] text-emerald-500">{t('prompt.saved')}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setPreview((p) => !p)} className={cn('rounded-md px-2 py-1 text-[11px] font-medium transition-colors', preview ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-600 dark:hover:text-zinc-400')}>
+          <button type="button" onClick={() => setPreview((p) => !p)} className={cn('rounded-md px-2 py-1 text-[11px] font-medium transition-colors', preview ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400')}>
             {preview ? t('prompt.edit') : t('prompt.preview')}
           </button>
           <button type="button" onClick={save} disabled={saving} className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-700 disabled:opacity-50">
@@ -152,11 +155,11 @@ function SessionPanel({ project, agentName }: { project: string; agentName: stri
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-900/30">
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('session.sessionLabel')}</h4>
+    <div className="rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-900/30">
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('session.sessionLabel')}</h4>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
         <span className="text-neutral-500 dark:text-zinc-500">
-          Session ID: {hasSession ? <span className="font-mono text-emerald-700 dark:text-emerald-400" title={info.sessionId}>{info.sessionId!.slice(0, 16)}…</span> : <span className="text-neutral-400 dark:text-zinc-600">{t('session.noSession')}</span>}
+          Session ID: {hasSession ? <span className="font-mono text-emerald-700 dark:text-emerald-400" title={info.sessionId}>{info.sessionId!.slice(0, 16)}…</span> : <span className="text-neutral-400 dark:text-zinc-500">{t('session.noSession')}</span>}
         </span>
         {info.sessionStartedAt && (
           <span className="text-neutral-500 dark:text-zinc-500">{t('session.startedAt')}: {fmt(info.sessionStartedAt)}</span>
@@ -367,49 +370,43 @@ export default function ProjectAgentDetailPage() {
         {ctxState.status === 'ok' && (() => {
           const ctx = ctxState.data
           return (
-            <div className="space-y-6">
-              {/* Info grid */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {ctx.team && (
-                  <InfoCard label={t('prompt.team')} value={ctx.team} />
-                )}
-                {ctx.role && (
-                  <InfoCard label={t('prompt.role')} value={ctx.role} />
-                )}
-                <InfoCard label={t('prompt.contextFile')} value={ctx.contextFile} mono />
-                {ctx.syncedAt && (
-                  <InfoCard label={t('prompt.lastSync')} value={fmt(ctx.syncedAt)} />
-                )}
+            <div className="space-y-8">
+              {/* Overview info grid */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {ctx.team && <InfoCard icon={Users} label={t('prompt.team')} value={ctx.team} />}
+                {ctx.role && <InfoCard icon={UserCog} label={t('prompt.role')} value={ctx.role} />}
+                <InfoCard icon={FileCode} label={t('prompt.contextFile')} value={ctx.contextFile} mono />
+                {ctx.syncedAt && <InfoCard icon={Clock} label={t('prompt.lastSync')} value={fmt(ctx.syncedAt)} />}
               </div>
 
-              {/* Agent type selector */}
-              <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-800/60 dark:bg-zinc-900/40">
-                <ModelSelector
-                  project={projectId}
-                  agentName={agentName}
-                  currentModel={ctx.model}
-                  currentHttpAgent={ctx.httpAgent}
-                  onChanged={() => setCtxReload((k) => k + 1)}
-                />
-              </div>
-
-              {/* API Provider env vars */}
-              <EnvEditor
-                project={projectId}
-                agentName={agentName}
-                model={ctx.model}
-                initialEnv={ctx.env ?? {}}
-                onChanged={() => setCtxReload((k) => k + 1)}
-              />
+              {/* Configuration: model + env */}
+              <section>
+                <SectionHeader icon={Settings2} title={t('members.configuration')} />
+                <div className="mt-3 space-y-4">
+                  <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+                    <ModelSelector
+                      project={projectId}
+                      agentName={agentName}
+                      currentModel={ctx.model}
+                      currentHttpAgent={ctx.httpAgent}
+                      onChanged={() => setCtxReload((k) => k + 1)}
+                    />
+                  </div>
+                  <EnvEditor
+                    project={projectId}
+                    agentName={agentName}
+                    model={ctx.model}
+                    initialEnv={ctx.env ?? {}}
+                    onChanged={() => setCtxReload((k) => k + 1)}
+                  />
+                </div>
+              </section>
 
               {/* Skills */}
               {ctx.skills && ctx.skills.length > 0 && (
-                <div>
-                  <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-neutral-700 dark:text-zinc-300">
-                    <Puzzle className="size-4 text-amber-500" strokeWidth={2} />
-                    {t('skill.agentSkills')}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
+                <section>
+                  <SectionHeader icon={Puzzle} title={t('skill.agentSkills')} />
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {ctx.skills.map((sk) => (
                       <span key={sk} className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                         <Puzzle className="size-3.5" strokeWidth={2} />
@@ -417,40 +414,30 @@ export default function ProjectAgentDetailPage() {
                       </span>
                     ))}
                   </div>
-                </div>
+                </section>
               )}
 
-              {/* Session */}
-              <SessionPanel project={projectId} agentName={agentName} />
-
-              {/* Sync */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={doSync}
-                  disabled={syncing}
-                  className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
-                >
-                  <RefreshCw className={cn('size-4', syncing && 'animate-spin')} strokeWidth={2} />
-                  {syncing ? t('prompt.syncing') : t('prompt.sync')}
-                </button>
-                {syncOutput && (
-                  <span className="text-sm text-neutral-500 dark:text-zinc-500">{syncOutput}</span>
-                )}
-              </div>
-
-              {/* Merged context */}
-              {ctx.context && (
-                <details className="group">
-                  <summary className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-neutral-600 dark:text-zinc-400">
-                    <ChevronRight className="size-4 transition-transform group-open:rotate-90" strokeWidth={2} />
-                    {t('prompt.mergedContext')} ({ctx.contextFile})
-                  </summary>
-                  <div className="mt-2 max-h-[50vh] overflow-auto rounded-lg border border-neutral-200/80 bg-neutral-50 p-4 font-mono text-sm leading-relaxed text-neutral-600 dark:border-zinc-800/60 dark:bg-zinc-950 dark:text-zinc-400">
-                    <Markdown remarkPlugins={[remarkGfm]}>{ctx.context}</Markdown>
+              {/* Session & Sync */}
+              <section>
+                <SectionHeader icon={Activity} title={t('session.sessionLabel')} />
+                <div className="mt-3 space-y-3">
+                  <SessionPanel project={projectId} agentName={agentName} />
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={doSync}
+                      disabled={syncing}
+                      className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
+                    >
+                      <RefreshCw className={cn('size-4', syncing && 'animate-spin')} strokeWidth={2} />
+                      {syncing ? t('prompt.syncing') : t('prompt.sync')}
+                    </button>
+                    {syncOutput && (
+                      <span className="text-sm text-neutral-500 dark:text-zinc-500">{syncOutput}</span>
+                    )}
                   </div>
-                </details>
-              )}
+                </div>
+              </section>
 
               {/* Wakeup prompt */}
               <PromptEditor
@@ -459,6 +446,19 @@ export default function ProjectAgentDetailPage() {
                 apiPath={`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/wakeup`}
                 initialContent={ctx.wakeup}
               />
+
+              {/* Merged context */}
+              {ctx.context && (
+                <details className="group">
+                  <summary className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-neutral-600 dark:text-zinc-400">
+                    <ChevronRight className="size-4 transition-transform group-open:rotate-90" strokeWidth={2} />
+                    {t('prompt.mergedContext')} ({ctx.contextFile})
+                  </summary>
+                  <div className="mt-2 max-h-[50vh] overflow-auto rounded-lg border border-neutral-200/80 bg-neutral-50 p-4 font-mono text-sm leading-relaxed text-neutral-600 dark:border-zinc-700/60 dark:bg-zinc-950 dark:text-zinc-400">
+                    <Markdown remarkPlugins={[remarkGfm]}>{ctx.context}</Markdown>
+                  </div>
+                </details>
+              )}
             </div>
           )
         })()}
@@ -467,11 +467,29 @@ export default function ProjectAgentDetailPage() {
   )
 }
 
-function InfoCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function InfoCard({ icon: Icon, label, value, mono }: { icon?: LucideIcon; label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-900/30">
-      <p className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{label}</p>
-      <p className={cn('mt-0.5 text-sm font-medium text-neutral-800 dark:text-zinc-200', mono && 'font-mono text-xs')}>{value}</p>
+    <div className="flex items-start gap-3 rounded-lg border border-neutral-200/80 bg-neutral-50/50 px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-800/30">
+      {Icon && (
+        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-zinc-700/60">
+          <Icon className="size-3.5 text-neutral-500 dark:text-zinc-400" strokeWidth={1.8} />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{label}</p>
+        <p className={cn('mt-0.5 text-sm font-medium text-neutral-800 dark:text-zinc-200', mono && 'font-mono text-xs')} title={value}>{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function SectionHeader({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex size-7 items-center justify-center rounded-lg bg-neutral-100 dark:bg-zinc-800">
+        <Icon className="size-3.5 text-neutral-500 dark:text-zinc-400" strokeWidth={1.8} />
+      </div>
+      <h3 className="text-sm font-semibold text-neutral-800 dark:text-zinc-200">{title}</h3>
     </div>
   )
 }
@@ -524,7 +542,7 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
   const inputCls = 'h-8 rounded-md border border-neutral-200 bg-white px-2.5 text-sm text-neutral-700 outline-none hover:border-neutral-300 focus:border-sky-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
 
   return (
-    <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+    <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-neutral-700 dark:text-zinc-300">
           {t('members.apiProvider')}
@@ -540,7 +558,7 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
       </div>
 
       {wellKnown && (
-        <p className="mb-3 text-xs text-neutral-400 dark:text-zinc-600">
+        <p className="mb-3 text-xs text-neutral-400 dark:text-zinc-500">
           {wellKnown.hint}
         </p>
       )}
@@ -569,7 +587,7 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
               className={cn(inputCls, 'w-48 font-mono text-xs')}
               disabled={busy}
             />
-            <span className="text-neutral-300 dark:text-zinc-700">=</span>
+            <span className="text-neutral-300 dark:text-zinc-500">=</span>
             <input
               value={entry.value}
               onChange={(e) => updateEntry(idx, 'value', e.target.value)}
@@ -579,7 +597,7 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
               disabled={busy}
             />
             <button type="button" onClick={() => removeEntry(idx)} disabled={busy}
-              className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-zinc-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
+              className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-zinc-500 dark:hover:bg-red-900/20 dark:hover:text-red-400">
               <Trash2 className="size-3.5" strokeWidth={2} />
             </button>
           </div>

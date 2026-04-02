@@ -153,7 +153,7 @@ export default function ProjectMessagesPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="shrink-0 border-b border-neutral-200/80 px-6 pb-3 dark:border-zinc-800/50">
+      <div className="shrink-0 border-b border-neutral-200/80 px-6 pb-3 dark:border-zinc-700/50">
         <div className="flex flex-wrap items-center gap-2">
           <select value={filters.read} onChange={(e) => setFilter('read', e.target.value as Filters['read'])} className={selectCls}>
             <option value="all">{t('messages.filterRead')}: {t('messages.readAll')}</option>
@@ -179,12 +179,12 @@ export default function ProjectMessagesPage() {
             })}
           </select>
           {hasFilters && (
-            <button type="button" onClick={resetFilters} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+            <button type="button" onClick={resetFilters} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
               <X className="size-3" strokeWidth={2} />
               {t('messages.resetFilters')}
             </button>
           )}
-          <button type="button" onClick={() => { setReloadKey((k) => k + 1); setChecked(new Set()) }} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+          <button type="button" onClick={() => { setReloadKey((k) => k + 1); setChecked(new Set()) }} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
             <RefreshCw className="size-3" strokeWidth={2} />
             {t('api.refresh')}
           </button>
@@ -227,7 +227,7 @@ export default function ProjectMessagesPage() {
         {state.status === 'error' && (
           <PlaceholderCard title={t('api.loadError')}>
             <p>{state.error.message}</p>
-            <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-600">{t('api.hintServe')}</p>
+            <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('api.hintServe')}</p>
           </PlaceholderCard>
         )}
         {state.status === 'ok' && messages.length === 0 && (
@@ -236,24 +236,24 @@ export default function ProjectMessagesPage() {
               <ListFilter className="size-6 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
             </div>
             <p className="text-base font-medium text-neutral-700 dark:text-zinc-300">{t('inbox.emptyTitle')}</p>
-            <p className="mt-1 text-sm text-neutral-400 dark:text-zinc-600">{t('api.noMessages')}</p>
+            <p className="mt-1 text-sm text-neutral-400 dark:text-zinc-500">{t('api.noMessages')}</p>
           </div>
         )}
 
         {state.status === 'ok' && messages.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[900px] w-full">
               <thead>
-                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+                <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
                   <th className="w-10 px-3 py-2.5 text-center">
                     <input type="checkbox" checked={allChecked} ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked }} onChange={toggleAll} className="size-3.5 rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
                   </th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTime')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColFrom')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColTo')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('api.msgColPreview')}</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('messages.colStatus')}</th>
-                  <th className="sticky right-0 bg-neutral-50/95 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 backdrop-blur-sm dark:bg-zinc-900/95 dark:text-zinc-600">
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('api.msgColTime')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('api.msgColFrom')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('api.msgColTo')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('api.msgColPreview')}</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('messages.colStatus')}</th>
+                  <th className="sticky right-0 bg-neutral-50/95 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 backdrop-blur-sm dark:bg-zinc-900/95 dark:text-zinc-500">
                     {t('messages.actions')}
                   </th>
                 </tr>

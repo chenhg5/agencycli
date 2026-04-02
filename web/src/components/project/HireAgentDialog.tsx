@@ -130,7 +130,7 @@ export function HireAgentDialog({ projectId, onHired }: Props) {
               <h2 id="hire-agent-title" className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
                 {t('members.hireAgent')}
               </h2>
-              <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-600">
+              <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-500">
                 {t('members.hireAgentDesc', { project: projectId })}
               </p>
             </div>

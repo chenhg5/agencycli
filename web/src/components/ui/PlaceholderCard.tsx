@@ -12,7 +12,7 @@ export function PlaceholderCard({
   return (
     <section
       className={cn(
-        'rounded-lg border border-neutral-200/80 bg-white p-5 dark:border-zinc-800/60 dark:bg-zinc-900/40',
+        'rounded-lg border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40',
         className,
       )}
     >

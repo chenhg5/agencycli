@@ -46,7 +46,7 @@ function ChangePasswordSection() {
   }
 
   return (
-    <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+    <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40">
       <div className="flex items-center gap-2 pb-3">
         <KeyRound className="size-4 text-neutral-500 dark:text-zinc-500" strokeWidth={1.8} />
         <h3 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
@@ -101,7 +101,7 @@ export default function SettingsPage() {
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{t('settings.title')}</h1>
         <p className="mt-0.5 text-sm text-neutral-500 dark:text-zinc-500">{t('settings.intro')}</p>
         {user && (
-          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-600">
+          <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">
             {t('auth.loggedInAs')} <span className="font-medium text-neutral-700 dark:text-zinc-300">{user.username}</span>
             <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">{user.role}</span>
           </p>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
 
       <div className="space-y-5">
         {/* Language */}
-        <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+        <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40">
           <h3 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
             {t('settings.languageSection')}
           </h3>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
         </section>
 
         {/* Appearance */}
-        <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+        <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40">
           <h3 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
             {t('settings.appearanceSection')}
           </h3>
@@ -146,7 +146,7 @@ export default function SettingsPage() {
               <option value="system">{t('theme.system')}</option>
             </select>
           </label>
-          <p className="mt-3 text-sm text-neutral-400 dark:text-zinc-600">{t('settings.themeHint')}</p>
+          <p className="mt-3 text-sm text-neutral-400 dark:text-zinc-500">{t('settings.themeHint')}</p>
         </section>
 
         {/* Change Password */}

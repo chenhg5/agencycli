@@ -41,7 +41,7 @@ type ScheduleResp = { project: string; agents: AgentSchedule[] }
 const tabCls = 'cursor-pointer px-4 py-3 text-sm font-medium transition-colors border-b-2'
 const tabActive = 'border-sky-600 text-sky-700 dark:border-sky-400 dark:text-sky-300'
 const tabInactive = 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300'
-const thCls = 'whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600'
+const thCls = 'whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500'
 const tdCls = 'whitespace-nowrap px-4 py-3 align-middle text-center text-[13px] text-neutral-700 dark:text-zinc-300'
 const thSticky = 'sticky right-0 z-[2] bg-neutral-50 dark:bg-zinc-900'
 const tdSticky = 'sticky right-0 z-[1] bg-white group-hover:bg-neutral-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
@@ -81,7 +81,7 @@ export default function ProjectSchedulePage() {
       </div>
 
       {/* Tabs */}
-      <div className="shrink-0 border-b border-neutral-200/80 px-6 dark:border-zinc-800/50">
+      <div className="shrink-0 border-b border-neutral-200/80 px-6 dark:border-zinc-700/50">
         <div className="flex gap-0">
           {(['heartbeat', 'cron', 'runtime'] as Tab[]).map((key) => (
             <button key={key} type="button" onClick={() => setTab(key)} className={cn(tabCls, tab === key ? tabActive : tabInactive)}>
@@ -202,10 +202,10 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
         <table className="min-w-[800px] w-full">
           <thead>
-            <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+            <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
               <th className={thCls}>Agent</th>
               <th className={thCls}>{t('schedule.statusLabel')}</th>
               <th className={thCls}>{t('schedule.interval')}</th>
@@ -234,12 +234,12 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
                       <StatusBadge color={hb.wakeupPreset === 'require_tasks' ? 'sky' : hb.wakeupPreset === 'require_messages' ? 'amber' : 'violet'}>
                         {t(`schedule.preset${hb.wakeupPreset === 'require_tasks' ? 'RequireTasks' : hb.wakeupPreset === 'require_messages' ? 'RequireMessages' : 'RequireAny'}`)}
                       </StatusBadge>
-                    ) : <span className="text-neutral-400 dark:text-zinc-600">—</span>}
+                    ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
                   </td>
                   <td className={tdCls}>{hb.lastWakeup ? fmt(hb.lastWakeup) : '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>
                     {hb.wakeupCount ?? 0}
-                    {(hb.wakeupCountToday ?? 0) > 0 && <span className="ml-1 text-neutral-400 dark:text-zinc-600">({hb.wakeupCountToday} {t('schedule.today')})</span>}
+                    {(hb.wakeupCountToday ?? 0) > 0 && <span className="ml-1 text-neutral-400 dark:text-zinc-500">({hb.wakeupCountToday} {t('schedule.today')})</span>}
                   </td>
                   <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -262,7 +262,7 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('schedule.configEffectHint')}</p>
+      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.configEffectHint')}</p>
 
       {editing && (
         <EditHeartbeatModal projectId={projectId} agentName={editing.name} hb={editing.hb} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged() }} />
@@ -338,7 +338,7 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
   const buildDaysString = () => {
     const sorted = ALL_DAYS.filter((d) => days.includes(d))
     if (sorted.length === 0) return ''
-    if (sorted.length === 5 && WEEKDAYS.every((d) => sorted.includes(d)) && !sorted.includes('Sat') && !sorted.includes('Sun')) return 'weekdays'
+    if (sorted.length === 5 && WEEKDAYS.every((d) => sorted.includes(d as (typeof ALL_DAYS)[number])) && !sorted.includes('Sat') && !sorted.includes('Sun')) return 'weekdays'
     if (sorted.length === 2 && sorted.includes('Sat') && sorted.includes('Sun')) return 'weekends'
     return sorted.join(',')
   }
@@ -372,14 +372,14 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
       <div className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('schedule.editHb')} — <span className="font-mono">{agentName}</span></h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
         <div className="space-y-4 px-5 py-4">
           {/* Interval */}
           <Field label={t('schedule.interval')}>
             <div className="flex items-center gap-2">
               <input type="number" min={1} value={ivNum} onChange={(e) => setIvNum(Number(e.target.value))} className={cn(fieldCls, 'w-24 tabular-nums')} />
-              <select value={ivUnit} onChange={(e) => setIvUnit(e.target.value)} className={cn(fieldCls, 'w-28')}>
+              <select value={ivUnit} onChange={(e) => setIvUnit(e.target.value as 'm' | 'h')} className={cn(fieldCls, 'w-28')}>
                 <option value="m">{t('schedule.unitMinutes')}</option>
                 <option value="h">{t('schedule.unitHours')}</option>
               </select>
@@ -428,7 +428,7 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
             <Field label={t('schedule.maxDuration')}>
               <div className="flex items-center gap-2">
                 <input type="number" min={0} value={mdNum} onChange={(e) => setMdNum(Number(e.target.value))} className={cn(fieldCls, 'w-20 tabular-nums')} />
-                <select value={mdUnit} onChange={(e) => setMdUnit(e.target.value)} className={cn(fieldCls, 'w-24')}>
+                <select value={mdUnit} onChange={(e) => setMdUnit(e.target.value as 'm' | 'h')} className={cn(fieldCls, 'w-24')}>
                   <option value="m">{t('schedule.unitMinutes')}</option>
                   <option value="h">{t('schedule.unitHours')}</option>
                 </select>
@@ -494,16 +494,16 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
 
       {allCrons.length === 0 && !adding && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <CalendarClock className="mb-3 size-8 text-neutral-300 dark:text-zinc-700" strokeWidth={1.5} />
+          <CalendarClock className="mb-3 size-8 text-neutral-300 dark:text-zinc-500" strokeWidth={1.5} />
           <p className="text-sm text-neutral-500 dark:text-zinc-500">{t('schedule.noCrons')}</p>
         </div>
       )}
 
       {allCrons.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+        <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
           <table className="min-w-[750px] w-full">
             <thead>
-              <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+              <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
                 <th className={thCls}>Agent</th>
                 <th className={thCls}>{t('forms.title')}</th>
                 <th className={thCls}>{t('schedule.cronSchedule')}</th>
@@ -540,7 +540,7 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
           </table>
         </div>
       )}
-      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('schedule.restartHint')}</p>
+      <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.restartHint')}</p>
     </>
   )
 }
@@ -636,7 +636,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   if (activeAgents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Zap className="mb-3 size-8 text-neutral-300 dark:text-zinc-700" strokeWidth={1.5} />
+        <Zap className="mb-3 size-8 text-neutral-300 dark:text-zinc-500" strokeWidth={1.5} />
         <p className="text-sm text-neutral-500 dark:text-zinc-500">{t('schedule.noActiveAgents')}</p>
       </div>
     )
@@ -645,10 +645,10 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   return (
     <>
       {wakeErr && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{wakeErr}</p>}
-      <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-800/60">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
         <table className="min-w-[1100px] w-full">
           <thead>
-            <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-800/60 dark:bg-zinc-900/40">
+            <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
               <th className={thCls}>Agent</th>
               <th className={thCls}>{t('schedule.statusLabel')}</th>
               <th className={thCls}>{t('schedule.nextWakeup')}</th>
@@ -691,12 +691,12 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       <div className="flex items-center gap-1.5">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
-                          {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-600">{fmt(hb.sessionStartedAt)}</span>}
+                          {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(hb.sessionStartedAt)}</span>}
                         </div>
                         <CopySessionCmd model={ag.model} sessionId={hb.sessionId!} agentDir={ag.agentDir} />
                       </div>
                     ) : (
-                      <span className="text-xs text-neutral-400 dark:text-zinc-600">{t('session.noSession')}</span>
+                      <span className="text-xs text-neutral-400 dark:text-zinc-500">{t('session.noSession')}</span>
                     )}
                   </td>
                   <td className={tdCls}>
@@ -715,7 +715,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       hb.lastConditionStatus === 'met' ? <StatusBadge color="emerald">Met</StatusBadge>
                       : hb.lastConditionStatus === 'not_met' ? <StatusBadge color="amber">Not met</StatusBadge>
                       : <StatusBadge color="neutral">—</StatusBadge>
-                    ) : <span className="text-neutral-400 dark:text-zinc-600">—</span>}
+                    ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
                   </td>
                   <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1">
@@ -790,10 +790,10 @@ function LiveLogModal({ projectId, agentName, onClose }: { projectId: string; ag
             )}
             {finished && <StatusBadge color="emerald">{t('schedule.finished')}</StatusBadge>}
           </div>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
         <div ref={scrollRef} className="flex-1 overflow-auto px-5 py-4">
-          {content ? <ConversationLog content={content} /> : <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('schedule.noLogYet')}</p>}
+          {content ? <ConversationLog content={content} /> : <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('schedule.noLogYet')}</p>}
         </div>
       </div>
     </div>
@@ -829,7 +829,7 @@ function CopySessionCmd({ model, sessionId, agentDir }: { model?: string; sessio
       type="button"
       onClick={doCopy}
       title={t('schedule.copyResumeCmd')}
-      className="shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+      className="shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
     >
       {copied
         ? <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓</span>

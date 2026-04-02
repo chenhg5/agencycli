@@ -219,10 +219,10 @@ export default function AssistantWidget() {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">{t('assistant.title')}</h3>
-              <p className="text-[11px] text-neutral-400 dark:text-zinc-600">{t('assistant.subtitle')}</p>
+              <p className="text-[11px] text-neutral-400 dark:text-zinc-500">{t('assistant.subtitle')}</p>
             </div>
             {msgs.length > 0 && !loading && (
-              <button type="button" onClick={() => setMsgs([])} className="rounded-md px-2 py-1 text-[11px] text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800">
+              <button type="button" onClick={() => setMsgs([])} className="rounded-md px-2 py-1 text-[11px] text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800">
                 {t('assistant.clear')}
               </button>
             )}
@@ -232,9 +232,9 @@ export default function AssistantWidget() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             {msgs.length === 0 && !loading && (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <Sparkles className="mb-2 size-8 text-neutral-200 dark:text-zinc-700" strokeWidth={1.2} />
-                <p className="text-sm text-neutral-400 dark:text-zinc-600">{t('assistant.welcome')}</p>
-                <p className="mt-1 text-xs text-neutral-300 dark:text-zinc-700">{t('assistant.examples')}</p>
+                <Sparkles className="mb-2 size-8 text-neutral-200 dark:text-zinc-500" strokeWidth={1.2} />
+                <p className="text-sm text-neutral-400 dark:text-zinc-500">{t('assistant.welcome')}</p>
+                <p className="mt-1 text-xs text-neutral-300 dark:text-zinc-500">{t('assistant.examples')}</p>
               </div>
             )}
             {msgs.map((m, i) => (

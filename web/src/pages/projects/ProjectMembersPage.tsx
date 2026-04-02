@@ -86,7 +86,7 @@ export default function ProjectMembersPage() {
                 <Link
                   key={row.name}
                   to={`/projects/${encodeURIComponent(projectId!)}/members/${encodeURIComponent(row.name)}`}
-                  className="group flex flex-col rounded-xl border border-neutral-200/80 bg-white p-4 transition-all duration-150 hover:border-neutral-300 hover:shadow-sm dark:border-zinc-800/60 dark:bg-zinc-900/40 dark:hover:border-zinc-700"
+                  className="group flex flex-col rounded-xl border border-neutral-200/80 bg-white p-4 transition-all duration-150 hover:border-neutral-300 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-zinc-700"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
@@ -101,7 +101,7 @@ export default function ProjectMembersPage() {
                     <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide', modelCls)}>
                       {row.model}
                     </span>
-                    <span className="ml-auto text-[11px] text-neutral-400 dark:text-zinc-600">{fmt(row.hiredAt)}</span>
+                    <span className="ml-auto text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(row.hiredAt)}</span>
                   </div>
                 </Link>
               )

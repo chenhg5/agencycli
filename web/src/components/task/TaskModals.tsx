@@ -51,7 +51,7 @@ export const priorityLabel: Record<number, { text: string; cls: string }> = {
   0: { text: 'P0', cls: 'text-red-600 dark:text-red-400' },
   1: { text: 'P1', cls: 'text-amber-600 dark:text-amber-400' },
   2: { text: 'P2', cls: 'text-sky-600 dark:text-sky-400' },
-  3: { text: 'P3', cls: 'text-neutral-400 dark:text-zinc-600' },
+  3: { text: 'P3', cls: 'text-neutral-400 dark:text-zinc-500' },
 }
 
 export function isTerminal(s: string) {
@@ -99,11 +99,11 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
       <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('tasks.edit')}</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-600 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
         <div className="space-y-3 px-5 py-4">
           <div className="text-sm font-medium text-neutral-700 dark:text-zinc-300">{task.title}</div>
-          <div className="font-mono text-xs text-neutral-400 dark:text-zinc-600">{task.id}</div>
+          <div className="font-mono text-xs text-neutral-400 dark:text-zinc-500">{task.id}</div>
           <label className="block text-sm">
             <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.filterStatus')}</span>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className={cn(fieldCls, 'mt-1')}>
@@ -133,7 +133,7 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
                 className={cn(fieldCls, 'mt-1')}
               />
               {task.createdBy && (
-                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-600">
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">
                   {t('tasks.willNotifyCreator', { creator: task.createdBy })}
                 </p>
               )}
@@ -173,24 +173,24 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[3vh]">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-fade-in dark:bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl animate-scale-in dark:border-zinc-800/80 dark:bg-zinc-900">
-        <div className="flex items-center justify-between border-b border-neutral-200/80 px-5 py-3 dark:border-zinc-800/60">
+      <div className="relative w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-2xl animate-scale-in dark:border-zinc-700/80 dark:bg-zinc-900">
+        <div className="flex items-center justify-between border-b border-neutral-200/80 px-5 py-3 dark:border-zinc-700/60">
           <div className="flex items-center gap-3 min-w-0">
             <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold', sCls)}>{t(`tasks.status.${task.status}`, { defaultValue: task.status })}</span>
             <span className={cn('shrink-0 text-[11px] font-bold', prio.cls)}>{prio.text}</span>
             <span className="truncate text-sm font-medium text-neutral-900 dark:text-zinc-100">{task.title}</span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <button type="button" onClick={() => onEdit(task)} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-600 dark:hover:bg-zinc-800" title={t('tasks.edit')}>
+            <button type="button" onClick={() => onEdit(task)} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800" title={t('tasks.edit')}>
               <Pencil className="size-4" strokeWidth={1.8} />
             </button>
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-600 dark:hover:bg-zinc-800">
+            <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800">
               <X className="size-4" strokeWidth={2} />
             </button>
           </div>
         </div>
 
-        <div className="shrink-0 grid grid-cols-2 gap-x-6 gap-y-2.5 border-b border-neutral-100 px-5 py-3 text-sm dark:border-zinc-800/40 sm:grid-cols-3">
+        <div className="shrink-0 grid grid-cols-2 gap-x-6 gap-y-2.5 border-b border-neutral-100 px-5 py-3 text-sm dark:border-zinc-700/40 sm:grid-cols-3">
           <InfoCell label="ID"><span className="font-mono text-xs">{task.id}</span></InfoCell>
           <InfoCell label={t('tasks.colProject')}><span className="font-mono">{task.project}</span></InfoCell>
           <InfoCell label={t('tasks.colAssignee')}>{task.assignee === 'human' ? <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">human</span> : <span className="font-mono">{task.agent}</span>}</InfoCell>
@@ -211,8 +211,8 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
         </div>
 
         {task.prompt && (
-          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-800/40">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('forms.prompt')}</span>
+          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('forms.prompt')}</span>
             <div className="mt-1.5 overflow-y-auto rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-zinc-800/50 dark:text-zinc-300">
               <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.prompt}</ReactMarkdown></div>
             </div>
@@ -220,7 +220,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
         )}
 
         {task.summary && (
-          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-800/40">
+          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">{t('tasks.summary')}</span>
             <div className="mt-1.5 overflow-y-auto rounded-lg bg-emerald-50 p-3 text-sm text-neutral-700 dark:bg-emerald-900/20 dark:text-zinc-300">
               <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.summary}</ReactMarkdown></div>
@@ -232,8 +232,8 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           {matchingRun ? (
             <>
               <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
-                <FileText className="size-3.5 text-neutral-400 dark:text-zinc-600" strokeWidth={1.8} />
-                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-600">{t('runs.logTitle')}</span>
+                <FileText className="size-3.5 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
+                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('runs.logTitle')}</span>
               </div>
               <div className="px-5 pb-4">
                 {hasLog && logState.status === 'loading' && (
@@ -244,7 +244,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
                 )}
                 {hasLog && logState.status === 'error' && <p className="py-4 text-center text-sm text-neutral-400">{t('runs.logNotFound')}</p>}
                 {hasLog && logState.status === 'ok' && <ConversationLog content={logState.data.content} />}
-                {!hasLog && <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('runs.noLog')}</p>}
+                {!hasLog && <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.noLog')}</p>}
               </div>
             </>
           ) : runsState.status === 'loading' ? (
@@ -253,7 +253,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
               <span className="text-sm text-neutral-500">{t('tasks.loadingRuns')}</span>
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-600">{t('tasks.noRunRecord')}</p>
+            <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('tasks.noRunRecord')}</p>
           )}
         </div>
       </div>
@@ -266,7 +266,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
 function InfoCell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <span className="text-xs font-medium text-neutral-400 dark:text-zinc-600">{label}</span>
+      <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{label}</span>
       <p className="text-neutral-800 dark:text-zinc-200">{children}</p>
     </div>
   )
@@ -298,12 +298,12 @@ function parseConversation(raw: string): ConvMsg[] {
 
 function ConversationLog({ content }: { content: string }) {
   const msgs = useMemo(() => parseConversation(content), [content])
-  if (msgs.length === 0) return <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-600">No conversation data</p>
+  if (msgs.length === 0) return <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">No conversation data</p>
   return (
     <div className="space-y-3">
       {msgs.map((m, i) => (
         <div key={i} className={cn('rounded-lg px-4 py-3 text-sm', m.role === 'user' ? 'bg-sky-50 dark:bg-sky-900/20' : m.role === 'system' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-neutral-50 dark:bg-zinc-800/40')}>
-          <span className={cn('mb-1 block text-[11px] font-semibold uppercase tracking-wider', m.role === 'user' ? 'text-sky-600 dark:text-sky-400' : m.role === 'system' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-400 dark:text-zinc-600')}>{m.role}</span>
+          <span className={cn('mb-1 block text-[11px] font-semibold uppercase tracking-wider', m.role === 'user' ? 'text-sky-600 dark:text-sky-400' : m.role === 'system' ? 'text-amber-600 dark:text-amber-400' : 'text-neutral-400 dark:text-zinc-500')}>{m.role}</span>
           <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-pre:my-1.5">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
           </div>

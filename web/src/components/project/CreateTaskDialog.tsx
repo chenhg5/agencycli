@@ -159,7 +159,7 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
                     </option>
                   ))}
                 </select>
-                <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-600">{t('tasks.assignHint')}</p>
+                <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-500">{t('tasks.assignHint')}</p>
               </label>
 
               <label className="block text-sm">
