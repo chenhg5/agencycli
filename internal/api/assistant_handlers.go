@@ -1,8 +1,8 @@
 package api
 
 import (
+	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -34,21 +34,73 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		s.jsonError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
 	skill := s.loadAssistantSkill()
 	prompt := buildAssistantPrompt(skill, s.root, body.History, msg)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 
-	output, err := runAssistantCLI(ctx, s.root, prompt)
-	if err != nil {
-		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("assistant error: %v", err))
+	cliPath, cliArgs := s.resolveAssistantCLI()
+	if cliPath == "" {
+		s.jsonError(w, http.StatusInternalServerError, "no supported AI CLI found (tried: claude, codex, gemini)")
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"response": strings.TrimSpace(output),
-	})
+	cmd := exec.CommandContext(ctx, cliPath, cliArgs...)
+	cmd.Dir = s.root
+	cmd.Env = os.Environ()
+	cmd.Stdin = strings.NewReader(prompt)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("pipe: %v", err))
+		return
+	}
+	cmd.Stderr = cmd.Stdout
+
+	if err := cmd.Start(); err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("start: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		fmt.Fprintf(w, "data: %s\n\n", line)
+		flusher.Flush()
+	}
+
+	_ = cmd.Wait()
+	fmt.Fprintf(w, "data: {\"type\":\"done\"}\n\n")
+	flusher.Flush()
+}
+
+func (s *Server) resolveAssistantCLI() (string, []string) {
+	if path, err := exec.LookPath("claude"); err == nil {
+		return path, []string{"-p", "-", "--output-format", "stream-json"}
+	}
+	if path, err := exec.LookPath("codex"); err == nil {
+		return path, []string{"exec", "-q", "-"}
+	}
+	if path, err := exec.LookPath("gemini"); err == nil {
+		return path, []string{"-p", "-", "--output-format", "stream-json"}
+	}
+	return "", nil
 }
 
 func (s *Server) loadAssistantSkill() string {
@@ -60,7 +112,7 @@ func (s *Server) loadAssistantSkill() string {
 	for _, p := range candidates {
 		data, err := os.ReadFile(p)
 		if err == nil && len(data) > 0 {
-			return string(data)
+			return stripFrontmatter(string(data))
 		}
 	}
 	return defaultAssistantSkill
@@ -112,51 +164,14 @@ func buildAssistantPrompt(skill, root string, history []assistantChatMsg, messag
 	return sb.String()
 }
 
-func runAssistantCLI(ctx context.Context, workDir, prompt string) (string, error) {
-	// Try claude CLI first (most common for agencycli users).
-	if path, err := exec.LookPath("claude"); err == nil {
-		cmd := exec.CommandContext(ctx, path, "--print", "-p", prompt)
-		cmd.Dir = workDir
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err == nil {
-			return string(out), nil
-		}
-		if len(out) > 0 {
-			return string(out), nil
-		}
-		return "", fmt.Errorf("claude: %w\n%s", err, string(out))
+func stripFrontmatter(s string) string {
+	if !strings.HasPrefix(s, "---") {
+		return s
 	}
-
-	// Try codex CLI.
-	if path, err := exec.LookPath("codex"); err == nil {
-		cmd := exec.CommandContext(ctx, path, "exec", "-q", prompt)
-		cmd.Dir = workDir
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err == nil {
-			return string(out), nil
-		}
-		if len(out) > 0 {
-			return string(out), nil
-		}
-		return "", fmt.Errorf("codex: %w", err)
+	rest := s[3:]
+	idx := strings.Index(rest, "---")
+	if idx < 0 {
+		return s
 	}
-
-	// Try gemini CLI.
-	if path, err := exec.LookPath("gemini"); err == nil {
-		cmd := exec.CommandContext(ctx, path, "--print", "-p", prompt)
-		cmd.Dir = workDir
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err == nil {
-			return string(out), nil
-		}
-		if len(out) > 0 {
-			return string(out), nil
-		}
-		return "", fmt.Errorf("gemini: %w", err)
-	}
-
-	return "", fmt.Errorf("no supported AI CLI found (tried: claude, codex, gemini). Install one to use the assistant")
+	return strings.TrimLeft(rest[idx+3:], "\r\n")
 }

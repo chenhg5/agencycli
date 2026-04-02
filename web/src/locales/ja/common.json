@@ -371,7 +371,7 @@
     "running": "実行中",
     "idle": "待機中",
     "failed": "失敗",
-    "waiting": "待機",
+    "waiting": "未起動",
     "lastWakeup": "前回のウェイクアップ",
     "wakeupCountLabel": "ウェイクアップ回数",
     "today": "今日",

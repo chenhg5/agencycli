@@ -1,16 +1,42 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { MessageSquareText, Send, X, Sparkles } from 'lucide-react'
-import { apiPost } from '../../lib/api'
+import { MessageSquareText, Send, X, Sparkles, Square } from 'lucide-react'
+import { ConversationLog } from '../ui/ConversationLog'
+import { apiBase } from '../../lib/api'
+import { getStoredToken } from '../../lib/auth'
 import { cn } from '../../lib/cn'
 
-type ChatMsg = { role: 'user' | 'assistant'; content: string }
+type ChatMsg =
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; rawLog: string; summary: string }
 
 const STORAGE_KEY = 'assistant-btn-pos'
 function loadPos(): { x: number; y: number } | null {
   try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : null } catch { return null }
+}
+
+function extractSummary(rawLog: string): string {
+  const lines = rawLog.split('\n')
+  const texts: string[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line.startsWith('{')) continue
+    try {
+      const ev = JSON.parse(line)
+      if (ev.type === 'assistant' && ev.message?.content) {
+        const content = ev.message.content
+        if (Array.isArray(content)) {
+          for (const b of content) {
+            if (b.type === 'text' && b.text) texts.push(b.text)
+          }
+        } else if (typeof content === 'string') {
+          texts.push(content)
+        }
+      }
+      if (ev.type === 'result' && ev.result) texts.push(ev.result)
+    } catch { /* skip */ }
+  }
+  return texts.join('\n').trim() || rawLog.slice(0, 300)
 }
 
 export default function AssistantWidget() {
@@ -19,6 +45,8 @@ export default function AssistantWidget() {
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streamLog, setStreamLog] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -28,9 +56,7 @@ export default function AssistantWidget() {
   const didDrag = useRef(false)
 
   useEffect(() => {
-    if (pos.x < 0) {
-      setPos({ x: window.innerWidth - 68, y: window.innerHeight - 120 })
-    }
+    if (pos.x < 0) setPos({ x: window.innerWidth - 68, y: window.innerHeight - 120 })
   }, [pos.x])
 
   function onPointerDown(e: RPointerEvent<HTMLButtonElement>) {
@@ -59,8 +85,12 @@ export default function AssistantWidget() {
     })
   }, [])
 
-  useEffect(() => { scrollToBottom() }, [msgs, scrollToBottom])
+  useEffect(() => { scrollToBottom() }, [msgs, streamLog, scrollToBottom])
   useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+
+  function stopStream() {
+    abortRef.current?.abort()
+  }
 
   async function send() {
     const text = input.trim()
@@ -68,21 +98,71 @@ export default function AssistantWidget() {
     setInput('')
 
     const userMsg: ChatMsg = { role: 'user', content: text }
-    const newMsgs = [...msgs, userMsg]
-    setMsgs(newMsgs)
+    const history = [...msgs, userMsg].slice(-10).map((m) =>
+      m.role === 'user' ? { role: 'user', content: m.content } : { role: 'assistant', content: m.summary }
+    )
+    setMsgs((prev) => [...prev, userMsg])
     setLoading(true)
+    setStreamLog('')
 
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    let accumulated = ''
     try {
-      const data = await apiPost<{ response: string }>('/api/v1/assistant/chat', {
-        message: text,
-        history: newMsgs.slice(-10),
+      const token = getStoredToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`${apiBase()}/api/v1/assistant/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message: text, history }),
+        signal: controller.signal,
       })
-      setMsgs((prev) => [...prev, { role: 'assistant', content: data.response }])
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText || `HTTP ${res.status}`)
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) throw new Error('no response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        const parts = buffer.split('\n')
+        buffer = parts.pop() ?? ''
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue
+          const data = part.slice(6)
+          if (data === '{"type":"done"}') continue
+          accumulated += data + '\n'
+          setStreamLog(accumulated)
+        }
+      }
     } catch (e) {
-      const errMsg = e instanceof Error ? e.message : String(e)
-      setMsgs((prev) => [...prev, { role: 'assistant', content: `Error: ${errMsg}` }])
+      if ((e as Error).name === 'AbortError') {
+        accumulated += '\n=== Stopped by user ===\n'
+      } else {
+        const errMsg = e instanceof Error ? e.message : String(e)
+        accumulated += `\n=== Error: ${errMsg} ===\n`
+      }
     } finally {
+      abortRef.current = null
+      setStreamLog('')
       setLoading(false)
+      if (accumulated.trim()) {
+        const summary = extractSummary(accumulated)
+        setMsgs((prev) => [...prev, { role: 'assistant', rawLog: accumulated, summary }])
+      }
     }
   }
 
@@ -98,7 +178,6 @@ export default function AssistantWidget() {
 
   return (
     <>
-      {/* Floating draggable button */}
       <button
         type="button"
         onPointerDown={onPointerDown}
@@ -116,10 +195,9 @@ export default function AssistantWidget() {
         {open ? <X className="size-4" /> : <Sparkles className="size-4" />}
       </button>
 
-      {/* Chat panel */}
       {open && (
         <div
-          className="fixed z-[60] flex h-[540px] w-[400px] flex-col overflow-hidden rounded-2xl border border-neutral-200/60 bg-white/95 shadow-2xl backdrop-blur-md animate-scale-in dark:border-zinc-700/60 dark:bg-zinc-900/95"
+          className="fixed z-[60] flex h-[600px] w-[460px] flex-col overflow-hidden rounded-2xl border border-neutral-200/60 bg-white/95 shadow-2xl backdrop-blur-md animate-scale-in dark:border-zinc-700/60 dark:bg-zinc-900/95"
           style={{ bottom: panelBottom, right: panelRight }}
         >
           {/* Header */}
@@ -131,7 +209,7 @@ export default function AssistantWidget() {
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">{t('assistant.title')}</h3>
               <p className="text-[11px] text-neutral-400 dark:text-zinc-600">{t('assistant.subtitle')}</p>
             </div>
-            {msgs.length > 0 && (
+            {msgs.length > 0 && !loading && (
               <button type="button" onClick={() => setMsgs([])} className="rounded-md px-2 py-1 text-[11px] text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-600 dark:hover:bg-zinc-800">
                 {t('assistant.clear')}
               </button>
@@ -140,7 +218,7 @@ export default function AssistantWidget() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {msgs.length === 0 && (
+            {msgs.length === 0 && !loading && (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <Sparkles className="mb-2 size-8 text-neutral-200 dark:text-zinc-700" strokeWidth={1.2} />
                 <p className="text-sm text-neutral-400 dark:text-zinc-600">{t('assistant.welcome')}</p>
@@ -148,22 +226,24 @@ export default function AssistantWidget() {
               </div>
             )}
             {msgs.map((m, i) => (
-              <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                <div className={cn(
-                  'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed',
-                  m.role === 'user'
-                    ? 'rounded-br-md bg-sky-600 text-white'
-                    : 'rounded-bl-md bg-neutral-100 text-neutral-800 dark:bg-zinc-800 dark:text-zinc-200',
-                )}>
-                  {m.role === 'assistant' ? (
-                    <div className="prose prose-sm prose-neutral max-w-none dark:prose-invert [&_pre]:bg-neutral-900 [&_pre]:text-neutral-100 [&_code]:text-sky-600 dark:[&_code]:text-sky-400 [&_pre_code]:text-neutral-100">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                    </div>
-                  ) : m.content}
+              m.role === 'user' ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-sky-600 px-3.5 py-2.5 text-[13px] leading-relaxed text-white">
+                    {m.content}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div key={i} className="w-full">
+                  <ConversationLog content={m.rawLog} />
+                </div>
+              )
             ))}
-            {loading && (
+            {loading && streamLog && (
+              <div className="w-full">
+                <ConversationLog content={streamLog} />
+              </div>
+            )}
+            {loading && !streamLog && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-neutral-100 px-4 py-3 dark:bg-zinc-800">
                   <span className="size-1.5 animate-bounce rounded-full bg-neutral-400 dark:bg-zinc-500" style={{ animationDelay: '0ms' }} />
@@ -192,14 +272,25 @@ export default function AssistantWidget() {
                   el.style.height = Math.min(el.scrollHeight, 120) + 'px'
                 }}
               />
-              <button
-                type="button"
-                onClick={() => void send()}
-                disabled={loading || !input.trim()}
-                className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white transition-colors hover:bg-sky-700 disabled:opacity-30 dark:bg-sky-500"
-              >
-                <Send className="size-3.5" />
-              </button>
+              {loading ? (
+                <button
+                  type="button"
+                  onClick={stopStream}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
+                  title="Stop"
+                >
+                  <Square className="size-3" fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void send()}
+                  disabled={!input.trim()}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white transition-colors hover:bg-sky-700 disabled:opacity-30 dark:bg-sky-500"
+                >
+                  <Send className="size-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>

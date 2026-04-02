@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   CalendarClock, ClipboardCopy, Heart, Pause, Pencil, Play, Plus, Power,
@@ -221,7 +221,7 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
               const hb = ag.heartbeat
               return (
                 <tr key={ag.name} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
-                  <td className={cn(tdCls, 'font-mono font-medium')}>{ag.name}</td>
+                  <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${ag.name}`} className="text-sky-700 hover:underline dark:text-sky-400">{ag.name}</Link></td>
                   <td className={tdCls}>
                     {hb.enabled && !hb.paused && <StatusBadge color="emerald">{t('schedule.hbActive')}</StatusBadge>}
                     {hb.enabled && hb.paused && <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>}
@@ -516,7 +516,7 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
             <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
               {allCrons.map(({ agent, cron: c }) => (
                 <tr key={`${agent}-${c.id}`} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
-                  <td className={cn(tdCls, 'font-mono font-medium')}>{agent}</td>
+                  <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${agent}`} className="text-sky-700 hover:underline dark:text-sky-400">{agent}</Link></td>
                   <td className={tdCls}>{c.title}</td>
                   <td className={cn(tdCls, 'font-mono')}>{c.schedule}</td>
                   <td className={tdCls}>
@@ -669,13 +669,13 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
               const hasSession = !!hb.sessionId
               return (
                 <tr key={ag.name} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
-                  <td className={cn(tdCls, 'font-mono font-medium')}>{ag.name}</td>
+                  <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${ag.name}`} className="text-sky-700 hover:underline dark:text-sky-400">{ag.name}</Link></td>
                   <td className={tdCls}>
                     {isRunningNow && <StatusBadge color="sky">{t('schedule.running')}</StatusBadge>}
                     {!isRunningNow && hb.paused && <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>}
-                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus === 'done' && <StatusBadge color="emerald">{t('schedule.idle')}</StatusBadge>}
                     {!isRunningNow && !hb.paused && hb.lastWakeupStatus === 'failed' && <StatusBadge color="red">{t('schedule.failed')}</StatusBadge>}
-                    {!isRunningNow && !hb.paused && !hb.lastWakeupStatus && <StatusBadge color="neutral">{t('schedule.waiting')}</StatusBadge>}
+                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus !== 'failed' && (hb.lastWakeupStatus === 'done' || hb.nextWakeupAt) && <StatusBadge color="emerald">{t('schedule.idle')}</StatusBadge>}
+                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus !== 'failed' && hb.lastWakeupStatus !== 'done' && !hb.nextWakeupAt && <StatusBadge color="neutral">{t('schedule.waiting')}</StatusBadge>}
                   </td>
                   <td className={tdCls}>
                     {hb.nextWakeupAt && new Date(hb.nextWakeupAt) > new Date() ? (

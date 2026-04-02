@@ -371,7 +371,7 @@
     "running": "Running",
     "idle": "Idle",
     "failed": "Failed",
-    "waiting": "Waiting",
+    "waiting": "Pending",
     "lastWakeup": "Last wakeup",
     "wakeupCountLabel": "Wakeups",
     "today": "today",
