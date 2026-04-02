@@ -12,6 +12,7 @@
     "projects": "项目",
     "workbench": "工作台",
     "skills": "技能",
+    "docs": "知识库",
     "settings": "设置"
   },
   "projectNav": {
@@ -232,6 +233,25 @@
     "replySent": "已发送",
     "filterProject": "项目",
     "allProjects": "全部项目"
+  },
+  "docs": {
+    "title": "知识库",
+    "search": "搜索文档...",
+    "addDoc": "添加文档",
+    "noDocuments": "暂无文档",
+    "allDocuments": "全部文档",
+    "virtualDir": "虚拟目录",
+    "createdBy": "创建人",
+    "createdAt": "创建时间",
+    "filePath": "文件路径",
+    "tags": "标签",
+    "description": "描述",
+    "remove": "移除",
+    "removeConfirm": "确定移除该文档索引？文件本身不会被删除。",
+    "moveTo": "移动到...",
+    "edit": "编辑",
+    "save": "保存",
+    "cancel": "取消"
   },
   "api": {
     "loading": "加载中…",

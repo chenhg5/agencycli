@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   Briefcase,
   CalendarClock,
   FolderKanban,
@@ -19,6 +20,7 @@ export type NavKey =
   | 'projects'
   | 'workbench'
   | 'skills'
+  | 'docs'
   | 'settings'
 
 /** 项目内执行面：`projectNav.*` */
@@ -49,6 +51,7 @@ export const workspaceNav: NavItem[] = [
   },
   { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams' },
   { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills' },
+  { to: '/docs', navKey: 'docs', icon: BookOpen, activePrefix: '/docs' },
   { to: '/settings', navKey: 'settings', icon: Settings, activePrefix: '/settings' },
 ]
 
@@ -69,6 +72,7 @@ export function navKeyFromPath(pathname: string): NavKey {
     projects: 'projects',
     workbench: 'workbench',
     skills: 'skills',
+    docs: 'docs',
     settings: 'settings',
   }
   return map[seg ?? ''] ?? 'overview'

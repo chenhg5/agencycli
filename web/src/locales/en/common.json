@@ -12,6 +12,7 @@
     "projects": "Projects",
     "workbench": "Workbench",
     "skills": "Skills",
+    "docs": "Knowledge Base",
     "settings": "Settings"
   },
   "projectNav": {
@@ -232,6 +233,25 @@
     "replySent": "Sent",
     "filterProject": "Project",
     "allProjects": "All projects"
+  },
+  "docs": {
+    "title": "Knowledge Base",
+    "search": "Search documents...",
+    "addDoc": "Add Document",
+    "noDocuments": "No documents yet",
+    "allDocuments": "All Documents",
+    "virtualDir": "Virtual Directory",
+    "createdBy": "Created by",
+    "createdAt": "Created at",
+    "filePath": "File path",
+    "tags": "Tags",
+    "description": "Description",
+    "remove": "Remove",
+    "removeConfirm": "Remove this document from the index? The file itself will not be deleted.",
+    "moveTo": "Move to...",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "api": {
     "loading": "Loading…",

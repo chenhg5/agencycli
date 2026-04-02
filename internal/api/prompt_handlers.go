@@ -2,11 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/chenhg5/agencycli/internal/entity"
 )
 
 type promptResponse struct {
@@ -271,6 +274,20 @@ func (s *Server) handlePutAgentWakeup(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+
+	// Ensure heartbeat.yaml references the wakeup file.
+	hb, _ := s.ts.GetHeartbeat(project, agent)
+	if hb == nil {
+		hb = &entity.HeartbeatConfig{}
+	}
+	if hb.WakeupPrompt != "@.agencycli/context/wakeup.md" {
+		hb.WakeupPrompt = "@.agencycli/context/wakeup.md"
+		_ = s.ts.SaveHeartbeat(project, agent, hb)
+	}
+
+	// Re-sync so CLAUDE.md/@import picks up wakeup.md.
+	s.syncAgent(project, agent)
+
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
@@ -325,4 +342,19 @@ func (s *Server) handlePostProjectSync(w http.ResponseWriter, r *http.Request) {
 		"ok":     true,
 		"output": string(out),
 	})
+}
+
+func (s *Server) syncAgent(project, agent string) {
+	bin, err := exec.LookPath("agencycli")
+	if err != nil {
+		bin, _ = os.Executable()
+	}
+	if bin == "" {
+		return
+	}
+	cmd := exec.Command(bin, "sync", "--dir", s.root, "--project", project, "--name", agent, "--force")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.Warn("sync after wakeup save failed", "project", project, "agent", agent, "err", err, "output", string(out))
+	}
 }

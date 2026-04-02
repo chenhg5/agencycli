@@ -82,7 +82,8 @@ Use --project to limit to one project, --project + --name for a single agent.`,
 					fmt.Fprintf(os.Stderr, "  ✗ %s/%s: %v\n", t.project, t.name, err)
 					continue
 				}
-				if len(diff.changed)+len(diff.added)+len(diff.removed) > 0 {
+				hasChanges := len(diff.changed)+len(diff.added)+len(diff.removed) > 0
+				if hasChanges || force {
 					fmt.Printf("  ✓ synced  %s/%s\n", t.project, t.name)
 					if len(diff.changed) > 0 {
 						fmt.Printf("      changed : %s\n", strings.Join(diff.changed, ", "))

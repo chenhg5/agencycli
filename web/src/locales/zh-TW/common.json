@@ -12,6 +12,7 @@
     "projects": "專案",
     "workbench": "工作臺",
     "skills": "技能",
+    "docs": "知識庫",
     "settings": "設定"
   },
   "projectNav": {
@@ -232,6 +233,25 @@
     "replySent": "已傳送",
     "filterProject": "專案",
     "allProjects": "全部專案"
+  },
+  "docs": {
+    "title": "知識庫",
+    "search": "搜尋文件...",
+    "addDoc": "新增文件",
+    "noDocuments": "暫無文件",
+    "allDocuments": "全部文件",
+    "virtualDir": "虛擬目錄",
+    "createdBy": "建立者",
+    "createdAt": "建立時間",
+    "filePath": "檔案路徑",
+    "tags": "標籤",
+    "description": "描述",
+    "remove": "移除",
+    "removeConfirm": "確定移除該文件索引？檔案本身不會被刪除。",
+    "moveTo": "移動到...",
+    "edit": "編輯",
+    "save": "儲存",
+    "cancel": "取消"
   },
   "api": {
     "loading": "載入中…",

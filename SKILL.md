@@ -256,6 +256,33 @@ agencycli inbox rm      <msg-id>                    # alias for delete
 # --recipient flag available on all above to specify mailbox (default: human)
 ```
 
+### Knowledge base (docs)
+
+A bookmark index for documents. Files stay where they are; only metadata is tracked in `.agencycli/docs.yaml`. Virtual directories are created automatically.
+
+```bash
+# Add a document
+agencycli docs add --path ./reports/design.md --title "System Design" \
+  --index "cc-connect/architecture" --created-by human --tag design
+
+# List / search
+agencycli docs list [--index prefix] [--tag tag] [--created-by human] [--json]
+agencycli docs search "design"
+agencycli docs tree                     # virtual directory tree
+
+# View details
+agencycli docs show <doc-id> [--content]
+
+# Update metadata / move
+agencycli docs update <doc-id> --title "New Title" --tag newtag
+agencycli docs move   <doc-id> --index "new/category"
+
+# Remove from index (file is NOT deleted)
+agencycli docs remove <doc-id>
+```
+
+The Web UI provides a visual knowledge base viewer at the "Knowledge Base" page with directory tree navigation and Markdown rendering.
+
 ### Daemon (heartbeat + wakeup routines)
 
 ```bash

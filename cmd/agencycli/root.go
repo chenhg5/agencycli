@@ -84,6 +84,7 @@ func init() {
 		newDaemonCmd(),
 		newCheckUpdateCmd(),
 		newUpdateCmd(),
+		newDocsCmd(),
 	)
 }
 

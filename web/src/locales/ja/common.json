@@ -12,6 +12,7 @@
     "projects": "プロジェクト",
     "workbench": "ワークベンチ",
     "skills": "スキル",
+    "docs": "ナレッジベース",
     "settings": "設定"
   },
   "projectNav": {
@@ -232,6 +233,25 @@
     "replySent": "送信しました",
     "filterProject": "プロジェクト",
     "allProjects": "すべてのプロジェクト"
+  },
+  "docs": {
+    "title": "ナレッジベース",
+    "search": "ドキュメント検索...",
+    "addDoc": "ドキュメント追加",
+    "noDocuments": "ドキュメントなし",
+    "allDocuments": "全ドキュメント",
+    "virtualDir": "仮想ディレクトリ",
+    "createdBy": "作成者",
+    "createdAt": "作成日",
+    "filePath": "ファイルパス",
+    "tags": "タグ",
+    "description": "説明",
+    "remove": "削除",
+    "removeConfirm": "インデックスからこのドキュメントを削除しますか？ファイル自体は削除されません。",
+    "moveTo": "移動先...",
+    "edit": "編集",
+    "save": "保存",
+    "cancel": "キャンセル"
   },
   "api": {
     "loading": "読み込み中…",

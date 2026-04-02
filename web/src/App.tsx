@@ -18,6 +18,7 @@ import ProjectSettingsPage from './pages/projects/ProjectSettingsPage'
 import ProjectTasksPage from './pages/projects/ProjectTasksPage'
 import TeamDetailPage from './pages/teams/TeamDetailPage'
 import TeamsPage from './pages/teams/TeamsPage'
+import DocsPage from './pages/docs/DocsPage'
 
 export default function App() {
   const { token, logout } = useAuth()
@@ -51,6 +52,7 @@ export default function App() {
         </Route>
         <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="skills" element={<SkillsPage />} />
+        <Route path="docs" element={<DocsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
