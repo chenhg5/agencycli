@@ -99,22 +99,18 @@ func newTaskAddCmd() *cobra.Command {
 		}
 
 			if !cmd.Flags().Changed("created-by") {
-				if assignee == "human" {
-					return fmt.Errorf("--created-by is required when assigning a task to human\n\n" +
-						"Usage:\n" +
-						"  --created-by human          (created by a human)\n" +
-						"  --created-by <project>/<agent>  (created by an agent, e.g. cc-connect/pm)")
-				}
-				createdBy = "human"
-			} else {
-				if strings.Contains(createdBy, "/") {
-					parts := strings.SplitN(createdBy, "/", 2)
-					if parts[1] == "human" {
-						return fmt.Errorf("invalid --created-by value %q: 'human' is not an agent name\n\n"+
-							"Usage:\n"+
-							"  --created-by human          (created by a human)\n"+
-							"  --created-by <project>/<agent>  (created by an agent, e.g. cc-connect/pm)", createdBy)
-					}
+				return fmt.Errorf("--created-by is required\n\n" +
+					"Usage:\n" +
+					"  --created-by human              (created by a human)\n" +
+					"  --created-by <project>/<agent>  (created by an agent, e.g. cc-connect/pm)")
+			}
+			if strings.Contains(createdBy, "/") {
+				parts := strings.SplitN(createdBy, "/", 2)
+				if parts[1] == "human" {
+					return fmt.Errorf("invalid --created-by value %q: 'human' is not an agent name\n\n"+
+						"Usage:\n"+
+						"  --created-by human              (created by a human)\n"+
+						"  --created-by <project>/<agent>  (created by an agent, e.g. cc-connect/pm)", createdBy)
 				}
 			}
 

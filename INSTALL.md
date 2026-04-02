@@ -559,7 +559,7 @@ Each time you are woken up with no pending tasks:
 1. Check messages — unread messages are injected automatically before your prompt
 2. Scan for new GitHub issues: `gh issue list --repo owner/my-api --state open --label "ready"`
 3. If unassigned issues exist, pick one and create a task:
-   `agencycli --dir $AGENCY_DIR task add --project my-api --agent dev --title "..." --prompt "..."`
+   `agencycli --dir $AGENCY_DIR task add --project my-api --agent dev --title "..." --prompt "..." --created-by my-api/pm`
 4. When done: `agencycli --dir $AGENCY_DIR task done --id <id> --status success --summary "..."`
 ```
 
@@ -626,7 +626,7 @@ agencycli task stop-all --project my-api --all-agents --include-running
 agencycli task add \
   --project my-api --agent dev \
   --title "Fix login redirect on mobile Safari" \
-  --type bug --priority 1 \
+  --type bug --priority 1 --created-by human \
   --prompt "The OAuth redirect fails on mobile Safari. Reproduce, fix, and open a PR."
 
 # Run an agent manually (bypasses scheduler)

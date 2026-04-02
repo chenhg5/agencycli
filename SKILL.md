@@ -58,7 +58,7 @@ agencycli hire --project my-service --team engineering --role developer \
 
 # 5. Add and run a task
 agencycli task add --project my-service --agent dev \
-  --title "Implement feature X" --prompt "..."
+  --title "Implement feature X" --prompt "..." --created-by human
 agencycli run --project my-service --agent dev
 ```
 
@@ -167,6 +167,7 @@ agents:
 
 ```bash
 agencycli task add    --project P --agent A --title "T" --prompt "..." \
+                      --created-by human|<project>/<agent> \
                       [--type feature|bug|chore] [--priority 0-3]
 agencycli task list   --project P --agent A [--status pending] [--archived]
 agencycli task show   <task-id>
