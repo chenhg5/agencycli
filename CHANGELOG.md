@@ -1,5 +1,56 @@
 # Changelog
 
+## [v0.3.0] - 2026-04-03
+
+### Added
+
+**Knowledge base (docs)**
+- `agencycli docs add` — index documents by file path with virtual directory structure
+- `agencycli docs list / tree / show / update / move / remove / search` — full document management
+- Web document viewer with Notion-style Markdown rendering, syntax highlighting, and YAML frontmatter stripping
+- Collapsible sidebar with virtual directory tree navigation
+- Document download via authenticated API endpoint
+- URL deep-linking: access documents directly via `/docs/<index>/<slug>`
+
+**AI assistant**
+- Built-in AI assistant widget (floating, draggable, resizable) powered by Claude CLI
+- Streaming chat with tool permission handling (`--allowedTools`)
+- Pre-loaded agencycli SKILL for guided operations
+
+**Scheduler & heartbeat**
+- Daemon service management (`agencycli service install/start/stop/status/uninstall`)
+- Version update checking with footer notification in web UI
+- Heartbeat UX: wakeup presets (pending tasks / unread messages), live log viewer
+- Wakeup auto-sync: editing wakeup prompt on web UI immediately regenerates CLAUDE.md
+- Explicit wakeup trigger prompt directs agents to follow `wakeup.md` steps
+
+**Cursor agent support**
+- `--force --trust` flags for full sandbox permissions in headless mode
+- Token usage parsing for Cursor's camelCase stream-json format (`inputTokens`/`outputTokens`)
+- Conversation log viewer adapted for Cursor tool_call/thinking events
+
+**Web UI polish**
+- Dark mode contrast overhaul: layered backgrounds (zinc-950 content / zinc-900 chrome)
+- Breadcrumb bar with brand indicator and improved typography
+- Agent detail page restructured with section headers and info cards
+- Context compression env vars configurable per agent (Claude Code autocompact)
+- Formatted conversation log for schedule wakeup results (reuses run viewer)
+
+### Fixed
+- `task add` now requires explicit `--created-by` flag; rejects `<project>/human` format
+- Wakeup prompt path corrected to `.agencycli/context/wakeup.md` across all docs
+- `inbox reply` default `from` field set to original recipient (was incorrectly `human`)
+- AI assistant: YAML frontmatter in SKILL no longer passed as CLI argument
+- AI assistant: position validation prevents widget disappearing off-screen
+- Schedule page: agent column links to member detail page
+- `sync --force` now always reports "synced" instead of misleading "skipped"
+- Version compare strips git-describe suffixes for accurate footer display
+- Dark mode text contrast improved globally (zinc-700→600→500 cascade)
+
+### Changed
+- Schedule heartbeat status label: "等待中" → "待激活" for clarity
+- Heartbeat wakeup preconditions check all non-completed task statuses (not just pending)
+
 ## [v0.2.2] - 2026-03-30
 
 ### Fixed
