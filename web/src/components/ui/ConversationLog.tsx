@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, User, Wrench, Terminal, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
+import { Bot, User, Wrench, Terminal, AlertTriangle, CheckCircle2, Info, BrainCircuit } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
 type ContentBlock =
@@ -10,10 +10,12 @@ type ContentBlock =
   | { type: 'tool_use'; id?: string; name: string; input?: unknown }
   | { type: 'tool_result'; tool_use_id?: string; content?: string; is_error?: boolean; output?: string }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type StreamEvent = {
   type: string
   subtype?: string
   session_id?: string
+  text?: string
   message?: {
     role?: string
     content?: ContentBlock[] | string
@@ -21,6 +23,8 @@ type StreamEvent = {
     stop_reason?: string
     usage?: { input_tokens?: number; output_tokens?: number }
   }
+  call_id?: string
+  tool_call?: Record<string, any>
   result?: string
   total_cost_usd?: number
   cost_usd?: number
@@ -31,24 +35,111 @@ type StreamEvent = {
   content?: ContentBlock[] | string
   role?: string
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 type ConversationItem =
   | { kind: 'header'; text: string }
   | { kind: 'system'; text: string }
+  | { kind: 'thinking'; text: string }
   | { kind: 'human'; text: string }
   | { kind: 'assistant'; blocks: ContentBlock[] }
   | { kind: 'tool_result'; name?: string; content: string; isError: boolean }
   | { kind: 'result'; text: string; cost?: number; turns?: number; isError: boolean }
 
+function extractCursorToolInfo(tc: Record<string, unknown>): { name: string; desc: string; input: unknown } | null {
+  const toolNames: Record<string, (inner: Record<string, unknown>) => { name: string; desc: string; input: unknown }> = {
+    shellToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return {
+        name: 'Shell',
+        desc: (inner.description as string) || (args.command as string) || '',
+        input: { command: args.command, ...(args.workingDirectory ? { workingDirectory: args.workingDirectory } : {}) },
+      }
+    },
+    readToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Read', desc: (args.filePath as string) || '', input: args }
+    },
+    editToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Edit', desc: (args.filePath as string) || '', input: args }
+    },
+    writeToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Write', desc: (args.filePath as string) || '', input: args }
+    },
+    grepToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Grep', desc: (args.pattern as string) || '', input: args }
+    },
+    globToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Glob', desc: (args.pattern as string) || '', input: args }
+    },
+    taskToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      return { name: 'Task', desc: (args.description as string) || '', input: args }
+    },
+    updateTodosToolCall: (inner) => {
+      const args = (inner.args || {}) as Record<string, unknown>
+      const todos = args.todos as Array<{ content?: string }> | undefined
+      const summary = todos?.slice(0, 3).map((t) => t.content).join(', ') || ''
+      return { name: 'TodoList', desc: summary, input: args }
+    },
+  }
+  for (const [key, extract] of Object.entries(toolNames)) {
+    if (tc[key]) return extract(tc[key] as Record<string, unknown>)
+  }
+  const firstKey = Object.keys(tc)[0]
+  if (firstKey) return { name: firstKey.replace(/ToolCall$/, ''), desc: '', input: (tc[firstKey] as Record<string, unknown>)?.args }
+  return null
+}
+
+function extractCursorToolResult(tc: Record<string, unknown>): { content: string; isError: boolean } | null {
+  for (const key of Object.keys(tc)) {
+    const inner = tc[key] as Record<string, unknown> | undefined
+    if (!inner?.result) continue
+    const result = inner.result as Record<string, unknown>
+    if (result.success) {
+      const s = result.success as Record<string, unknown>
+      if (key === 'shellToolCall') {
+        const parts: string[] = []
+        if (s.stdout) parts.push(String(s.stdout))
+        if (s.stderr) parts.push(String(s.stderr))
+        return { content: parts.join('\n') || `exit ${s.exitCode ?? 0}`, isError: false }
+      }
+      if (key === 'readToolCall') {
+        const text = (s.content as string) || (s.text as string) || ''
+        return { content: text ? truncateStr(text, 3000) : '(read ok)', isError: false }
+      }
+      return { content: JSON.stringify(s, null, 2), isError: false }
+    }
+    if (result.error) {
+      const e = result.error as Record<string, unknown>
+      return { content: (e.message as string) || JSON.stringify(e), isError: true }
+    }
+  }
+  return null
+}
+
 function parseLog(content: string): ConversationItem[] {
   const items: ConversationItem[] = []
   const lines = content.split('\n')
+  let thinkingBuf = ''
+
+  const flushThinking = () => {
+    if (thinkingBuf.trim()) {
+      items.push({ kind: 'thinking', text: thinkingBuf.trim() })
+    }
+    thinkingBuf = ''
+  }
 
   for (const raw of lines) {
     const line = raw.trim()
     if (!line) continue
 
     if (line.startsWith('===')) {
+      flushThinking()
       items.push({ kind: 'header', text: line.replace(/^=+\s*/, '').replace(/\s*=+$/, '') })
       continue
     }
@@ -67,6 +158,18 @@ function parseLog(content: string): ConversationItem[] {
       continue
     }
 
+    // --- Thinking deltas (Cursor) ---
+    if (ev.type === 'thinking') {
+      if (ev.subtype === 'delta' && ev.text) {
+        thinkingBuf += ev.text
+      } else if (ev.subtype === 'completed') {
+        flushThinking()
+      }
+      continue
+    }
+
+    if (thinkingBuf) flushThinking()
+
     if (ev.type === 'system') {
       const info = ev.subtype === 'init' && ev.session_id
         ? `Session: ${ev.session_id}`
@@ -75,7 +178,7 @@ function parseLog(content: string): ConversationItem[] {
       continue
     }
 
-    if (ev.type === 'human' || ev.role === 'human') {
+    if (ev.type === 'human' || ev.type === 'user' || ev.role === 'human') {
       const text = typeof ev.content === 'string'
         ? ev.content
         : typeof ev.message?.content === 'string'
@@ -86,6 +189,34 @@ function parseLog(content: string): ConversationItem[] {
               ? (ev.content as ContentBlock[]).filter((b): b is { type: 'text'; text: string } => b.type === 'text').map((b) => b.text).join('\n')
               : ''
       if (text) items.push({ kind: 'human', text })
+      continue
+    }
+
+    // --- Tool calls (Cursor format) ---
+    if (ev.type === 'tool_call' && ev.tool_call) {
+      if (ev.subtype === 'started') {
+        const info = extractCursorToolInfo(ev.tool_call)
+        if (info) {
+          items.push({
+            kind: 'assistant',
+            blocks: [{
+              type: 'tool_use',
+              id: ev.call_id,
+              name: info.name + (info.desc ? `: ${truncateStr(info.desc, 80)}` : ''),
+              input: info.input,
+            }],
+          })
+        }
+      } else if (ev.subtype === 'completed') {
+        const res = extractCursorToolResult(ev.tool_call)
+        if (res && res.content) {
+          items.push({
+            kind: 'tool_result',
+            content: res.content,
+            isError: res.isError,
+          })
+        }
+      }
       continue
     }
 
@@ -116,6 +247,7 @@ function parseLog(content: string): ConversationItem[] {
     }
 
     if (ev.type === 'result') {
+      flushThinking()
       items.push({
         kind: 'result',
         text: ev.result || (ev.is_error ? 'Error' : 'Completed'),
@@ -127,6 +259,7 @@ function parseLog(content: string): ConversationItem[] {
     }
   }
 
+  flushThinking()
   return items
 }
 
@@ -243,6 +376,20 @@ export function ConversationLog({ content }: { content: string }) {
                 <Info className="size-3.5 shrink-0 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
                 <span className="text-xs text-neutral-500 dark:text-zinc-500">{item.text}</span>
               </div>
+            )
+
+          case 'thinking':
+            return (
+              <details key={i} className="group">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400">
+                  <BrainCircuit className="size-3.5 shrink-0" strokeWidth={1.5} />
+                  <span>Thinking</span>
+                  <span className="text-[10px] opacity-60">({item.text.length} chars)</span>
+                </summary>
+                <div className="ml-5 mt-1 max-h-48 overflow-auto rounded-md border border-neutral-200/60 bg-neutral-50/50 px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-neutral-500 dark:border-zinc-700/40 dark:bg-zinc-800/20 dark:text-zinc-500">
+                  {truncateStr(item.text, 4000)}
+                </div>
+              </details>
             )
 
           case 'human':
