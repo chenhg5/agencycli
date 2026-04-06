@@ -408,11 +408,11 @@ export function ConversationLog({ content }: { content: string }) {
           case 'assistant':
             return (
               <div key={i} className="flex gap-2.5">
-                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
-                  <Bot className="size-3.5 text-violet-700 dark:text-violet-400" strokeWidth={2} />
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
+                  <Bot className="size-3.5 text-sky-700 dark:text-sky-400" strokeWidth={2} />
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs font-medium text-violet-700 dark:text-violet-400">Assistant</p>
+                  <p className="text-xs font-medium text-sky-700 dark:text-sky-400">Assistant</p>
                   {item.blocks.map((block, bi) => {
                     if (block.type === 'text') {
                       return <MdBlock key={bi} text={block.text} />

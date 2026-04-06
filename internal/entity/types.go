@@ -652,6 +652,13 @@ type HeartbeatConfig struct {
 	LastConditionStatus string     `yaml:"last_condition_status,omitempty"`
 	LastConditionAt     *time.Time `yaml:"last_condition_at,omitempty"`
 
+	// Jitter adds a random delay in [0, Jitter) before each wakeup to avoid
+	// thundering-herd patterns. Go duration string, e.g. "5m", "10m".
+	// On the very first cycle after scheduler start, jitter is always applied
+	// within [0, min(Jitter, interval)). If empty or "0", defaults to the full
+	// interval on the first cycle only (backward-compatible behaviour).
+	Jitter string `yaml:"jitter,omitempty"`
+
 	// Scheduler runtime stats (persisted across scheduler restarts).
 	WakeupCount      int        `yaml:"wakeup_count,omitempty"`
 	WakeupCountToday int        `yaml:"wakeup_count_today,omitempty"`

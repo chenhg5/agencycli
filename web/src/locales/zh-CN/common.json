@@ -386,6 +386,8 @@
     "heartbeat": "心跳",
     "interval": "间隔",
     "activeHours": "活跃时段",
+    "jitter": "抖动",
+    "jitterHint": "每次唤醒前加入的随机延迟，防止多个 Agent 同时触发。0 = 仅首次周期抖动。",
     "activeDaysLabel": "活跃日",
     "maxTasks": "单次最大任务数",
     "maxDuration": "单次最大时长",
@@ -540,6 +542,7 @@
     "welcome": "你好！我可以帮你管理你的 Agency。",
     "examples": "试试：「创建一个新项目」或「给 pm 发条消息」",
     "placeholder": "问我任何关于你的 Agency 的问题...",
-    "clear": "清空"
+    "clear": "清空",
+    "stop": "停止"
   }
 }

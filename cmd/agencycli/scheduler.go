@@ -444,11 +444,19 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			waitDur = 0 // will get startup jitter below
 		}
 
-		// On the first cycle, always randomise the initial delay within [0, interval)
-		// regardless of LastWakeup. This decouples agents from each other on every
-		// scheduler restart, even when they share the same interval and LastWakeup time.
+		// Apply jitter: on the first cycle, randomise delay to decouple agents.
+		// If hb.Jitter is set, use it as the upper bound; otherwise fall back
+		// to the full interval (backward-compatible).
+		jitterMax := interval
+		if hb.Jitter != "" {
+			if parsed, err := time.ParseDuration(hb.Jitter); err == nil && parsed > 0 {
+				jitterMax = parsed
+			}
+		}
 		if firstCycle {
-			waitDur = time.Duration(rand.Float64() * float64(interval))
+			waitDur = time.Duration(rand.Float64() * float64(jitterMax))
+		} else if hb.Jitter != "" && jitterMax > 0 {
+			waitDur += time.Duration(rand.Float64() * float64(jitterMax))
 		}
 		firstCycle = false
 
@@ -1078,15 +1086,58 @@ func isInActiveWindowAt(t time.Time, hb *entity.HeartbeatConfig) bool {
 
 // nextWindowStart returns how long to sleep until the active window opens.
 // Returns 0 if the window is currently open or cannot be determined.
+// It considers both ActiveDays and ActiveHours together.
 func nextWindowStart(hb *entity.HeartbeatConfig) time.Duration {
 	now := time.Now()
 
-	// If active-hours is set, compute exact time until window start.
-	if hb.ActiveHours != "" {
-		_, next := isActiveHour(hb.ActiveHours, now)
-		return next
+	// Scan up to 8 days ahead to find the first moment that satisfies
+	// both ActiveDays and ActiveHours.
+	for d := 0; d < 8; d++ {
+		candidate := now.Add(time.Duration(d) * 24 * time.Hour)
+		dayOK := hb.ActiveDays == "" || isActiveDay(hb.ActiveDays, candidate)
+		if !dayOK {
+			continue
+		}
+
+		if hb.ActiveHours == "" {
+			// Day matches and no hour restriction.
+			if d == 0 {
+				return 0 // today is active, no wait
+			}
+			// Sleep until midnight of the active day.
+			midnight := time.Date(candidate.Year(), candidate.Month(), candidate.Day(),
+				0, 0, 0, 0, candidate.Location())
+			return time.Until(midnight)
+		}
+
+		// Day matches — check if we're inside or can reach the hour window on this day.
+		ok, untilOpen := isActiveHourAt(hb.ActiveHours, candidate)
+		if d == 0 {
+			if ok {
+				return 0 // inside the window right now
+			}
+			if untilOpen > 0 {
+				return untilOpen // window opens later today
+			}
+			// Window already closed today; try tomorrow.
+			continue
+		}
+
+		// Future active day: compute duration until window start on that day.
+		parts := strings.SplitN(hb.ActiveHours, "-", 2)
+		if len(parts) != 2 {
+			return 0
+		}
+		startH, startM, err := parseHHMM(strings.TrimSpace(parts[0]))
+		if err != nil {
+			return 0
+		}
+		openAt := time.Date(candidate.Year(), candidate.Month(), candidate.Day(),
+			startH, startM, 0, 0, now.Location())
+		return time.Until(openAt)
 	}
-	// If only active-days: sleep until midnight then re-check.
+
+	// Fallback: sleep until tomorrow midnight.
 	tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
 	return time.Until(tomorrow)
 }
@@ -1339,6 +1390,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 		enable           bool
 		disable          bool
 		interval         string
+		jitter           string
 		sessionScope     string
 		activeHours      string
 		activeDays       string
@@ -1403,6 +1455,15 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 					return fmt.Errorf("invalid interval %q: %w", interval, err)
 				}
 				hb.Interval = interval
+				changed = true
+			}
+			if cmd.Flags().Changed("jitter") {
+				if jitter != "" {
+					if _, err := time.ParseDuration(jitter); err != nil {
+						return fmt.Errorf("invalid jitter %q: %w", jitter, err)
+					}
+				}
+				hb.Jitter = jitter
 				changed = true
 			}
 			if sessionScope != "" {
@@ -1533,6 +1594,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 	cmd.Flags().StringVar(&sessionScope, "session-scope", "", "session scope: cycle (default) or task")
 	cmd.Flags().StringVar(&activeHours, "active-hours", "", `restrict wakeups to a time window, e.g. "09:00-18:00" or "22:00-06:00"`)
 	cmd.Flags().StringVar(&activeDays, "active-days", "", `restrict wakeups to specific days, e.g. "weekdays", "Mon,Wed,Fri", "Sat,Sun"`)
+	cmd.Flags().StringVar(&jitter, "jitter", "", `random delay added before each wakeup, e.g. "5m", "10m" (empty = full interval on first cycle only)`)
 	cmd.Flags().StringVar(&wakeupPromptFile, "wakeup-prompt-file", "", "path to a markdown file used as the default wakeup routine when queue is empty")
 	cmd.Flags().StringVar(&wakeupCondition, "wakeup-condition", "", `shell command evaluated before each wakeup; exit 0 = proceed, non-zero = skip cycle (e.g. "gh issue list --state open | grep -q .")`)
 	return cmd

@@ -255,6 +255,18 @@ export default function AssistantWidget() {
                 <ConversationLog content={streamLog} />
               </div>
             )}
+            {loading && (
+              <div className="flex items-center justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={stopStream}
+                  className="flex items-center gap-1.5 rounded-full border border-neutral-200/60 bg-neutral-50 px-3 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:border-zinc-700/40 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                >
+                  <Square className="size-2.5" fill="currentColor" />
+                  {t('assistant.stop')}
+                </button>
+              </div>
+            )}
             {loading && !streamLog && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-neutral-100 px-4 py-3 dark:bg-zinc-800">
@@ -268,7 +280,7 @@ export default function AssistantWidget() {
 
           {/* Input */}
           <div className="shrink-0 border-t border-neutral-200/60 p-3 dark:border-zinc-700/40">
-            <div className="flex items-end gap-2 rounded-xl border border-neutral-200/60 bg-neutral-50/50 px-3 py-2 focus-within:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-800/50">
+            <div className="flex items-center gap-2 rounded-xl border border-neutral-200/60 bg-neutral-50/50 px-3 py-2 focus-within:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-800/50">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -276,7 +288,7 @@ export default function AssistantWidget() {
                 onKeyDown={handleKeyDown}
                 placeholder={t('assistant.placeholder')}
                 rows={1}
-                className="flex-1 resize-none bg-transparent text-sm text-neutral-800 outline-none placeholder:text-neutral-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+                className="flex-1 resize-none bg-transparent py-0.5 text-sm leading-[1.625rem] text-neutral-800 outline-none placeholder:text-neutral-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
                 style={{ maxHeight: '120px' }}
                 onInput={(e) => {
                   const el = e.currentTarget

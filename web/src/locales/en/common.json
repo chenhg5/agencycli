@@ -386,6 +386,8 @@
     "heartbeat": "Heartbeat",
     "interval": "Interval",
     "activeHours": "Active hours",
+    "jitter": "Jitter",
+    "jitterHint": "Random delay added before each wakeup to avoid thundering-herd. 0 = no jitter after first cycle.",
     "activeDaysLabel": "Active days",
     "maxTasks": "Max tasks/cycle",
     "maxDuration": "Max duration",
@@ -540,6 +542,7 @@
     "welcome": "Hi! I can help you manage your agency.",
     "examples": "Try: \"Create a new project\" or \"Send a message to pm\"",
     "placeholder": "Ask me anything about your agency...",
-    "clear": "Clear"
+    "clear": "Clear",
+    "stop": "Stop"
   }
 }

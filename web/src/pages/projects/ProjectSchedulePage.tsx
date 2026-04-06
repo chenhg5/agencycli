@@ -19,8 +19,8 @@ type SchedStatusResp = { schedulers: SchedInstance[] }
 
 type HeartbeatRow = {
   enabled: boolean; interval: string; paused: boolean
-  activeHours?: string; activeDays?: string; wakeupPrompt?: string; wakeupCondition?: string
-  wakeupPreset?: string
+  activeHours?: string; activeDays?: string; jitter?: string
+  wakeupPrompt?: string; wakeupCondition?: string; wakeupPreset?: string
   maxTasksPerCycle?: number; maxCycleDuration?: string; pid?: number
   lastWakeup?: string; lastWakeupStatus?: string; lastCycleDuration?: string
   wakeupCount?: number; wakeupCountToday?: number; nextWakeupAt?: string
@@ -284,6 +284,11 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
   const [ivNum, setIvNum] = useState(iv.num)
   const [ivUnit, setIvUnit] = useState<'m' | 'h'>(iv.unit === 'h' ? 'h' : 'm')
 
+  // Jitter
+  const jt = parseInterval(hb.jitter ?? '0m')
+  const [jtNum, setJtNum] = useState(jt.num)
+  const [jtUnit, setJtUnit] = useState<'m' | 'h'>(jt.unit === 'h' ? 'h' : 'm')
+
   // Active Hours: parse "09:00-18:00" (split on '-' would break HH:MM-HH:MM)
   const parseAH = (v: string) => {
     const m = v.trim().match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/)
@@ -347,10 +352,12 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
     setErr(null); setBusy(true)
     try {
       const intervalStr = ivNum > 0 ? `${ivNum}${ivUnit}` : ''
+      const jitterStr = jtNum > 0 ? `${jtNum}${jtUnit}` : ''
       const activeHoursStr = ahStart && ahEnd ? `${ahStart}-${ahEnd}` : ''
       const maxDurStr = mdNum > 0 ? `${mdNum}${mdUnit}` : ''
       await apiPatch(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/heartbeat`, {
         interval: intervalStr || undefined,
+        jitter: jitterStr,
         activeHours: activeHoursStr,
         activeDays: buildDaysString(),
         maxTasksPerCycle: maxTasks,
@@ -384,6 +391,18 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
                 <option value="h">{t('schedule.unitHours')}</option>
               </select>
             </div>
+          </Field>
+
+          {/* Jitter */}
+          <Field label={t('schedule.jitter')}>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} value={jtNum} onChange={(e) => setJtNum(Number(e.target.value))} className={cn(fieldCls, 'w-24 tabular-nums')} />
+              <select value={jtUnit} onChange={(e) => setJtUnit(e.target.value as 'm' | 'h')} className={cn(fieldCls, 'w-28')}>
+                <option value="m">{t('schedule.unitMinutes')}</option>
+                <option value="h">{t('schedule.unitHours')}</option>
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.jitterHint')}</p>
           </Field>
 
           {/* Active Hours */}

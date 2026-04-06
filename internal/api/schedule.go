@@ -104,6 +104,7 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		"wakeupPrompt":          h.WakeupPrompt,
 		"wakeupCondition":       h.WakeupCondition,
 		"wakeupPreset":          h.WakeupPreset,
+		"jitter":                h.Jitter,
 		"maxTasksPerCycle":      h.MaxTasksPerCycle,
 		"maxCycleDuration":      h.MaxCycleDuration,
 		"pid":                   h.PID,
@@ -196,6 +197,7 @@ func (s *Server) parseProjectAgent(w http.ResponseWriter, r *http.Request) (proj
 type patchHeartbeatBody struct {
 	Enabled          *bool   `json:"enabled,omitempty"`
 	Interval         *string `json:"interval,omitempty"`
+	Jitter           *string `json:"jitter,omitempty"`
 	Paused           *bool   `json:"paused,omitempty"`
 	ActiveHours      *string `json:"activeHours,omitempty"`
 	ActiveDays       *string `json:"activeDays,omitempty"`
@@ -233,6 +235,15 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		hb.Interval = strings.TrimSpace(*body.Interval)
+	}
+	if body.Jitter != nil {
+		if t := strings.TrimSpace(*body.Jitter); t != "" {
+			if _, err := time.ParseDuration(t); err != nil {
+				s.jsonError(w, http.StatusBadRequest, "invalid jitter duration")
+				return
+			}
+		}
+		hb.Jitter = strings.TrimSpace(*body.Jitter)
 	}
 	if body.Paused != nil {
 		hb.Paused = *body.Paused

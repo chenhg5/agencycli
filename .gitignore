@@ -39,3 +39,5 @@ Thumbs.db
 **/agents/*/context.md
 # Keep the agent metadata so sync can detect changes
 !**/agents/*/.agencycli/agent.yaml
+
+.npmrc

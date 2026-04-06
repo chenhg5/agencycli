@@ -386,6 +386,8 @@
     "heartbeat": "心跳",
     "interval": "間隔",
     "activeHours": "活躍時段",
+    "jitter": "抖動",
+    "jitterHint": "每次喚醒前加入的隨機延遲，防止多個 Agent 同時觸發。0 = 僅首次週期抖動。",
     "activeDaysLabel": "活躍日",
     "maxTasks": "單次最大任務數",
     "maxDuration": "單次最大時長",
@@ -540,6 +542,7 @@
     "welcome": "你好！我可以幫你管理你的 Agency。",
     "examples": "試試：「建立一個新專案」或「傳訊息給 pm」",
     "placeholder": "問我任何關於你的 Agency 的問題...",
-    "clear": "清空"
+    "clear": "清空",
+    "stop": "停止"
   }
 }
