@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { X } from 'lucide-react'
 import { apiPost } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
@@ -171,9 +173,9 @@ export function MessageDetailModal({ open, message, onClose, onMutated }: Props)
             <p className="text-[13px] font-medium text-neutral-900 dark:text-zinc-100">{m.subject}</p>
           )}
 
-          <pre className="whitespace-pre-wrap break-words rounded-lg border border-neutral-100 bg-neutral-50/50 p-3 font-sans text-[12.5px] leading-relaxed text-neutral-800 dark:border-zinc-700/40 dark:bg-zinc-800/30 dark:text-zinc-200">
-            {m.body}
-          </pre>
+          <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none rounded-lg border border-neutral-100 bg-neutral-50/50 p-3 text-[12.5px] leading-relaxed dark:border-zinc-700/40 dark:bg-zinc-800/30 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-neutral-100 [&_pre]:p-2.5 dark:[&_pre]:bg-zinc-800 [&_code]:text-[12px] [&_table]:text-[12px] [&_a]:text-sky-600 dark:[&_a]:text-sky-400">
+            <Markdown remarkPlugins={[remarkGfm]}>{m.body}</Markdown>
+          </div>
         </div>
 
         {/* Footer actions */}
