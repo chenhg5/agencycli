@@ -543,6 +543,10 @@
     "examples": "試試：「建立一個新專案」或「傳訊息給 pm」",
     "placeholder": "問我任何關於你的 Agency 的問題...",
     "clear": "清空",
-    "stop": "停止"
+    "stop": "停止",
+    "permissionTitle": "請求權限",
+    "permAllow": "允許",
+    "permDeny": "拒絕",
+    "permAllowAll": "全部允許"
   }
 }

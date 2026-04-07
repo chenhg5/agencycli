@@ -543,6 +543,10 @@
     "examples": "试试：「创建一个新项目」或「给 pm 发条消息」",
     "placeholder": "问我任何关于你的 Agency 的问题...",
     "clear": "清空",
-    "stop": "停止"
+    "stop": "停止",
+    "permissionTitle": "请求权限",
+    "permAllow": "允许",
+    "permDeny": "拒绝",
+    "permAllowAll": "全部允许"
   }
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
@@ -38,8 +39,10 @@ type Server struct {
 	ts           taskstore.Store
 	users        *UserStore
 	sched        *SchedulerManager
-	updateCheck  UpdateChecker
-	daemonStatus DaemonStatusFunc
+	updateCheck       UpdateChecker
+	daemonStatus      DaemonStatusFunc
+	assistantMu       sync.Mutex
+	assistantSessions map[string]*assistantSession
 }
 
 // NewServer builds an API server for the given workspace root.
@@ -122,6 +125,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/run", s.handleRunAgent)
 	mux.HandleFunc("POST /api/v1/session/reset", s.handleSessionReset)
 	mux.HandleFunc("POST /api/v1/assistant/chat", s.handleAssistantChat)
+	mux.HandleFunc("POST /api/v1/assistant/permission", s.handleAssistantPermission)
 	mux.HandleFunc("GET /api/v1/docs", s.handleDocsList)
 	mux.HandleFunc("GET /api/v1/docs/tree", s.handleDocsTree)
 	mux.HandleFunc("GET /api/v1/docs/{id}", s.handleDocsGet)

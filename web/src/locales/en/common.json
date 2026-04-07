@@ -543,6 +543,10 @@
     "examples": "Try: \"Create a new project\" or \"Send a message to pm\"",
     "placeholder": "Ask me anything about your agency...",
     "clear": "Clear",
-    "stop": "Stop"
+    "stop": "Stop",
+    "permissionTitle": "Permission requested",
+    "permAllow": "Allow",
+    "permDeny": "Deny",
+    "permAllowAll": "Allow All"
   }
 }

@@ -71,6 +71,9 @@ type Record struct {
 
 	CommandSummary string
 
+	APIModel   string
+	APIBaseURL string
+
 	PromptBytes int64
 	PromptSHA256  string
 
@@ -153,6 +156,13 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
+	// Schema evolution: add columns that may not exist in older databases.
+	for _, alter := range []string{
+		`ALTER TABLE agent_runs ADD COLUMN api_model TEXT DEFAULT ''`,
+		`ALTER TABLE agent_runs ADD COLUMN api_base_url TEXT DEFAULT ''`,
+	} {
+		_, _ = db.Exec(alter)
+	}
 	return nil
 }
 
@@ -175,8 +185,9 @@ INSERT INTO agent_runs (
 	task_id, task_title, model, sandbox, status, exit_code,
 	session_id, error_msg, log_path, command_summary,
 	prompt_bytes, prompt_sha256,
-	input_tokens, output_tokens, cache_read_tokens, total_cost_usd, has_cost
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	input_tokens, output_tokens, cache_read_tokens, total_cost_usd, has_cost,
+	api_model, api_base_url
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		time.Now().UTC().Format(time.RFC3339Nano),
 		rec.StartedAt.UTC().Format(time.RFC3339Nano),
 		rec.FinishedAt.UTC().Format(time.RFC3339Nano),
@@ -187,6 +198,7 @@ INSERT INTO agent_runs (
 		rec.LogPathRel, rec.CommandSummary,
 		rec.PromptBytes, rec.PromptSHA256,
 		sqlInt64Ptr(rec.InputTokens), sqlInt64Ptr(rec.OutputTokens), sqlInt64Ptr(rec.CacheReadTokens), sqlFloat64Ptr(rec.TotalCostUSD), hc,
+		rec.APIModel, rec.APIBaseURL,
 	)
 	return err
 }

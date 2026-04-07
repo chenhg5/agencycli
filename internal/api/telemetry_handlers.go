@@ -193,6 +193,12 @@ func (s *Server) handleTelemetryRuns(w http.ResponseWriter, r *http.Request) {
 		if row.HasCost && row.TotalCostUSD.Valid {
 			m["costUSD"] = row.TotalCostUSD.Float64
 		}
+		if row.APIModel != "" {
+			m["apiModel"] = row.APIModel
+		}
+		if row.APIBaseURL != "" {
+			m["apiBaseUrl"] = row.APIBaseURL
+		}
 		runOut = append(runOut, m)
 	}
 

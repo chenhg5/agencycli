@@ -54,6 +54,8 @@ type RunRow = {
   cacheReadTokens?: number
   costUSD?: number
   model?: string
+  apiModel?: string
+  apiBaseUrl?: string
   command?: string
   logPath?: string
   sessionId?: string
@@ -402,6 +404,12 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
             <div>
               <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.model')}</span>
               <p className="font-mono text-neutral-800 dark:text-zinc-200">{run.model}</p>
+              {run.apiModel && (
+                <p className="mt-0.5 font-mono text-xs text-neutral-500 dark:text-zinc-400">{run.apiModel}</p>
+              )}
+              {run.apiBaseUrl && (
+                <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-400 dark:text-zinc-500">{run.apiBaseUrl}</p>
+              )}
             </div>
           )}
           <div>

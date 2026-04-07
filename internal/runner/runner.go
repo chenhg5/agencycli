@@ -110,6 +110,8 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
+	effectiveEnv := mergeEnv(os.Environ(), meta.Env)
+	apiModel, apiBaseURL := resolveAPIModelFromEnv(model, effectiveEnv)
 	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 	innerArgs := invoker.Args(promptFile, sessionID)
 
@@ -179,7 +181,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	if execDir != "" {
 		cmd.Dir = execDir
 	}
-	cmd.Env = mergeEnv(os.Environ(), meta.Env)
+	cmd.Env = effectiveEnv
 
 	// When the invoker reads the prompt from stdin, open the prompt file and
 	// pipe it through. For Docker this works because `-i` is always present in
@@ -223,6 +225,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	}
 	ec := exitCodeOrZero(cmd)
 	r.recordAgentRun(telemetry.KindExec, project, agentName, "", "", string(model), sandboxLabel,
+		apiModel, apiBaseURL,
 		runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
 		logPath, telemetry.FormatExecCommand(executable, args), prompt, outBuf.Bytes())
 	return result, nil
@@ -263,6 +266,8 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
+	effectiveEnv := mergeEnv(os.Environ(), meta.Env)
+	apiModel, apiBaseURL := resolveAPIModelFromEnv(model, effectiveEnv)
 	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 
 	// Build the inner agent CLI arguments.
@@ -372,7 +377,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	if execDir != "" {
 		cmd.Dir = execDir
 	}
-	cmd.Env = mergeEnv(os.Environ(), meta.Env)
+	cmd.Env = effectiveEnv
 
 	var outBuf bytes.Buffer
 	multiOut := io.MultiWriter(&outBuf, logFile)
@@ -405,6 +410,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		result.Status = entity.TaskStatusAwaitingConfirmation
 		result.Summary = strings.TrimSpace(summary)
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+			apiModel, apiBaseURL,
 			runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
 			logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 		return result, nil
@@ -414,6 +420,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = runErr.Error()
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+			apiModel, apiBaseURL,
 			runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
 			logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 		return result, runErr
@@ -421,6 +428,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 
 	result.Status = entity.TaskStatusDoneSuccess
 	r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+		apiModel, apiBaseURL,
 		runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
 		logPath, cmdSummary, fullPrompt, outBuf.Bytes())
 	return result, nil
@@ -455,6 +463,7 @@ func (r *Runner) recordAgentRun(
 	project, agent string,
 	taskID, taskTitle string,
 	modelNorm, sandbox string,
+	apiModel, apiBaseURL string,
 	started, finished time.Time,
 	status entity.TaskStatus,
 	exitCode *int,
@@ -471,6 +480,8 @@ func (r *Runner) recordAgentRun(
 		TaskID:         taskID,
 		TaskTitle:      taskTitle,
 		Model:          modelNorm,
+		APIModel:       apiModel,
+		APIBaseURL:     apiBaseURL,
 		Sandbox:        sandbox,
 		Status:         string(status),
 		SessionID:      sessionID,
@@ -484,6 +495,39 @@ func (r *Runner) recordAgentRun(
 	rec.PromptBytes, rec.PromptSHA256 = telemetry.PromptFingerprint(prompt)
 	telemetry.ApplyStreamUsage(&rec, telemetry.ParseStreamJSONUsage(stdout))
 	_ = telemetry.Insert(r.root, rec)
+}
+
+// resolveAPIModelFromEnv extracts the actual API model name and base URL
+// from the effective environment for the given agent model type.
+func resolveAPIModelFromEnv(modelType entity.AgentModel, env []string) (apiModel, apiBaseURL string) {
+	lookup := func(keys ...string) string {
+		for i := len(env) - 1; i >= 0; i-- {
+			k, v, _ := strings.Cut(env[i], "=")
+			for _, want := range keys {
+				if k == want && v != "" {
+					return v
+				}
+			}
+		}
+		return ""
+	}
+	switch modelType {
+	case entity.ModelClaudeCode:
+		apiModel = lookup("ANTHROPIC_MODEL", "CLAUDE_MODEL")
+		apiBaseURL = lookup("ANTHROPIC_BASE_URL", "ANTHROPIC_API_BASE")
+	case entity.ModelCodex:
+		apiModel = lookup("OPENAI_MODEL", "CODEX_MODEL")
+		apiBaseURL = lookup("OPENAI_BASE_URL", "OPENAI_API_BASE")
+	case entity.ModelGemini:
+		apiModel = lookup("GEMINI_MODEL", "GOOGLE_MODEL")
+		apiBaseURL = lookup("GOOGLE_API_BASE")
+	case entity.ModelCursor:
+		apiModel = lookup("CURSOR_MODEL")
+	case entity.ModelOpenCode:
+		apiModel = lookup("OPENAI_MODEL")
+		apiBaseURL = lookup("OPENAI_BASE_URL", "OPENAI_API_BASE")
+	}
+	return
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -606,6 +650,7 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = httpErr.Error()
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+			"", "",
 			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
 			logPath, httpSummary, userPrompt, []byte(output))
 		return result, nil
@@ -616,6 +661,7 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 		result.Status = entity.TaskStatusAwaitingConfirmation
 		result.Summary = strings.TrimSpace(summary)
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+			"", "",
 			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
 			logPath, httpSummary, userPrompt, []byte(output))
 		return result, nil
@@ -626,6 +672,7 @@ func (r *Runner) runTaskHTTP(project, agentName, agentDir string, meta *entity.A
 
 	result.Status = entity.TaskStatusDoneSuccess
 	r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, modelNorm, sandboxLabel,
+		"", "",
 		runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
 		logPath, httpSummary, userPrompt, []byte(output))
 	return result, nil
@@ -672,6 +719,7 @@ func (r *Runner) execPromptHTTP(agentDir string, meta *entity.AgentMeta, prompt 
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = httpErr.Error()
 		r.recordAgentRun(telemetry.KindExec, meta.Project, meta.Name, "", "", modelNorm, sandboxLabel,
+			"", "",
 			runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
 			logPath, httpSummary, prompt, []byte(output))
 		return result, nil
@@ -681,6 +729,7 @@ func (r *Runner) execPromptHTTP(agentDir string, meta *entity.AgentMeta, prompt 
 	}
 	result.Status = entity.TaskStatusDoneSuccess
 	r.recordAgentRun(telemetry.KindExec, meta.Project, meta.Name, "", "", modelNorm, sandboxLabel,
+		"", "",
 		runStarted, runFinished, result.Status, nil, result.SessionID, result.ErrorMsg,
 		logPath, httpSummary, prompt, []byte(output))
 	return result, nil

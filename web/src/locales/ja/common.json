@@ -543,6 +543,10 @@
     "examples": "例：「新しいプロジェクトを作成」「pmにメッセージを送信」",
     "placeholder": "エージェンシーについて何でも聞いてください...",
     "clear": "クリア",
-    "stop": "停止"
+    "stop": "停止",
+    "permissionTitle": "権限のリクエスト",
+    "permAllow": "許可",
+    "permDeny": "拒否",
+    "permAllowAll": "すべて許可"
   }
 }
