@@ -119,6 +119,15 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 		args = append(args, fmt.Sprintf("--cpus=%.2f", cfg.CPUs))
 	}
 
+	// ── Security options ────────────────────────────────────────────────────
+	// Codex CLI uses bubblewrap (bwrap) to sandbox individual command
+	// executions. bwrap needs user namespaces, which Docker's default seccomp
+	// profile blocks. Relax it for Codex containers so bwrap can function.
+	switch entity.NormaliseModel(model) {
+	case entity.ModelCodex, entity.ModelQoder:
+		args = append(args, "--security-opt", "seccomp=unconfined")
+	}
+
 	// ── Network ──────────────────────────────────────────────────────────────
 	networkMode := "bridge"
 	if cfg != nil && cfg.NetworkMode != "" {

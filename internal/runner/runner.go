@@ -217,13 +217,22 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 		result.SessionID = sid
 	}
 
+	ec := exitCodeOrZero(cmd)
 	if runErr != nil {
+		if sessionID != "" && isThinkingSignatureError(output) {
+			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — retrying with fresh session ===\n")
+			r.recordAgentRun(telemetry.KindExec, project, agentName, "", "", string(model), sandboxLabel,
+				apiModel, apiBaseURL,
+				runStarted, runFinished, entity.TaskStatusDoneFailed, &ec, result.SessionID,
+				"thinking block signature invalid, retrying fresh",
+				logPath, telemetry.FormatExecCommand(executable, args), prompt, outBuf.Bytes())
+			return r.ExecPrompt(project, agentName, prompt, "")
+		}
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = runErr.Error()
 	} else {
 		result.Status = entity.TaskStatusDoneSuccess
 	}
-	ec := exitCodeOrZero(cmd)
 	r.recordAgentRun(telemetry.KindExec, project, agentName, "", "", string(model), sandboxLabel,
 		apiModel, apiBaseURL,
 		runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
@@ -417,6 +426,15 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	}
 
 	if runErr != nil {
+		if sessionID != "" && isThinkingSignatureError(output) {
+			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — retrying with fresh session ===\n")
+			r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
+				apiModel, apiBaseURL,
+				runStarted, runFinished, entity.TaskStatusDoneFailed, &ec, result.SessionID,
+				"thinking block signature invalid, retrying fresh",
+				logPath, cmdSummary, fullPrompt, outBuf.Bytes())
+			return r.RunTask(project, agentName, task, "")
+		}
 		result.Status = entity.TaskStatusDoneFailed
 		result.ErrorMsg = runErr.Error()
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
@@ -444,6 +462,10 @@ func (r *Runner) ResumeTask(project, agentName string, task *entity.Task, confir
 	result, err := r.RunTask(project, agentName, task, sessionID)
 	task.Prompt = original // restore
 	return result, err
+}
+
+func isThinkingSignatureError(output string) bool {
+	return strings.Contains(output, "Invalid signature in thinking block")
 }
 
 func exitCodeOrZero(cmd *exec.Cmd) int {

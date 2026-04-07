@@ -168,7 +168,7 @@ export default function DocsPage() {
             </button>
             {tree && tree.children?.map(node => (
               <TreeItem
-                key={node.name} node={node} depth={0}
+                key={node.name} node={node} depth={0} parentPath=""
                 selectedIndex={selectedIndex}
                 onSelect={idx => { setSelectedIndex(idx); setSelectedDoc(null); setSearchQ(''); navigate(`/docs/${idx}`, { replace: true }) }}
               />
@@ -257,24 +257,19 @@ export default function DocsPage() {
   )
 }
 
-function TreeItem({ node, depth, selectedIndex, onSelect }: {
-  node: TreeNode; depth: number; selectedIndex: string | null
+function TreeItem({ node, depth, parentPath, selectedIndex, onSelect }: {
+  node: TreeNode; depth: number; parentPath: string; selectedIndex: string | null
   onSelect: (idx: string) => void
 }) {
   const [open, setOpen] = useState(true)
   const hasChildren = (node.children?.length ?? 0) > 0
-  const fullPath = useMemo(() => node.name, [node.name])
-
-  const buildPath = useCallback((n: TreeNode, parentPath: string): string => {
-    return parentPath ? `${parentPath}/${n.name}` : n.name
-  }, [])
-
+  const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name
   const isActive = selectedIndex === fullPath
 
   return (
     <div style={{ paddingLeft: depth * 12 }}>
       <button
-        onClick={() => { hasChildren ? setOpen(!open) : onSelect(fullPath); onSelect(fullPath) }}
+        onClick={() => { if (hasChildren) setOpen(!open); onSelect(fullPath) }}
         className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
           isActive
             ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 font-medium'
@@ -291,8 +286,9 @@ function TreeItem({ node, depth, selectedIndex, onSelect }: {
       {open && node.children?.map(c => (
         <TreeItem
           key={c.name} node={c} depth={depth + 1}
+          parentPath={fullPath}
           selectedIndex={selectedIndex}
-          onSelect={idx => onSelect(buildPath(c, fullPath) === idx ? idx : `${fullPath}/${c.name}`)}
+          onSelect={onSelect}
         />
       ))}
     </div>

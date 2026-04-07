@@ -122,9 +122,169 @@ function extractCursorToolResult(tc: Record<string, unknown>): { content: string
   return null
 }
 
-function parseLog(content: string): ConversationItem[] {
+function isCodexLog(lines: string[]): boolean {
+  return lines.some(l => l.includes('OpenAI Codex') || /^model:\s/.test(l.trim()))
+}
+
+function parseCodexLog(lines: string[]): ConversationItem[] {
   const items: ConversationItem[] = []
+  type Section = 'none' | 'header' | 'user' | 'thinking' | 'exec' | 'exec_output' | 'response' | 'tokens'
+  let section: Section = 'none'
+  let buf: string[] = []
+  let execCmd = ''
+  let execExitCode = -1
+  let tokensTotal = 0
+  let seenResponse = false
+
+  const isNoise = (l: string) =>
+    /^\d{4}-\d{2}-\d{2}T.*\s(ERROR|WARN)\s/.test(l) ||
+    l.startsWith('warning:') ||
+    l.startsWith('WARNING:')
+
+  const flush = () => {
+    const text = buf.join('\n').trim()
+    buf = []
+    if (!text) return
+    switch (section) {
+      case 'user':
+        items.push({ kind: 'human', text })
+        break
+      case 'thinking':
+        items.push({ kind: 'thinking', text })
+        break
+      case 'exec_output':
+        items.push({
+          kind: 'tool_result',
+          content: text,
+          isError: execExitCode !== 0,
+        })
+        break
+      case 'response':
+        if (!seenResponse) {
+          seenResponse = true
+          items.push({ kind: 'assistant', blocks: [{ type: 'text', text }] })
+        }
+        break
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    const line = raw.trim()
+
+    if (!line || isNoise(line)) continue
+
+    if (line.startsWith('===')) {
+      flush()
+      section = 'none'
+      const headerText = line.replace(/^=+\s*/, '').replace(/\s*=+$/, '')
+      if (headerText) items.push({ kind: 'header', text: headerText })
+      continue
+    }
+
+    if (line.startsWith('Command:') || line.startsWith('Started:')) {
+      flush()
+      section = 'none'
+      items.push({ kind: 'header', text: line })
+      continue
+    }
+
+    if (line === '--------') {
+      flush()
+      section = section === 'header' ? 'none' : 'header'
+      continue
+    }
+
+    if (section === 'header') {
+      if (line.startsWith('model:') || line.startsWith('provider:') || line.startsWith('session id:')) {
+        items.push({ kind: 'system', text: line })
+      }
+      continue
+    }
+
+    if (line === 'user') {
+      flush()
+      section = 'user'
+      continue
+    }
+
+    if (line === 'exec') {
+      flush()
+      section = 'exec'
+      continue
+    }
+
+    if (line === 'codex') {
+      flush()
+      section = 'response'
+      continue
+    }
+
+    if (/^tokens used$/i.test(line)) {
+      flush()
+      section = 'tokens'
+      continue
+    }
+
+    if (section === 'tokens') {
+      const n = parseInt(line.replace(/,/g, ''), 10)
+      if (!isNaN(n)) tokensTotal = n
+      section = 'none'
+      continue
+    }
+
+    if (/^\*\*.*\*\*$/.test(line)) {
+      flush()
+      section = 'thinking'
+      buf.push(line)
+      continue
+    }
+
+    if (section === 'exec') {
+      const exitMatch = line.match(/^\s*exited\s+(\d+)\s+in\s+/)
+      if (exitMatch) {
+        execExitCode = parseInt(exitMatch[1], 10)
+        items.push({
+          kind: 'assistant',
+          blocks: [{ type: 'tool_use', name: 'Shell', input: { command: execCmd } }],
+        })
+        section = 'exec_output'
+        continue
+      }
+      execCmd = line
+      continue
+    }
+
+    buf.push(raw)
+  }
+
+  flush()
+
+  if (tokensTotal > 0) {
+    const lastResult = items.findIndex(it => it.kind === 'result')
+    if (lastResult === -1) {
+      const lastAssistant = [...items].reverse().find(it => it.kind === 'assistant')
+      const resultText = lastAssistant && lastAssistant.kind === 'assistant'
+        ? lastAssistant.blocks.find(b => b.type === 'text')?.text || 'Completed'
+        : 'Completed'
+      items.push({
+        kind: 'result',
+        text: `${tokensTotal.toLocaleString()} tokens used`,
+        isError: false,
+      })
+      void resultText
+    }
+  }
+
+  return items
+}
+
+function parseLog(content: string): ConversationItem[] {
   const lines = content.split('\n')
+
+  if (isCodexLog(lines)) return parseCodexLog(lines)
+
+  const items: ConversationItem[] = []
   let thinkingBuf = ''
 
   const flushThinking = () => {
