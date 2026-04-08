@@ -463,6 +463,12 @@
     "noSession": "セッションなし",
     "resetSession": "セッションリセット",
     "resettingSession": "リセット中…",
+    "clearSession": "クリア",
+    "scopePersistent": "永続",
+    "scopeHint": "サイクル：1回の起動で共有。タスク単位：タスクごとに独立。永続：起動をまたいで維持。",
+    "sessionIdLabel": "セッション ID",
+    "sessionIdPlaceholder": "空欄で自動割当",
+    "sessionIdHint": "セッション ID を指定すると以前の会話コンテキストを引き継ぎます。クリアすると次回は新しいセッションで開始します。",
     "startedAt": "開始",
     "runAgent": "エージェント実行",
     "runAgentDesc": "プロンプトを入力してエージェントを実行、または次の保留タスクを実行します。",
@@ -474,6 +480,23 @@
     "promptOptional": "（任意）",
     "promptPlaceholder": "エージェントへの指示 / プロンプトを入力…",
     "promptHint": "プロンプトを入力するとタスクを作成して即時実行します。空欄の場合は次の保留タスクを実行します。"
+  },
+  "context": {
+    "runs": "実行回数"
+  },
+  "provider": {
+    "title": "API プロバイダー",
+    "desc": "API プロバイダーを一元管理。エージェントがプロバイダーを選択すると API キーとエンドポイントが自動注入されます。",
+    "add": "プロバイダー追加",
+    "edit": "プロバイダー編集",
+    "empty": "プロバイダーが未設定です。",
+    "nameLabel": "名前",
+    "typeLabel": "タイプ",
+    "modelLabel": "モデル",
+    "selectLabel": "プロバイダー",
+    "none": "なし（環境変数を使用）",
+    "overrideHint": "プロバイダー設定が先に適用され、エージェント固有の環境変数で上書きできます。",
+    "keyUnchangedHint": "（変更なし、空欄で維持）"
   },
   "runs": {
     "subtitle": "このプロジェクトのエージェントの実行履歴、トークン消費、コストの集計。",
@@ -508,6 +531,7 @@
     "finished": "終了時刻",
     "model": "モデル",
     "taskLabel": "関連タスク",
+    "sessionLabel": "セッション ID",
     "command": "コマンド",
     "errorLabel": "エラー",
     "logTitle": "実行ログ",

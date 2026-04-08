@@ -463,6 +463,12 @@
     "noSession": "No session",
     "resetSession": "Reset session",
     "resettingSession": "Resetting…",
+    "clearSession": "Clear",
+    "scopePersistent": "Persistent",
+    "scopeHint": "Cycle: shared within one wakeup. Per-task: fresh per task. Persistent: kept across wakeups.",
+    "sessionIdLabel": "Session ID",
+    "sessionIdPlaceholder": "Leave empty for auto-assign",
+    "sessionIdHint": "Set a specific session ID to resume context from a previous run, or clear to start fresh.",
     "startedAt": "Started",
     "runAgent": "Run Agent",
     "runAgentDesc": "Run an agent with a custom prompt, or execute its next pending task.",
@@ -474,6 +480,23 @@
     "promptOptional": "(optional)",
     "promptPlaceholder": "Enter the prompt / instructions for the agent…",
     "promptHint": "If provided, a task will be created and run immediately. If left empty, the next pending task will be executed."
+  },
+  "context": {
+    "runs": "Runs"
+  },
+  "provider": {
+    "title": "API Providers",
+    "desc": "Manage API providers centrally. Agents can select a provider to automatically inject API keys and endpoints.",
+    "add": "Add Provider",
+    "edit": "Edit Provider",
+    "empty": "No providers configured yet.",
+    "nameLabel": "Name",
+    "typeLabel": "Type",
+    "modelLabel": "Model",
+    "selectLabel": "Provider",
+    "none": "None (use env vars)",
+    "overrideHint": "Provider settings are applied first; per-agent env vars override them.",
+    "keyUnchangedHint": "(unchanged, leave empty to keep)"
   },
   "runs": {
     "subtitle": "Token usage and cost for this project’s agents, plus recent runs.",
@@ -508,6 +531,7 @@
     "finished": "Finished",
     "model": "Model",
     "taskLabel": "Task",
+    "sessionLabel": "Session ID",
     "command": "Command",
     "errorLabel": "Error",
     "logTitle": "Run log",

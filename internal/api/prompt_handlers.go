@@ -224,6 +224,9 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 	if len(meta.Env) > 0 {
 		resp["env"] = meta.Env
 	}
+	if meta.Provider != "" {
+		resp["provider"] = meta.Provider
+	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
 

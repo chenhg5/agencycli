@@ -143,6 +143,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/auth/me", s.handleAuthMe)
 	mux.HandleFunc("PUT /api/v1/auth/password", s.handleChangePassword)
 
+	mux.HandleFunc("GET /api/v1/providers", s.handleListProviders)
+	mux.HandleFunc("POST /api/v1/providers", s.handleAddProvider)
+	mux.HandleFunc("PUT /api/v1/providers/{id}", s.handleUpdateProvider)
+	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
+
 	mux.HandleFunc("GET /api/v1/check-update", s.handleCheckUpdate)
 	mux.HandleFunc("GET /api/v1/daemon/status", s.handleDaemonStatus)
 

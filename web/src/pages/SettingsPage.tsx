@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, Plus, Server, Trash2, Pencil, X, Eye, EyeOff } from 'lucide-react'
 import { i18n } from '../i18n'
 import type { ThemeMode } from '../theme/ThemeProvider'
 import { useTheme } from '../theme/ThemeProvider'
 import { useAuth } from '../lib/auth'
-import { apiPut } from '../lib/api'
+import { apiFetch, apiPost, apiPut, apiDelete } from '../lib/api'
+import { cn } from '../lib/cn'
 
 const selectCls =
   'max-w-xs rounded-md border border-neutral-200/80 bg-neutral-50/50 px-3 py-2 text-sm text-neutral-800 outline-none transition-colors focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-200'
@@ -83,6 +84,175 @@ function ChangePasswordSection() {
   )
 }
 
+type ProviderRow = {
+  id: string; name: string; type: string; baseUrl?: string; model?: string
+  hasKey: boolean; env?: Record<string, string>
+}
+
+const PROVIDER_TYPES = ['anthropic', 'openai', 'gemini', 'custom'] as const
+
+function ProvidersSection() {
+  const { t } = useTranslation()
+  const [providers, setProviders] = useState<ProviderRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<Partial<ProviderRow> & { apiKey?: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [showKey, setShowKey] = useState(false)
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await apiFetch<ProviderRow[]>('/api/v1/providers')
+      setProviders(data ?? [])
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { void refresh() }, [refresh])
+
+  function openNew() {
+    setEditing({ name: '', type: 'anthropic', baseUrl: '', model: '', apiKey: '' })
+    setShowKey(false)
+    setErr(null)
+  }
+
+  function openEdit(p: ProviderRow) {
+    setEditing({ ...p, apiKey: '' })
+    setShowKey(false)
+    setErr(null)
+  }
+
+  async function handleSave() {
+    if (!editing || !editing.name?.trim()) return
+    setSaving(true); setErr(null)
+    try {
+      const body: any = {
+        name: editing.name,
+        type: editing.type || 'anthropic',
+        baseUrl: editing.baseUrl || '',
+        model: editing.model || '',
+      }
+      if (editing.apiKey) body.apiKey = editing.apiKey
+      if (editing.id) {
+        await apiPut(`/api/v1/providers/${editing.id}`, body)
+      } else {
+        await apiPost('/api/v1/providers', body)
+      }
+      setEditing(null)
+      await refresh()
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await apiDelete(`/api/v1/providers/${id}`)
+      await refresh()
+    } catch { /* ignore */ }
+  }
+
+  const fieldCls = 'w-full rounded-md border border-neutral-200/80 bg-neutral-50/50 px-3 py-2 text-sm outline-none transition-colors focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-200'
+
+  return (
+    <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between pb-3">
+        <div className="flex items-center gap-2">
+          <Server className="size-4 text-neutral-500 dark:text-zinc-500" strokeWidth={1.8} />
+          <h3 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('provider.title')}</h3>
+        </div>
+        <button type="button" onClick={openNew}
+          className="flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700">
+          <Plus className="size-3.5" /> {t('provider.add')}
+        </button>
+      </div>
+      <p className="mb-3 text-xs text-neutral-400 dark:text-zinc-500">{t('provider.desc')}</p>
+
+      {loading ? (
+        <p className="py-4 text-center text-sm text-neutral-400">{t('forms.loading')}</p>
+      ) : providers.length === 0 && !editing ? (
+        <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('provider.empty')}</p>
+      ) : (
+        <div className="space-y-2">
+          {providers.map(p => (
+            <div key={p.id} className="flex items-center justify-between rounded-lg border border-neutral-200/80 bg-neutral-50/30 px-4 py-2.5 dark:border-zinc-700/60 dark:bg-zinc-800/30">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-neutral-800 dark:text-zinc-200">{p.name}</span>
+                <span className="text-xs text-neutral-400 dark:text-zinc-500">
+                  {p.type}{p.model ? ` · ${p.model}` : ''}{p.baseUrl ? ` · ${p.baseUrl}` : ''}{p.hasKey ? ' · 🔑' : ''}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => openEdit(p)}
+                  className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300">
+                  <Pencil className="size-3.5" />
+                </button>
+                <button type="button" onClick={() => void handleDelete(p.id)}
+                  className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !saving && setEditing(null)}>
+          <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
+              <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">
+                {editing.id ? t('provider.edit') : t('provider.add')}
+              </h2>
+              <button type="button" onClick={() => setEditing(null)} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('provider.nameLabel')}</span>
+                <input value={editing.name ?? ''} onChange={e => setEditing({ ...editing, name: e.target.value })} className={fieldCls} placeholder="My Anthropic" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('provider.typeLabel')}</span>
+                <select value={editing.type ?? 'anthropic'} onChange={e => setEditing({ ...editing, type: e.target.value })} className={fieldCls}>
+                  {PROVIDER_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">Base URL</span>
+                <input value={editing.baseUrl ?? ''} onChange={e => setEditing({ ...editing, baseUrl: e.target.value })} className={cn(fieldCls, 'font-mono text-xs')} placeholder="https://api.anthropic.com" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('provider.modelLabel')}</span>
+                <input value={editing.model ?? ''} onChange={e => setEditing({ ...editing, model: e.target.value })} className={cn(fieldCls, 'font-mono text-xs')} placeholder="claude-sonnet-4-20250514" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">API Key</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={editing.apiKey ?? ''}
+                    onChange={e => setEditing({ ...editing, apiKey: e.target.value })}
+                    className={cn(fieldCls, 'flex-1 font-mono text-xs')}
+                    placeholder={editing.id && editing.hasKey ? t('provider.keyUnchangedHint') : 'sk-...'}
+                  />
+                  <button type="button" onClick={() => setShowKey(!showKey)}
+                    className="rounded p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </label>
+              {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-zinc-600">{t('forms.cancel')}</button>
+                <button type="button" onClick={() => void handleSave()} disabled={saving || !editing.name?.trim()} className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">{saving ? t('forms.saving') : t('forms.save')}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
@@ -148,6 +318,9 @@ export default function SettingsPage() {
           </label>
           <p className="mt-3 text-sm text-neutral-400 dark:text-zinc-500">{t('settings.themeHint')}</p>
         </section>
+
+        {/* API Providers */}
+        <ProvidersSection />
 
         {/* Change Password */}
         <ChangePasswordSection />

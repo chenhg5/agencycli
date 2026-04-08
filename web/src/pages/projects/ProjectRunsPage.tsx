@@ -412,6 +412,12 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
               )}
             </div>
           )}
+          {run.sessionId && (
+            <div>
+              <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.sessionLabel')}</span>
+              <p className="font-mono text-xs text-neutral-700 dark:text-zinc-300" title={run.sessionId}>{run.sessionId.length > 20 ? run.sessionId.slice(0, 20) + '…' : run.sessionId}</p>
+            </div>
+          )}
           <div>
             <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.colTok')}</span>
             <p className="tabular-nums text-neutral-800 dark:text-zinc-200">

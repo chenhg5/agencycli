@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
@@ -11,7 +11,7 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
-import { apiPost, apiPut } from '../../lib/api'
+import { apiFetch, apiPost, apiPut } from '../../lib/api'
 
 const AGENT_MODELS = [
   'claudecode', 'codex', 'cursor', 'gemini',
@@ -51,6 +51,7 @@ type AgentContext = {
   skills: string[]
   httpAgent?: HTTPAgentConfig
   env?: Record<string, string>
+  provider?: string
 }
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
@@ -397,6 +398,7 @@ export default function ProjectAgentDetailPage() {
                     agentName={agentName}
                     model={ctx.model}
                     initialEnv={ctx.env ?? {}}
+                    initialProvider={ctx.provider}
                     onChanged={() => setCtxReload((k) => k + 1)}
                   />
                 </div>
@@ -494,8 +496,10 @@ function SectionHeader({ icon: Icon, title }: { icon: LucideIcon; title: string 
   )
 }
 
-function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
-  project: string; agentName: string; model: string; initialEnv: Record<string, string>; onChanged: () => void
+type ProviderOption = { id: string; name: string; type: string; model?: string }
+
+function EnvEditor({ project, agentName, model, initialEnv, initialProvider, onChanged }: {
+  project: string; agentName: string; model: string; initialEnv: Record<string, string>; initialProvider?: string; onChanged: () => void
 }) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<{ key: string; value: string }[]>(() => {
@@ -504,6 +508,12 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
   })
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [providerOptions, setProviderOptions] = useState<ProviderOption[]>([])
+  const [selectedProvider, setSelectedProvider] = useState(initialProvider ?? '')
+
+  useEffect(() => {
+    void apiFetch<ProviderOption[]>('/api/v1/providers').then(data => setProviderOptions(data ?? [])).catch(() => {})
+  }, [])
 
   const wellKnown = WELL_KNOWN_ENV[model]
   const usedKeys = new Set(entries.map((e) => e.key))
@@ -531,7 +541,7 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
         const k = e.key.trim()
         if (k) env[k] = e.value
       }
-      await apiPut(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agentName)}/env`, { env })
+      await apiPut(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agentName)}/env`, { env, provider: selectedProvider })
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
       onChanged()
@@ -556,6 +566,25 @@ function EnvEditor({ project, agentName, model, initialEnv, onChanged }: {
           </button>
         </div>
       </div>
+
+      {/* Provider selector */}
+      {providerOptions.length > 0 && (
+        <div className="mb-3">
+          <label className="flex items-center gap-2">
+            <span className="text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('provider.selectLabel')}</span>
+            <select value={selectedProvider} onChange={e => { setSelectedProvider(e.target.value); setSaved(false) }}
+              className={cn(inputCls, 'w-56 text-xs')}>
+              <option value="">{t('provider.none')}</option>
+              {providerOptions.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.type}{p.model ? ` · ${p.model}` : ''})</option>
+              ))}
+            </select>
+          </label>
+          {selectedProvider && (
+            <p className="mt-1 text-[11px] text-neutral-400 dark:text-zinc-500">{t('provider.overrideHint')}</p>
+          )}
+        </div>
+      )}
 
       {wellKnown && (
         <p className="mb-3 text-xs text-neutral-400 dark:text-zinc-500">

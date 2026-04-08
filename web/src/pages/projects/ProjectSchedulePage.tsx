@@ -33,7 +33,12 @@ type CronRow = {
   lastRun?: string; lastRunStatus?: string; runCount?: number
 }
 
-type AgentSchedule = { name: string; heartbeat: HeartbeatRow; crons: CronRow[]; model?: string; agentDir?: string }
+type SessionUsage = {
+  lastInputTokens: number; totalInputTokens: number; totalOutputTokens: number
+  totalCacheRead: number; totalCostUsd: number; runCount: number; contextLimit: number
+}
+
+type AgentSchedule = { name: string; heartbeat: HeartbeatRow; crons: CronRow[]; model?: string; agentDir?: string; sessionUsage?: SessionUsage }
 type ScheduleResp = { project: string; agents: AgentSchedule[] }
 
 /* ─── shared styles ─── */
@@ -335,6 +340,10 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
   const [mdNum, setMdNum] = useState(md.num)
   const [mdUnit, setMdUnit] = useState<'m' | 'h'>(md.unit === 'h' ? 'h' : 'm')
 
+  // Session scope & ID
+  const [sessionScope, setSessionScope] = useState(hb.sessionScope || 'cycle')
+  const [sessionId, setSessionId] = useState(hb.sessionId ?? '')
+
   // Wakeup preset
   const [wakeupPreset, setWakeupPreset] = useState(hb.wakeupPreset ?? '')
   const [busy, setBusy] = useState(false)
@@ -363,6 +372,8 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
         maxTasksPerCycle: maxTasks,
         maxCycleDuration: maxDurStr,
         wakeupPreset: wakeupPreset,
+        sessionScope: sessionScope,
+        sessionId: sessionId !== (hb.sessionId ?? '') ? sessionId : undefined,
       })
       onSaved()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
@@ -438,6 +449,38 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
               <option value="require_any">{t('schedule.presetRequireAny')}</option>
             </select>
           </Field>
+
+          {/* Session */}
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-800/30">
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-zinc-400">{t('session.sessionLabel')}</p>
+            <div className="space-y-3">
+              <Field label={t('session.scopeLabel')}>
+                <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={fieldCls}>
+                  <option value="cycle">{t('session.scopeCycle')}</option>
+                  <option value="task">{t('session.scopeTask')}</option>
+                  <option value="persistent">{t('session.scopePersistent')}</option>
+                </select>
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('session.scopeHint')}</p>
+              </Field>
+              <Field label={t('session.sessionIdLabel')}>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    placeholder={t('session.sessionIdPlaceholder')}
+                    className={cn(fieldCls, 'flex-1 font-mono text-xs')}
+                  />
+                  {sessionId && (
+                    <button type="button" onClick={() => setSessionId('')}
+                      className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50">
+                      {t('session.clearSession')}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('session.sessionIdHint')}</p>
+              </Field>
+            </div>
+          </div>
 
           {/* Max tasks + duration */}
           <div className="grid grid-cols-2 gap-3">
@@ -617,6 +660,37 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
    Runtime tab
    ═══════════════════════════════════════════════════════════════ */
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return String(n)
+}
+
+function ContextUsageBar({ usage }: { usage: SessionUsage }) {
+  const { t } = useTranslation()
+  const pct = usage.contextLimit > 0 ? Math.min(100, (usage.lastInputTokens / usage.contextLimit) * 100) : 0
+  const color = pct >= 80 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-500' : 'bg-sky-500'
+  const label = `${formatTokens(usage.lastInputTokens)} / ${formatTokens(usage.contextLimit)}`
+  const detail = [
+    `${t('context.runs')}: ${usage.runCount}`,
+    `In: ${formatTokens(usage.totalInputTokens)}`,
+    `Out: ${formatTokens(usage.totalOutputTokens)}`,
+    usage.totalCostUsd > 0 ? `$${usage.totalCostUsd.toFixed(4)}` : '',
+  ].filter(Boolean).join('  ·  ')
+
+  return (
+    <div className="min-w-[120px]" title={detail}>
+      <div className="flex items-center justify-between text-[10px] tabular-nums text-neutral-500 dark:text-zinc-500">
+        <span>{label}</span>
+        <span>{pct.toFixed(0)}%</span>
+      </div>
+      <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-zinc-700">
+        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId: string }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
@@ -707,12 +781,17 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                   <td className={cn(tdCls, 'tabular-nums')}>{hb.wakeupCountToday ?? 0}</td>
                   <td className={tdCls}>
                     {hasSession ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
-                          {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(hb.sessionStartedAt)}</span>}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={hb.sessionId}>{hb.sessionId!.slice(0, 12)}…</span>
+                            {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(hb.sessionStartedAt)}</span>}
+                          </div>
+                          <CopySessionCmd model={ag.model} sessionId={hb.sessionId!} agentDir={ag.agentDir} />
                         </div>
-                        <CopySessionCmd model={ag.model} sessionId={hb.sessionId!} agentDir={ag.agentDir} />
+                        {ag.sessionUsage && ag.sessionUsage.runCount > 0 && (
+                          <ContextUsageBar usage={ag.sessionUsage} />
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-neutral-400 dark:text-zinc-500">{t('session.noSession')}</span>

@@ -463,6 +463,12 @@
     "noSession": "无会话",
     "resetSession": "重置会话",
     "resettingSession": "重置中…",
+    "clearSession": "清除",
+    "scopePersistent": "持久",
+    "scopeHint": "按周期：同一次唤醒共享会话。按任务：每个任务独立会话。持久：跨唤醒保持会话。",
+    "sessionIdLabel": "会话 ID",
+    "sessionIdPlaceholder": "留空自动分配",
+    "sessionIdHint": "指定 Session ID 可继承之前的对话上下文，清除则下次运行使用新会话。",
     "startedAt": "开始时间",
     "runAgent": "运行 Agent",
     "runAgentDesc": "输入 prompt 运行 Agent，或执行其下一个待处理任务。",
@@ -474,6 +480,23 @@
     "promptOptional": "（可选）",
     "promptPlaceholder": "输入给 Agent 的指令 / Prompt…",
     "promptHint": "如果填写了 Prompt，会先创建任务再立即运行。留空则执行下一个待处理任务。"
+  },
+  "context": {
+    "runs": "运行次数"
+  },
+  "provider": {
+    "title": "API 供应商",
+    "desc": "集中管理 API 供应商。Agent 可选择供应商以自动注入 API 密钥和端点。",
+    "add": "添加供应商",
+    "edit": "编辑供应商",
+    "empty": "暂未配置供应商。",
+    "nameLabel": "名称",
+    "typeLabel": "类型",
+    "modelLabel": "模型",
+    "selectLabel": "供应商",
+    "none": "无（使用环境变量）",
+    "overrideHint": "供应商设置优先应用，Agent 级环境变量可覆盖。",
+    "keyUnchangedHint": "（未更改，留空保持不变）"
   },
   "runs": {
     "subtitle": "本项目 Agent 的运行记录、Token 消耗与成本汇总。",
@@ -508,6 +531,7 @@
     "finished": "结束时间",
     "model": "模型",
     "taskLabel": "关联任务",
+    "sessionLabel": "会话 ID",
     "command": "命令",
     "errorLabel": "错误",
     "logTitle": "运行日志",

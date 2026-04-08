@@ -203,6 +203,61 @@ func Summarize(rows []RunRow) Summary {
 	return s
 }
 
+// SessionUsage holds aggregated token/cost data for a specific session.
+type SessionUsage struct {
+	LastInputTokens   int64   // input_tokens from the most recent run (≈ current context fill)
+	TotalInputTokens  int64
+	TotalOutputTokens int64
+	TotalCacheRead    int64
+	TotalCostUSD      float64
+	RunCount          int64
+}
+
+// ReadSessionUsage queries aggregate token usage across all runs sharing a session_id.
+// LastInputTokens comes from the latest run and approximates the current context window fill level.
+func ReadSessionUsage(db *sql.DB, sessionID string) (*SessionUsage, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	q := `SELECT
+		COALESCE(SUM(CASE WHEN input_tokens IS NOT NULL THEN input_tokens ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN output_tokens IS NOT NULL THEN output_tokens ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN cache_read_tokens IS NOT NULL THEN cache_read_tokens ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN total_cost_usd IS NOT NULL THEN total_cost_usd ELSE 0 END), 0),
+		COUNT(*)
+	FROM agent_runs WHERE session_id = ?`
+	var u SessionUsage
+	if err := db.QueryRow(q, sessionID).Scan(
+		&u.TotalInputTokens, &u.TotalOutputTokens, &u.TotalCacheRead,
+		&u.TotalCostUSD, &u.RunCount,
+	); err != nil {
+		return nil, err
+	}
+	if u.RunCount == 0 {
+		return &u, nil
+	}
+	lastQ := `SELECT COALESCE(input_tokens, 0) FROM agent_runs
+		WHERE session_id = ? AND input_tokens IS NOT NULL
+		ORDER BY started_at DESC LIMIT 1`
+	_ = db.QueryRow(lastQ, sessionID).Scan(&u.LastInputTokens)
+	return &u, nil
+}
+
+// ContextWindowLimit returns the approximate token limit for a model.
+func ContextWindowLimit(model string) int64 {
+	limits := map[string]int64{
+		"claudecode": 200_000,
+		"codex":      192_000,
+		"gemini":     1_000_000,
+		"cursor":     200_000,
+		"opencode":   200_000,
+	}
+	if n, ok := limits[model]; ok {
+		return n
+	}
+	return 200_000
+}
+
 type pairKey struct{ p, a string }
 
 // SummarizeByAgent groups rows by project and agent.

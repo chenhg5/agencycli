@@ -307,7 +307,8 @@ func (s *Server) handleSessionReset(w http.ResponseWriter, r *http.Request) {
 // ── Agent Environment Variables ──────────────────────────────────────────────
 
 type agentEnvBody struct {
-	Env map[string]string `json:"env"`
+	Env      map[string]string `json:"env"`
+	Provider *string           `json:"provider,omitempty"`
 }
 
 func (s *Server) handlePutAgentEnv(w http.ResponseWriter, r *http.Request) {
@@ -344,10 +345,13 @@ func (s *Server) handlePutAgentEnv(w http.ResponseWriter, r *http.Request) {
 	} else {
 		meta.Env = cleaned
 	}
+	if body.Provider != nil {
+		meta.Provider = strings.TrimSpace(*body.Provider)
+	}
 
 	if err := s.st.SaveAgentMeta(project, agent, meta); err != nil {
 		s.serverError(w, err)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "env": meta.Env})
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "env": meta.Env, "provider": meta.Provider})
 }

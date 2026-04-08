@@ -95,6 +95,18 @@ func IsValidModel(m AgentModel) bool {
 	return false
 }
 
+// APIProvider defines a reusable API provider configuration.
+// Stored in <root>/.agencycli/providers.yaml.
+type APIProvider struct {
+	ID      string            `yaml:"id"      json:"id"`
+	Name    string            `yaml:"name"    json:"name"`
+	Type    string            `yaml:"type"    json:"type"`     // anthropic, openai, gemini, custom
+	BaseURL string            `yaml:"base_url,omitempty" json:"baseUrl,omitempty"`
+	APIKey  string            `yaml:"api_key,omitempty"  json:"-"`
+	Model   string            `yaml:"model,omitempty"    json:"model,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty"      json:"env,omitempty"`
+}
+
 // Agency is the top-level organisational unit (the "company").
 // Stored at <root>/.agencycli/agency.yaml.
 type Agency struct {
@@ -217,6 +229,11 @@ type AgentMeta struct {
 	// HTTPAgent configures an HTTP LLM backend for this agent.
 	// Required (and only used) when Model == "http-agent".
 	HTTPAgent *HTTPAgentConfig `yaml:"http_agent,omitempty"`
+
+	// Provider references an API provider by ID from the workspace-level
+	// providers.yaml. When set, the provider's env vars are injected at runtime,
+	// overriding the per-agent Env for matching keys.
+	Provider string `yaml:"provider,omitempty"`
 
 	// Env holds per-agent environment variable overrides that are set on the
 	// agent subprocess (e.g. ANTHROPIC_MODEL, ANTHROPIC_BASE_URL, OPENAI_API_KEY).

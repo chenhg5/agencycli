@@ -110,7 +110,8 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
-	effectiveEnv := mergeEnv(os.Environ(), meta.Env)
+	agentEnv := resolveProviderEnv(r.root, meta)
+	effectiveEnv := mergeEnv(os.Environ(), agentEnv)
 	apiModel, apiBaseURL := resolveAPIModelFromEnv(model, effectiveEnv)
 	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 	innerArgs := invoker.Args(promptFile, sessionID)
@@ -220,12 +221,13 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 	ec := exitCodeOrZero(cmd)
 	if runErr != nil {
 		if sessionID != "" && isThinkingSignatureError(output) {
-			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — retrying with fresh session ===\n")
+			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — clearing heartbeat session + retrying fresh ===\n")
 			r.recordAgentRun(telemetry.KindExec, project, agentName, "", "", string(model), sandboxLabel,
 				apiModel, apiBaseURL,
 				runStarted, runFinished, entity.TaskStatusDoneFailed, &ec, result.SessionID,
 				"thinking block signature invalid, retrying fresh",
 				logPath, telemetry.FormatExecCommand(executable, args), prompt, outBuf.Bytes())
+			r.clearHeartbeatSession(project, agentName)
 			return r.ExecPrompt(project, agentName, prompt, "")
 		}
 		result.Status = entity.TaskStatusDoneFailed
@@ -275,7 +277,8 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	defer os.Remove(promptFile)
 
 	model := entity.NormaliseModel(meta.Model)
-	effectiveEnv := mergeEnv(os.Environ(), meta.Env)
+	agentEnv := resolveProviderEnv(r.root, meta)
+	effectiveEnv := mergeEnv(os.Environ(), agentEnv)
 	apiModel, apiBaseURL := resolveAPIModelFromEnv(model, effectiveEnv)
 	invoker := InvokerFor(model, meta.RunCommand, meta.AddDirs)
 
@@ -427,12 +430,13 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 
 	if runErr != nil {
 		if sessionID != "" && isThinkingSignatureError(output) {
-			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — retrying with fresh session ===\n")
+			fmt.Fprintf(logFile, "\n=== thinking block signature invalid — clearing heartbeat session + retrying fresh ===\n")
 			r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
 				apiModel, apiBaseURL,
 				runStarted, runFinished, entity.TaskStatusDoneFailed, &ec, result.SessionID,
 				"thinking block signature invalid, retrying fresh",
 				logPath, cmdSummary, fullPrompt, outBuf.Bytes())
+			r.clearHeartbeatSession(project, agentName)
 			return r.RunTask(project, agentName, task, "")
 		}
 		result.Status = entity.TaskStatusDoneFailed
@@ -466,6 +470,18 @@ func (r *Runner) ResumeTask(project, agentName string, task *entity.Task, confir
 
 func isThinkingSignatureError(output string) bool {
 	return strings.Contains(output, "Invalid signature in thinking block")
+}
+
+// clearHeartbeatSession zeroes the stored session ID in the heartbeat config
+// so subsequent heartbeat triggers don't reuse a stale/invalid session.
+func (r *Runner) clearHeartbeatSession(project, agent string) {
+	hb, err := r.ts.GetHeartbeat(project, agent)
+	if err != nil || hb == nil {
+		return
+	}
+	hb.SessionID = ""
+	hb.SessionStartedAt = nil
+	_ = r.ts.SaveHeartbeat(project, agent, hb)
 }
 
 func exitCodeOrZero(cmd *exec.Cmd) int {
@@ -766,6 +782,25 @@ func remapPromptFile(args []string, hostPath, containerPath string) []string {
 		out[i] = strings.ReplaceAll(a, hostPath, containerPath)
 	}
 	return out
+}
+
+// resolveProviderEnv loads the API provider's env vars (if any) and merges
+// them with the agent's per-agent env. Provider env is applied first, then
+// agent env overrides, so agent-level settings always win.
+func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
+	merged := make(map[string]string)
+	if meta.Provider != "" {
+		ps := store.NewProviderStore(root)
+		if provEnv, err := ps.ResolveEnv(meta.Provider); err == nil {
+			for k, v := range provEnv {
+				merged[k] = v
+			}
+		}
+	}
+	for k, v := range meta.Env {
+		merged[k] = v
+	}
+	return merged
 }
 
 // mergeEnv returns a copy of base with the entries in override applied.

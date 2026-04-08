@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/telemetry"
 )
 
 // processAlive checks whether a process with the given PID is still running.
@@ -78,9 +79,28 @@ func (s *Server) handleGetProjectSchedule(w http.ResponseWriter, r *http.Request
 			"heartbeat": heartbeatToJSON(hb),
 			"crons":     cronOut,
 		}
+		modelStr := ""
 		if meta, err := s.st.AgentMeta(name, ag.Name); err == nil && meta != nil {
-			entry["model"] = string(meta.Model)
+			modelStr = string(meta.Model)
+			entry["model"] = modelStr
 			entry["agentDir"] = s.st.AgentDir(name, ag.Name)
+		}
+		if hb.SessionID != "" {
+			if db, err := telemetry.OpenReadOnly(s.root); err == nil {
+				if usage, err := telemetry.ReadSessionUsage(db, hb.SessionID); err == nil && usage != nil && usage.RunCount > 0 {
+					ctxLimit := telemetry.ContextWindowLimit(modelStr)
+					entry["sessionUsage"] = map[string]any{
+						"lastInputTokens":   usage.LastInputTokens,
+						"totalInputTokens":  usage.TotalInputTokens,
+						"totalOutputTokens": usage.TotalOutputTokens,
+						"totalCacheRead":    usage.TotalCacheRead,
+						"totalCostUsd":      usage.TotalCostUSD,
+						"runCount":          usage.RunCount,
+						"contextLimit":      ctxLimit,
+					}
+				}
+				db.Close()
+			}
 		}
 		sortAgents = append(sortAgents, entry)
 	}
@@ -202,6 +222,7 @@ type patchHeartbeatBody struct {
 	ActiveHours      *string `json:"activeHours,omitempty"`
 	ActiveDays       *string `json:"activeDays,omitempty"`
 	SessionScope     *string `json:"sessionScope,omitempty"`
+	SessionID        *string `json:"sessionId,omitempty"`
 	WakeupPrompt     *string `json:"wakeupPrompt,omitempty"`
 	WakeupCondition  *string `json:"wakeupCondition,omitempty"`
 	WakeupPreset     *string `json:"wakeupPreset,omitempty"`
@@ -259,6 +280,18 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 	if hb.SessionScope == "" {
 		hb.SessionScope = entity.SessionScopeCycle
+	}
+	if body.SessionID != nil {
+		newSID := strings.TrimSpace(*body.SessionID)
+		if newSID != hb.SessionID {
+			hb.SessionID = newSID
+			if newSID == "" {
+				hb.SessionStartedAt = nil
+			} else {
+				now := time.Now().UTC()
+				hb.SessionStartedAt = &now
+			}
+		}
 	}
 	if body.WakeupPrompt != nil {
 		hb.WakeupPrompt = *body.WakeupPrompt
