@@ -24,6 +24,7 @@ import {
 import { CreateMessageDialog } from '../components/project/CreateMessageDialog'
 import { CreateTaskDialog } from '../components/project/CreateTaskDialog'
 import { RunAgentDialog } from '../components/project/RunAgentDialog'
+import { Pagination } from '../components/ui/Pagination'
 import {
   EditTaskModal,
   TaskDetailModal,
@@ -189,9 +190,20 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
   const [batchBusy, setBatchBusy] = useState(false)
   const firstProject = projectsAgents[0]
 
+  const [wbMsgPage, setWbMsgPage] = useState(1)
+  const wbMsgsPerPage = 20
+
   const queryString = useMemo(() => buildMsgQuery(filters), [filters])
   const state = useApiJson<MessageRow[]>(`/api/v1/workbench/messages${queryString}`, reloadKey)
   const messages = state.status === 'ok' ? (state.data ?? []) : []
+
+  const totalWbMsgPages = Math.ceil(messages.length / wbMsgsPerPage)
+  const pagedWbMessages = useMemo(() => {
+    const start = (wbMsgPage - 1) * wbMsgsPerPage
+    return messages.slice(start, start + wbMsgsPerPage)
+  }, [messages, wbMsgPage])
+
+  useEffect(() => { setWbMsgPage(1) }, [filters])
 
   function setFilter<K extends keyof Filters>(key: K, val: Filters[K]) {
     setFilters((prev) => {
@@ -330,7 +342,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
               <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
               <span className="text-xs text-neutral-400 dark:text-zinc-500">{messages.length} {t('workbench.tabMessages').toLowerCase()}</span>
             </div>
-            {messages.map((row) => {
+            {pagedWbMessages.map((row) => {
               const isSent = row.from === 'human'
               const unread = !isSent && !row.readAt
               const archived = Boolean(row.archivedAt)
@@ -405,6 +417,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
                 </div>
               )
             })}
+            <Pagination page={wbMsgPage} totalPages={totalWbMsgPages} onPageChange={setWbMsgPage} />
           </div>
         )}
       </div>
@@ -430,8 +443,19 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   if (statusFilter) qp.set('status', statusFilter)
   if (projectFilter) qp.set('project', projectFilter)
   const qs = qp.toString() ? `?${qp.toString()}` : ''
+  const [wbTaskPage, setWbTaskPage] = useState(1)
+  const wbTasksPerPage = 20
+
   const state = useApiJson<TaskRow[]>(`/api/v1/workbench/tasks${qs}`, reloadKey)
   const tasks = state.status === 'ok' ? (state.data ?? []) : []
+
+  const totalWbTaskPages = Math.ceil(tasks.length / wbTasksPerPage)
+  const pagedWbTasks = useMemo(() => {
+    const start = (wbTaskPage - 1) * wbTasksPerPage
+    return tasks.slice(start, start + wbTasksPerPage)
+  }, [tasks, wbTaskPage])
+
+  useEffect(() => { setWbTaskPage(1) }, [statusFilter, projectFilter])
 
   const projects = useMemo(() => {
     const s = new Set(tasks.map((t) => t.project))
@@ -566,7 +590,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
               <input type="checkbox" checked={allChecked} onChange={toggleAll} className="size-3.5 cursor-pointer rounded border-neutral-300 accent-sky-600 dark:border-zinc-600" />
               <span className="text-xs text-neutral-400 dark:text-zinc-500">{tasks.length} {t('workbench.tabTasks').toLowerCase()}</span>
             </div>
-            {tasks.map((row) => {
+            {pagedWbTasks.map((row) => {
               const prio = priorityLabel[row.priority] ?? priorityLabel[2]
               const sCls = statusColor[row.status] ?? statusColor.pending
               const terminal = isTerminal(row.status)
@@ -649,6 +673,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
                 </div>
               )
             })}
+            <Pagination page={wbTaskPage} totalPages={totalWbTaskPages} onPageChange={setWbTaskPage} />
           </div>
         )}
       </div>

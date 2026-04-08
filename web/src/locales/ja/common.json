@@ -572,5 +572,9 @@
     "permAllow": "許可",
     "permDeny": "拒否",
     "permAllowAll": "すべて許可"
+  },
+  "pagination": {
+    "page": "{{page}} / {{total}} ページ",
+    "perPage": "表示件数"
   }
 }

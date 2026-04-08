@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, FileText, RefreshCw, X } from 'lucide-react'
+import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
 import { cn } from '../../lib/cn'
@@ -113,11 +114,14 @@ export default function ProjectRunsPage() {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const { projectId } = useParams<{ projectId: string }>()
+  const [searchParams] = useSearchParams()
   const [windowKey, setWindowKey] = useState<WindowKey>('7d')
   const [selectedRun, setSelectedRun] = useState<RunRow | null>(null)
   const [filterKind, setFilterKind] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterAgent, setFilterAgent] = useState<string>('all')
+  const [filterAgent, setFilterAgent] = useState<string>(() => searchParams.get('agent') ?? 'all')
+  const [runsPage, setRunsPage] = useState(1)
+  const runsPerPage = 20
 
   const summaryQuery = useMemo(() => {
     const p = new URLSearchParams()
@@ -167,6 +171,16 @@ export default function ProjectRunsPage() {
       return true
     })
   }, [allRuns, filterKind, filterStatus, filterAgent])
+
+  const totalRunPages = Math.ceil(filteredRuns.length / runsPerPage)
+  const pagedRuns = useMemo(() => {
+    const start = (runsPage - 1) * runsPerPage
+    return filteredRuns.slice(start, start + runsPerPage)
+  }, [filteredRuns, runsPage])
+
+  useEffect(() => {
+    setRunsPage(1)
+  }, [filterKind, filterStatus, filterAgent, windowKey])
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -312,6 +326,7 @@ export default function ProjectRunsPage() {
           <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.noRuns')}</p>
         )}
         {runsState.status === 'ok' && runsState.data.available && filteredRuns.length > 0 && (
+          <>
           <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[700px] w-full">
               <thead>
@@ -324,7 +339,7 @@ export default function ProjectRunsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-                {filteredRuns.map((r, i) => {
+                {pagedRuns.map((r, i) => {
                   const rk = resolveKind(r)
                   const kl = kindStyles[rk] ?? { text: rk, cls: 'bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-500' }
                   return (
@@ -353,6 +368,8 @@ export default function ProjectRunsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={runsPage} totalPages={totalRunPages} onPageChange={setRunsPage} />
+          </>
         )}
       </div>
 

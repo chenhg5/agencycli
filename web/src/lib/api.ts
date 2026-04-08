@@ -1,4 +1,5 @@
 import { getStoredToken } from './auth'
+import { showToast } from '../components/ui/Toast'
 
 export function apiBase(): string {
   return (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
@@ -37,6 +38,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
       const j = JSON.parse(text) as { error?: string }
       if (j?.error) detail = j.error
     } catch { /* plain text */ }
+    showToast(detail, 'error')
     throw new Error(`${res.status} ${detail}`)
   }
   if (res.status === 204) return undefined as T

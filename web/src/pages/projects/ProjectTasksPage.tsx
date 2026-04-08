@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Archive, ListTodo, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
 import { CreateTaskDialog } from '../../components/project/CreateTaskDialog'
+import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { apiPost } from '../../lib/api'
 import { cn } from '../../lib/cn'
@@ -50,6 +51,8 @@ export default function ProjectTasksPage() {
   const [batchBusy, setBatchBusy] = useState(false)
   const [editRow, setEditRow] = useState<TaskRow | null>(null)
   const [detailRow, setDetailRow] = useState<TaskRow | null>(null)
+  const [taskPage, setTaskPage] = useState(1)
+  const tasksPerPage = 20
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
   const tasksPath = base != null ? `${base}/tasks${queryString}` : null
@@ -59,6 +62,16 @@ export default function ProjectTasksPage() {
   const agentsState = useApiJson<AgentRow[]>(agentsPath, reloadKey)
   const tasks = state.status === 'ok' ? (state.data ?? []) : []
   const agents = agentsState.status === 'ok' ? (agentsState.data ?? []) : []
+
+  const totalTaskPages = Math.ceil(tasks.length / tasksPerPage)
+  const pagedTasks = useMemo(() => {
+    const start = (taskPage - 1) * tasksPerPage
+    return tasks.slice(start, start + tasksPerPage)
+  }, [tasks, taskPage])
+
+  useEffect(() => {
+    setTaskPage(1)
+  }, [filters])
 
   function setFilter<K extends keyof Filters>(key: K, val: Filters[K]) {
     setFilters((prev) => ({ ...prev, [key]: val }))
@@ -201,7 +214,8 @@ export default function ProjectTasksPage() {
         )}
 
         {state.status === 'ok' && tasks.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
+          <>
+            <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[900px] w-full">
               <thead>
                 <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
@@ -217,7 +231,7 @@ export default function ProjectTasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-                {tasks.map((row) => {
+                {pagedTasks.map((row) => {
                   const prio = priorityLabel[row.priority] ?? priorityLabel[2]
                   const sCls = statusColor[row.status] ?? statusColor.pending
                   const terminal = isTerminal(row.status)
@@ -278,7 +292,9 @@ export default function ProjectTasksPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+            <Pagination page={taskPage} totalPages={totalTaskPages} onPageChange={setTaskPage} />
+          </>
         )}
       </div>
 

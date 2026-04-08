@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ListFilter, RefreshCw, X } from 'lucide-react'
@@ -7,6 +7,7 @@ import {
   type MessageDetailModel,
 } from '../../components/project/MessageDetailModal'
 import { CreateMessageDialog } from '../../components/project/CreateMessageDialog'
+import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { apiPost } from '../../lib/api'
 import { cn } from '../../lib/cn'
@@ -57,6 +58,8 @@ export default function ProjectMessagesPage() {
   const [selected, setSelected] = useState<MessageRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [batchBusy, setBatchBusy] = useState(false)
+  const [msgPage, setMsgPage] = useState(1)
+  const msgsPerPage = 20
 
   const queryString = useMemo(() => buildQuery(filters), [filters])
   const messagesPath = base != null ? `${base}/messages${queryString}` : null
@@ -66,6 +69,16 @@ export default function ProjectMessagesPage() {
   const agentsState = useApiJson<AgentRow[]>(agentsPath, reloadKey)
   const messages = state.status === 'ok' ? (state.data ?? []) : []
   const agents = agentsState.status === 'ok' ? (agentsState.data ?? []) : []
+
+  const totalMsgPages = Math.ceil(messages.length / msgsPerPage)
+  const pagedMessages = useMemo(() => {
+    const start = (msgPage - 1) * msgsPerPage
+    return messages.slice(start, start + msgsPerPage)
+  }, [messages, msgPage])
+
+  useEffect(() => {
+    setMsgPage(1)
+  }, [filters])
 
   function setFilter<K extends keyof Filters>(key: K, val: Filters[K]) {
     setFilters((prev) => ({ ...prev, [key]: val }))
@@ -241,7 +254,8 @@ export default function ProjectMessagesPage() {
         )}
 
         {state.status === 'ok' && messages.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
+          <>
+            <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[900px] w-full">
               <thead>
                 <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
@@ -259,7 +273,7 @@ export default function ProjectMessagesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-                {messages.map((row) => {
+                {pagedMessages.map((row) => {
                   const unread = !row.readAt
                   const archived = Boolean(row.archivedAt)
                   const isChecked = checked.has(row.id)
@@ -324,7 +338,9 @@ export default function ProjectMessagesPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+            <Pagination page={msgPage} totalPages={totalMsgPages} onPageChange={setMsgPage} />
+          </>
         )}
       </div>
     </div>

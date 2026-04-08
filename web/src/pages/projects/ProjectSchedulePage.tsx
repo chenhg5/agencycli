@@ -54,14 +54,14 @@ const selectCls = 'h-8 rounded-md border border-neutral-200/80 bg-white px-2.5 p
 const fieldCls = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
 const smallBtn = 'rounded p-1 transition-colors'
 
-type Tab = 'heartbeat' | 'cron' | 'runtime'
+type Tab = 'runtime' | 'heartbeat' | 'cron'
 
 export default function ProjectSchedulePage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const path = projectId ? `/api/v1/projects/${encodeURIComponent(projectId)}/schedule` : null
   const [reloadKey, setReloadKey] = useState(0)
-  const [tab, setTab] = useState<Tab>('heartbeat')
+  const [tab, setTab] = useState<Tab>('runtime')
   const state = useApiJson<ScheduleResp>(path, reloadKey)
   const reload = useCallback(() => setReloadKey((k) => k + 1), [])
   const agents = state.status === 'ok' ? state.data.agents : []
@@ -88,7 +88,7 @@ export default function ProjectSchedulePage() {
       {/* Tabs */}
       <div className="shrink-0 border-b border-neutral-200/80 px-6 dark:border-zinc-700/50">
         <div className="flex gap-0">
-          {(['heartbeat', 'cron', 'runtime'] as Tab[]).map((key) => (
+          {(['runtime', 'heartbeat', 'cron'] as Tab[]).map((key) => (
             <button key={key} type="button" onClick={() => setTab(key)} className={cn(tabCls, tab === key ? tabActive : tabInactive)}>
               {key === 'heartbeat' && <Heart className="mr-1.5 inline size-3.5" strokeWidth={1.8} />}
               {key === 'cron' && <CalendarClock className="mr-1.5 inline size-3.5" strokeWidth={1.8} />}
@@ -241,7 +241,13 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
                       </StatusBadge>
                     ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
                   </td>
-                  <td className={tdCls}>{hb.lastWakeup ? fmt(hb.lastWakeup) : '—'}</td>
+                  <td className={tdCls}>
+                    {hb.lastWakeup ? (
+                      <Link to={`/projects/${projectId}/runs?agent=${encodeURIComponent(projectId + '/' + ag.name)}`} className="text-neutral-700 transition-colors hover:text-sky-600 hover:underline dark:text-zinc-300 dark:hover:text-sky-400">
+                        {fmt(hb.lastWakeup)}
+                      </Link>
+                    ) : '—'}
+                  </td>
                   <td className={cn(tdCls, 'tabular-nums')}>
                     {hb.wakeupCount ?? 0}
                     {(hb.wakeupCountToday ?? 0) > 0 && <span className="ml-1 text-neutral-400 dark:text-zinc-500">({hb.wakeupCountToday} {t('schedule.today')})</span>}
@@ -775,7 +781,13 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       <span className="font-mono text-sky-700 dark:text-sky-400">{fmt(hb.nextWakeupAt)}</span>
                     ) : '—'}
                   </td>
-                  <td className={tdCls}>{hb.lastWakeup ? fmt(hb.lastWakeup) : '—'}</td>
+                  <td className={tdCls}>
+                    {hb.lastWakeup ? (
+                      <Link to={`/projects/${projectId}/runs?agent=${encodeURIComponent(projectId + '/' + ag.name)}`} className="text-neutral-700 transition-colors hover:text-sky-600 hover:underline dark:text-zinc-300 dark:hover:text-sky-400">
+                        {fmt(hb.lastWakeup)}
+                      </Link>
+                    ) : '—'}
+                  </td>
                   <td className={cn(tdCls, 'font-mono tabular-nums')}>{hb.lastCycleDuration || '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums font-semibold')}>{hb.wakeupCount ?? 0}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>{hb.wakeupCountToday ?? 0}</td>

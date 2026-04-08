@@ -14,6 +14,7 @@ import {
   projectNavKeyFromPath,
 } from './nav-config'
 import AssistantWidget from '../assistant/AssistantWidget'
+import { ToastContainer } from '../ui/Toast'
 
 export type BreadcrumbSegment = {
   label: string
@@ -25,6 +26,18 @@ function useBreadcrumbs(): BreadcrumbSegment[] {
   const { t } = useTranslation()
   const pid = projectIdFromPath(pathname)
   const pseg = projectNavKeyFromPath(pathname)
+
+  // Check for agent detail page: /projects/:id/members/:agentName
+  const agentMatch = /^\/projects\/[^/]+\/members\/([^/]+)$/.exec(pathname)
+  if (pid && agentMatch) {
+    const agentName = decodeURIComponent(agentMatch[1])
+    return [
+      { label: t('nav.projects'), to: '/projects' },
+      { label: pid, to: `/projects/${encodeURIComponent(pid)}/tasks` },
+      { label: t('projectNav.members'), to: `/projects/${encodeURIComponent(pid)}/members` },
+      { label: agentName },
+    ]
+  }
 
   if (pid && pseg) {
     return [
@@ -166,6 +179,7 @@ export function AppShell() {
           <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
         </div>
         <AssistantWidget />
+        <ToastContainer />
       </>
     </PageTabsProvider>
   )

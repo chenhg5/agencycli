@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
-  ArrowLeft, RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
+  RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
   Settings2, Users, UserCog, FileCode, Clock, Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -329,13 +329,6 @@ export default function ProjectAgentDetailPage() {
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-6 pt-5 pb-4">
-        <Link
-          to={`/projects/${encodeURIComponent(projectId)}/members`}
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} />
-          {t('projectNav.members')}
-        </Link>
         <div className="flex items-center gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
             <Bot className="size-6 text-violet-600 dark:text-violet-400" strokeWidth={1.8} />

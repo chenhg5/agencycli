@@ -572,5 +572,9 @@
     "permAllow": "Allow",
     "permDeny": "Deny",
     "permAllowAll": "Allow All"
+  },
+  "pagination": {
+    "page": "Page {{page}} of {{total}}",
+    "perPage": "Per page"
   }
 }

@@ -56,6 +56,7 @@ If unable to complete, run:
   agencycli task done --id %s --status failed --error "reason"
 `
 
+
 // Runner executes tasks for agents using their configured CLI.
 type Runner struct {
 	root       string
@@ -127,6 +128,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 			return nil, err
 		}
 		dockerCfg := cloneDockerCfg(meta.Sandbox.Docker)
+		injectProviderEnvIntoDocker(dockerCfg, agentEnv)
 		for _, addDir := range meta.AddDirs {
 			absDir, err := filepath.Abs(addDir)
 			if err != nil {
@@ -265,7 +267,6 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		return r.runTaskHTTP(project, agentName, agentDir, meta, task)
 	}
 
-	// Build full prompt.
 	fullPrompt := task.Prompt + fmt.Sprintf(systemMetaFooter,
 		task.ID, project, agentName, task.ID, task.ID, task.ID)
 
@@ -303,6 +304,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 		// Clone the docker config so we can inject extra mounts without
 		// mutating the original AgentMeta.
 		dockerCfg := cloneDockerCfg(meta.Sandbox.Docker)
+		injectProviderEnvIntoDocker(dockerCfg, agentEnv)
 
 		// Auto-mount the project's code repository at the same absolute path
 		// inside the container. This lets the agent read/write/commit code at
@@ -801,6 +803,16 @@ func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
 		merged[k] = v
 	}
 	return merged
+}
+
+// injectProviderEnvIntoDocker adds agent/provider env vars as explicit
+// KEY=VALUE entries into the Docker config's ExtraEnv. This is necessary
+// because Docker's `-e KEY` (inherit) mode only copies vars from the host
+// OS environment, but provider-resolved vars exist only in the Go map.
+func injectProviderEnvIntoDocker(cfg *entity.DockerSandboxConfig, env map[string]string) {
+	for k, v := range env {
+		cfg.ExtraEnv = append(cfg.ExtraEnv, k+"="+v)
+	}
 }
 
 // mergeEnv returns a copy of base with the entries in override applied.

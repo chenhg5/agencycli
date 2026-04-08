@@ -572,5 +572,9 @@
     "permAllow": "允许",
     "permDeny": "拒绝",
     "permAllowAll": "全部允许"
+  },
+  "pagination": {
+    "page": "第 {{page}} / {{total}} 页",
+    "perPage": "每页"
   }
 }

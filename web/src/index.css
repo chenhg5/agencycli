@@ -11,6 +11,7 @@
   --animate-slide-up: slide-up 0.25s ease-out;
   --animate-slide-down: slide-down 0.2s ease-out;
   --animate-scale-in: scale-in 0.15s ease-out;
+  --animate-slide-in-right: slideInRight 0.3s ease-out;
 }
 
 @keyframes fade-in {
@@ -32,6 +33,11 @@
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(1rem); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 html {

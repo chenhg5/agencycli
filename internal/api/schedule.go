@@ -230,6 +230,20 @@ type patchHeartbeatBody struct {
 	MaxCycleDuration *string `json:"maxCycleDuration,omitempty"`
 }
 
+func (s *Server) handleGetHeartbeat(w http.ResponseWriter, r *http.Request) {
+	name, agent, ok := s.parseProjectAgent(w, r)
+	if !ok {
+		return
+	}
+	hb, err := s.ts.GetHeartbeat(name, agent)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(heartbeatToJSON(hb))
+}
+
 func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	name, agent, ok := s.parseProjectAgent(w, r)
 	if !ok {

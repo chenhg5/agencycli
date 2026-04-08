@@ -119,13 +119,13 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 		args = append(args, fmt.Sprintf("--cpus=%.2f", cfg.CPUs))
 	}
 
-	// ── Security options ────────────────────────────────────────────────────
-	// Codex CLI uses bubblewrap (bwrap) to sandbox individual command
-	// executions. bwrap needs user namespaces, which Docker's default seccomp
-	// profile blocks. Relax it for Codex containers so bwrap can function.
+	// ── Codex sandbox bypass ─────────────────────────────────────────────────
+	// Docker IS the sandbox, so Codex's internal sandbox (bwrap/landlock) is
+	// redundant and causes read-only filesystem issues. Inject the bypass flag
+	// into innerArgs so Codex runs commands directly without nested sandboxing.
 	switch entity.NormaliseModel(model) {
 	case entity.ModelCodex, entity.ModelQoder:
-		args = append(args, "--security-opt", "seccomp=unconfined")
+		innerArgs = injectCodexSandboxBypass(innerArgs)
 	}
 
 	// ── Network ──────────────────────────────────────────────────────────────
@@ -416,4 +416,22 @@ func wellKnownEnvKeys(model entity.AgentModel) []string {
 		}
 	}
 	return append(common, modelKeys...)
+}
+
+// injectCodexSandboxBypass inserts --dangerously-bypass-approvals-and-sandbox
+// into a Codex CLI argument list. The flag disables Codex's internal sandbox
+// (bwrap/landlock), which is redundant when already running inside Docker and
+// otherwise causes read-only filesystem issues.
+//
+// The flag is inserted before the trailing "-" (stdin marker) if present.
+func injectCodexSandboxBypass(args []string) []string {
+	const flag = "--dangerously-bypass-approvals-and-sandbox"
+	n := len(args)
+	if n > 0 && args[n-1] == "-" {
+		out := make([]string, 0, n+1)
+		out = append(out, args[:n-1]...)
+		out = append(out, flag, "-")
+		return out
+	}
+	return append(args, flag)
 }
