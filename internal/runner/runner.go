@@ -471,7 +471,8 @@ func (r *Runner) ResumeTask(project, agentName string, task *entity.Task, confir
 }
 
 func isThinkingSignatureError(output string) bool {
-	return strings.Contains(output, "Invalid signature in thinking block")
+	return strings.Contains(output, "Invalid signature in thinking block") ||
+		strings.Contains(output, "Invalid `signature` in `thinking` block")
 }
 
 // clearHeartbeatSession zeroes the stored session ID in the heartbeat config
