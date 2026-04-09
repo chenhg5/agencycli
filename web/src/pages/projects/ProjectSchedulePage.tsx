@@ -50,8 +50,8 @@ const thCls = 'whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold u
 const tdCls = 'whitespace-nowrap px-4 py-3 align-middle text-center text-[13px] text-neutral-700 dark:text-zinc-300'
 const thSticky = 'sticky right-0 z-[2] bg-neutral-50 dark:bg-zinc-900'
 const tdSticky = 'sticky right-0 z-[1] bg-white group-hover:bg-neutral-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
-const selectCls = 'h-8 rounded-md border border-neutral-200/80 bg-white px-2.5 pr-7 text-[13px] text-neutral-700 outline-none hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300'
-const fieldCls = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
+const selectCls = 'h-8 rounded-md border border-neutral-200/80 bg-white px-2.5 pr-7 text-[13px] text-neutral-700 outline-none hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300 dark:[color-scheme:dark] [&>option]:dark:bg-zinc-900 [&>option]:dark:text-zinc-300'
+const fieldCls = 'w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:[color-scheme:dark] [&>option]:dark:bg-zinc-800 [&>option]:dark:text-zinc-100'
 const smallBtn = 'rounded p-1 transition-colors'
 
 type Tab = 'runtime' | 'heartbeat' | 'cron'
@@ -814,7 +814,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       value={hb.sessionScope || 'cycle'}
                       onChange={(e) => void doScopeChange(ag.name, e.target.value)}
                       disabled={scopeUpdating === ag.name}
-                      className="h-7 cursor-pointer rounded border border-neutral-200 bg-white px-1.5 text-xs outline-none hover:border-neutral-300 focus:border-sky-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                      className="h-7 cursor-pointer rounded border border-neutral-200 bg-white px-1.5 text-xs outline-none hover:border-neutral-300 focus:border-sky-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:[color-scheme:dark] [&>option]:dark:bg-zinc-800 [&>option]:dark:text-zinc-300"
                     >
                       <option value="cycle">{t('session.scopeCycle')}</option>
                       <option value="task">{t('session.scopeTask')}</option>

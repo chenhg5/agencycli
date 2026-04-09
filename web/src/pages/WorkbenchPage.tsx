@@ -72,7 +72,7 @@ type Filters = {
   from: string
 }
 
-const defaultFilters: Filters = { direction: 'all', read: 'unread', archived: 'no', from: '' }
+const defaultFilters: Filters = { direction: 'inbox', read: 'unread', archived: 'no', from: '' }
 
 function buildMsgQuery(f: Filters) {
   const p = new URLSearchParams()
@@ -90,7 +90,7 @@ function preview(body: string, max = 160) {
 }
 
 const selectCls =
-  'h-9 rounded-lg border border-neutral-200/80 bg-white px-3 pr-8 text-sm text-neutral-700 outline-none transition-colors hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600'
+  'h-9 rounded-lg border border-neutral-200/80 bg-white px-3 pr-8 text-sm text-neutral-700 outline-none transition-colors hover:border-neutral-300 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600 dark:[color-scheme:dark] [&>option]:dark:bg-zinc-900 [&>option]:dark:text-zinc-300'
 
 
 /* ── Inline reply ─────────────────────────────────────────────────────────── */
@@ -217,7 +217,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
     setChecked(new Set())
   }
   function resetFilters() { setFilters({ ...defaultFilters }); setChecked(new Set()) }
-  const hasFilters = filters.direction !== 'all' || filters.read !== 'all' || filters.archived !== 'no' || filters.from !== ''
+  const hasFilters = filters.direction !== defaultFilters.direction || filters.read !== defaultFilters.read || filters.archived !== defaultFilters.archived || filters.from !== defaultFilters.from
 
   const allChecked = messages.length > 0 && checked.size === messages.length
   const someChecked = checked.size > 0

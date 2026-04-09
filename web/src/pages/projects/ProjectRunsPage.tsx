@@ -108,7 +108,7 @@ function resolveKind(r: RunRow): string {
 }
 
 const filterSelect =
-  'rounded-lg border border-neutral-200/80 bg-white px-3 py-1.5 text-sm text-neutral-700 outline-none transition-colors focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:text-zinc-300'
+  'rounded-lg border border-neutral-200/80 bg-white px-3 py-1.5 text-sm text-neutral-700 outline-none transition-colors focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-300 dark:[color-scheme:dark] [&>option]:dark:bg-zinc-900 [&>option]:dark:text-zinc-300'
 
 export default function ProjectRunsPage() {
   const { t } = useTranslation()
