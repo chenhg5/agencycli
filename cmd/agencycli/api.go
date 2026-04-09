@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/chenhg5/agencycli/internal/api"
 	"github.com/spf13/cobra"
@@ -54,7 +58,19 @@ Authorization: Bearer <key>.`,
 			if key != "" {
 				log.Printf("API key auth enabled (set AGENCYCLI_WEB_API_KEY or --api-key)")
 			}
-			if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+
+			httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
+
+			quit := make(chan os.Signal, 1)
+			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-quit
+				log.Println("shutting down — stopping schedulers…")
+				srv.Shutdown()
+				_ = httpSrv.Shutdown(context.Background())
+			}()
+
+			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("http server: %w", err)
 			}
 			return nil

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -9,10 +10,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/chenhg5/agencycli/internal/api"
 	"github.com/chenhg5/agencycli/internal/daemon"
@@ -87,11 +90,23 @@ remote server. For local development with hot-reload, use
 			if open {
 				go openBrowser(url)
 			}
-			err = http.ListenAndServe(addr, handler)
+
+			httpSrv := &http.Server{Addr: addr, Handler: handler}
+
+			quit := make(chan os.Signal, 1)
+			signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-quit
+				log.Println("shutting down — stopping schedulers…")
+				srv.Shutdown()
+				_ = httpSrv.Shutdown(context.Background())
+			}()
+
+			err = httpSrv.ListenAndServe()
 			if logCloser != nil {
 				logCloser()
 			}
-			if err != nil {
+			if err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("http server: %w", err)
 			}
 			return nil

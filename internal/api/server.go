@@ -67,6 +67,9 @@ func (s *Server) SetUpdateChecker(fn UpdateChecker) { s.updateCheck = fn }
 // SetDaemonStatus sets the function used to get daemon status.
 func (s *Server) SetDaemonStatus(fn DaemonStatusFunc) { s.daemonStatus = fn }
 
+// Shutdown stops all managed scheduler processes.
+func (s *Server) Shutdown() { s.sched.Cleanup() }
+
 // Handler returns the root HTTP handler (includes optional auth).
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()

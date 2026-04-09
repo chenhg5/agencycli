@@ -95,7 +95,7 @@ const selectCls =
 
 /* ── Inline reply ─────────────────────────────────────────────────────────── */
 
-function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: () => void }) {
+function InlineReply({ originalFrom, mailbox, messageId, onSent }: { originalFrom: string; mailbox?: string; messageId?: string; onSent: () => void }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [body, setBody] = useState('')
@@ -107,6 +107,9 @@ function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: (
     setBusy(true)
     try {
       await apiPost('/api/v1/messages', { from: 'human', to: originalFrom, body: body.trim() })
+      if (mailbox && messageId) {
+        await apiPost('/api/v1/messages/mark-read', { mailbox, id: messageId }).catch(() => {})
+      }
       setBody('')
       setOpen(false)
       setSent(true)
@@ -117,7 +120,7 @@ function InlineReply({ originalFrom, onSent }: { originalFrom: string; onSent: (
     } finally {
       setBusy(false)
     }
-  }, [body, originalFrom, onSent])
+  }, [body, originalFrom, mailbox, messageId, onSent])
 
   if (sent) {
     return (
@@ -399,11 +402,11 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
 
                   {/* Quick actions */}
                   <div
-                    className="border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:border-zinc-700/40"
+                    className="border-t border-neutral-100/80 px-5 py-2.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 has-[textarea]:opacity-100 focus-within:opacity-100 dark:border-zinc-700/40"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center gap-3">
-                      {!isSent && <InlineReply originalFrom={row.from} onSent={reloadAndNotify} />}
+                      {!isSent && <InlineReply originalFrom={row.from} mailbox={row.mailbox} messageId={row.id} onSent={reloadAndNotify} />}
                       <div className="ml-auto flex items-center gap-2">
                         {unread && (
                           <button type="button" onClick={(e) => void quickMarkRead(row, e)} className="rounded-lg px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20">{t('forms.markAsRead')}</button>
