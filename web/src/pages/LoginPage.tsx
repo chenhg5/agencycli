@@ -8,6 +8,9 @@ type LoginResponse = {
   token: string
   username: string
   role: string
+  displayName?: string
+  projects?: { project: string; role: string }[]
+  linkedAgents?: string[]
 }
 
 export default function LoginPage() {
@@ -24,7 +27,13 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await apiLoginPost<LoginResponse>('/api/v1/auth/login', { username, password })
-      const user: AuthUser = { username: res.username, role: res.role }
+      const user: AuthUser = {
+        username: res.username,
+        role: res.role,
+        displayName: res.displayName,
+        projects: res.projects,
+        linkedAgents: res.linkedAgents,
+      }
       login(res.token, user)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

@@ -21,7 +21,8 @@ import TeamsPage from './pages/teams/TeamsPage'
 import DocsPage from './pages/docs/DocsPage'
 
 export default function App() {
-  const { token, logout } = useAuth()
+  const { token, user, logout } = useAuth()
+  const isAdmin = !user || user.role === 'admin'
 
   useEffect(() => {
     const onExpired = () => logout()
@@ -37,8 +38,8 @@ export default function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<OverviewPage />} />
-        <Route path="teams/:teamId" element={<TeamDetailPage />} />
-        <Route path="teams" element={<TeamsPage />} />
+        {isAdmin && <Route path="teams/:teamId" element={<TeamDetailPage />} />}
+        {isAdmin && <Route path="teams" element={<TeamsPage />} />}
         <Route path="projects" element={<ProjectsListPage />} />
         <Route path="projects/:projectId" element={<ProjectBranch />}>
           <Route index element={<Navigate to="tasks" replace />} />
@@ -46,13 +47,13 @@ export default function App() {
           <Route path="messages" element={<ProjectMessagesPage />} />
           <Route path="members" element={<ProjectMembersPage />} />
           <Route path="members/:agentName" element={<ProjectAgentDetailPage />} />
-          <Route path="schedule" element={<ProjectSchedulePage />} />
+          {isAdmin && <Route path="schedule" element={<ProjectSchedulePage />} />}
           <Route path="runs" element={<ProjectRunsPage />} />
-          <Route path="settings" element={<ProjectSettingsPage />} />
+          {isAdmin && <Route path="settings" element={<ProjectSettingsPage />} />}
         </Route>
         <Route path="workbench" element={<WorkbenchPage />} />
-        <Route path="skills" element={<SkillsPage />} />
-        <Route path="docs/*" element={<DocsPage />} />
+        {isAdmin && <Route path="skills" element={<SkillsPage />} />}
+        {isAdmin && <Route path="docs/*" element={<DocsPage />} />}
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

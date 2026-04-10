@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
-  Settings2, Users, UserCog, FileCode, Clock, Activity,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, CheckCircle2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 import { apiFetch, apiPost, apiPut } from '../../lib/api'
+import { Pagination } from '../../components/ui/Pagination'
 
 const AGENT_MODELS = [
   'claudecode', 'codex', 'cursor', 'gemini',
@@ -28,6 +29,7 @@ const MODEL_COLORS: Record<string, string> = {
   iflow:         'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
   'generic-cli': 'bg-neutral-200 text-neutral-700 dark:bg-zinc-700 dark:text-zinc-300',
   'http-agent':  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  human:         'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 }
 
 type SessionInfo = { sessionId?: string; sessionStartedAt?: string; sessionScope?: string }
@@ -323,15 +325,19 @@ export default function ProjectAgentDetailPage() {
 
   if (!projectId || !agentName) return null
 
+  const isHuman = ctxState.status === 'ok' && ctxState.data.model === 'human'
   const modelCls = MODEL_COLORS[ctxState.status === 'ok' ? ctxState.data.model : ''] ?? ''
+  const HeaderIcon = isHuman ? User : Bot
+  const headerIconBg = isHuman ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-violet-100 dark:bg-violet-900/30'
+  const headerIconColor = isHuman ? 'text-indigo-600 dark:text-indigo-400' : 'text-violet-600 dark:text-violet-400'
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-6 pt-5 pb-4">
         <div className="flex items-center gap-4">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
-            <Bot className="size-6 text-violet-600 dark:text-violet-400" strokeWidth={1.8} />
+          <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl', headerIconBg)}>
+            <HeaderIcon className={cn('size-6', headerIconColor)} strokeWidth={1.8} />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{agentName}</h1>
@@ -361,7 +367,21 @@ export default function ProjectAgentDetailPage() {
         {ctxState.status === 'error' && (
           <p className="py-3 text-sm text-red-500">{ctxState.error.message}</p>
         )}
-        {ctxState.status === 'ok' && (() => {
+
+        {/* ── Human member view ── */}
+        {ctxState.status === 'ok' && isHuman && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {ctxState.data.team && <InfoCard icon={Users} label={t('prompt.team')} value={ctxState.data.team} />}
+              {ctxState.data.role && <InfoCard icon={UserCog} label={t('prompt.role')} value={ctxState.data.role} />}
+            </div>
+            <HumanMessagesPanel project={projectId} member={agentName} />
+            <HumanTasksPanel project={projectId} member={agentName} />
+          </div>
+        )}
+
+        {/* ── Agent member view ── */}
+        {ctxState.status === 'ok' && !isHuman && (() => {
           const ctx = ctxState.data
           return (
             <div className="space-y-8">
@@ -632,5 +652,219 @@ function EnvEditor({ project, agentName, model, initialEnv, initialProvider, onC
         {t('members.addEnvVar')}
       </button>
     </div>
+  )
+}
+
+/* ── Human member panels ─────────────────────────────────────────────────── */
+
+type HumanMsg = {
+  id: string; from: string; to: string; subject?: string; body: string
+  sentAt: string; readAt?: string; archivedAt?: string; mailbox: string
+}
+
+function HumanMessagesPanel({ project, member }: { project: string; member: string }) {
+  const { t } = useTranslation()
+  const fmt = useFormatDateTime()
+  const [page, setPage] = useState(1)
+  const perPage = 10
+  const [reloadKey, setReloadKey] = useState(0)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  const [replyBody, setReplyBody] = useState('')
+  const [replyBusy, setReplyBusy] = useState(false)
+
+  const mailbox = `${project}/${member}`
+  const state = useApiJson<HumanMsg[]>(`/api/v1/projects/${encodeURIComponent(project)}/messages?mailbox=${encodeURIComponent(mailbox)}&archived=all`, reloadKey)
+  const messages = state.status === 'ok' ? (state.data ?? []) : []
+  const totalPages = Math.ceil(messages.length / perPage)
+  const paged = useMemo(() => messages.slice((page - 1) * perPage, page * perPage), [messages, page])
+
+  async function sendReply(msg: HumanMsg) {
+    if (!replyBody.trim()) return
+    setReplyBusy(true)
+    try {
+      await apiPost('/api/v1/messages', { from: 'human', to: msg.from, body: replyBody.trim() })
+      await apiPost('/api/v1/messages/mark-read', { mailbox: msg.mailbox, id: msg.id }).catch(() => {})
+      setReplyBody('')
+      setReplyTo(null)
+      setReloadKey((k) => k + 1)
+    } catch (e) { alert(String(e)) }
+    finally { setReplyBusy(false) }
+  }
+
+  async function markRead(msg: HumanMsg) {
+    await apiPost('/api/v1/messages/mark-read', { mailbox: msg.mailbox, id: msg.id })
+    setReloadKey((k) => k + 1)
+  }
+
+  return (
+    <section>
+      <SectionHeader icon={Mail} title={t('workbench.tabMessages')} />
+      <div className="mt-3 rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+        {state.status === 'loading' && (
+          <div className="flex items-center gap-2 py-8 justify-center">
+            <div className="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
+          </div>
+        )}
+        {state.status === 'ok' && messages.length === 0 && (
+          <div className="flex flex-col items-center py-10 text-center">
+            <Mail className="mb-2 size-6 text-neutral-300 dark:text-zinc-600" strokeWidth={1.5} />
+            <p className="text-sm text-neutral-400 dark:text-zinc-500">{t('workbench.emptyMessages')}</p>
+          </div>
+        )}
+        {state.status === 'ok' && messages.length > 0 && (
+          <div className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
+            {paged.map((msg) => {
+              const unread = !msg.readAt
+              const isExpanded = expanded === msg.id
+              const isReplying = replyTo === msg.id
+              return (
+                <div key={msg.id} className="px-4 py-3">
+                  <div
+                    className="flex cursor-pointer items-center gap-3"
+                    onClick={() => { setExpanded(isExpanded ? null : msg.id); setReplyTo(null) }}
+                  >
+                    {unread && <span className="size-2 shrink-0 rounded-full bg-sky-500" />}
+                    {!unread && <span className="size-2 shrink-0" />}
+                    <span className="font-mono text-xs font-semibold text-neutral-700 dark:text-zinc-300">{msg.from}</span>
+                    <span className="text-xs text-neutral-400 dark:text-zinc-500">→ {msg.to}</span>
+                    <span className="ml-auto shrink-0 text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(msg.sentAt)}</span>
+                  </div>
+                  {!isExpanded && (
+                    <p className="mt-1 truncate pl-5 text-xs text-neutral-500 dark:text-zinc-500">
+                      {msg.body.replace(/\s+/g, ' ').slice(0, 120)}
+                    </p>
+                  )}
+                  {isExpanded && (
+                    <div className="mt-2 pl-5">
+                      <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none rounded-md border border-neutral-100 bg-neutral-50/50 p-3 text-xs leading-relaxed dark:border-zinc-700/40 dark:bg-zinc-800/30 [&_pre]:overflow-x-auto">
+                        <Markdown remarkPlugins={[remarkGfm]}>{msg.body}</Markdown>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        {unread && (
+                          <button type="button" onClick={() => void markRead(msg)}
+                            className="rounded-md px-2 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20">
+                            {t('forms.markAsRead')}
+                          </button>
+                        )}
+                        <button type="button" onClick={() => { setReplyTo(isReplying ? null : msg.id); setReplyBody('') }}
+                          className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20">
+                          <Reply className="size-3" strokeWidth={2} />
+                          {t('workbench.replyTo')}
+                        </button>
+                      </div>
+                      {isReplying && (
+                        <div className="mt-2 rounded-md border border-sky-200/60 bg-sky-50/30 p-3 dark:border-sky-800/40 dark:bg-sky-950/20">
+                          <textarea
+                            autoFocus value={replyBody} onChange={(e) => setReplyBody(e.target.value)}
+                            rows={3} placeholder={t('forms.body')}
+                            className="block w-full resize-y rounded-md border border-neutral-200 bg-white p-2 text-xs outline-none focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                          />
+                          <div className="mt-2 flex justify-end gap-2">
+                            <button type="button" onClick={() => setReplyTo(null)}
+                              className="rounded-md px-2.5 py-1 text-[11px] text-neutral-500 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800">
+                              {t('forms.cancel')}
+                            </button>
+                            <button type="button" disabled={replyBusy || !replyBody.trim()} onClick={() => void sendReply(msg)}
+                              className="flex items-center gap-1 rounded-md bg-sky-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:opacity-50">
+                              <Send className="size-3" strokeWidth={2} />
+                              {replyBusy ? t('forms.sending') : t('forms.send')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
+    </section>
+  )
+}
+
+type HumanTask = {
+  id: string; project: string; agent: string; assignee?: string
+  title: string; prompt?: string; status: string; priority: number
+  type?: string; createdAt: string; updatedAt: string
+}
+
+const taskStatusCls: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  running: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  done_success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  done_failed: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  cancelled: 'bg-neutral-100 text-neutral-500 dark:bg-zinc-800 dark:text-zinc-500',
+  awaiting_confirmation: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+}
+
+function HumanTasksPanel({ project, member }: { project: string; member: string }) {
+  const { t } = useTranslation()
+  const fmt = useFormatDateTime()
+  const [page, setPage] = useState(1)
+  const perPage = 10
+  const [reloadKey, setReloadKey] = useState(0)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const state = useApiJson<HumanTask[]>(`/api/v1/projects/${encodeURIComponent(project)}/tasks?agent=${encodeURIComponent(member)}`, reloadKey)
+  const tasks = state.status === 'ok' ? (state.data ?? []) : []
+  const totalPages = Math.ceil(tasks.length / perPage)
+  const paged = useMemo(() => tasks.slice((page - 1) * perPage, page * perPage), [tasks, page])
+
+  async function completeTask(task: HumanTask) {
+    await apiPost('/api/v1/tasks/cancel', { project: task.project, agent: task.agent, id: task.id })
+    setReloadKey((k) => k + 1)
+  }
+
+  return (
+    <section>
+      <SectionHeader icon={ListTodo} title={t('workbench.tabTasks')} />
+      <div className="mt-3 rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+        {state.status === 'loading' && (
+          <div className="flex items-center gap-2 py-8 justify-center">
+            <div className="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
+          </div>
+        )}
+        {state.status === 'ok' && tasks.length === 0 && (
+          <div className="flex flex-col items-center py-10 text-center">
+            <ListTodo className="mb-2 size-6 text-neutral-300 dark:text-zinc-600" strokeWidth={1.5} />
+            <p className="text-sm text-neutral-400 dark:text-zinc-500">{t('workbench.emptyTasks')}</p>
+          </div>
+        )}
+        {state.status === 'ok' && tasks.length > 0 && (
+          <div className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
+            {paged.map((task) => {
+              const sCls = taskStatusCls[task.status] ?? taskStatusCls.pending
+              const isExpanded = expanded === task.id
+              return (
+                <div key={task.id} className="px-4 py-3">
+                  <div
+                    className="flex cursor-pointer items-center gap-3"
+                    onClick={() => setExpanded(isExpanded ? null : task.id)}
+                  >
+                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', sCls)}>
+                      {t(`tasks.status.${task.status}`, { defaultValue: task.status })}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-800 dark:text-zinc-200">{task.title}</span>
+                    <span className="shrink-0 text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(task.updatedAt)}</span>
+                  </div>
+                  {isExpanded && task.prompt && (
+                    <div className="mt-2 pl-5">
+                      <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none rounded-md border border-neutral-100 bg-neutral-50/50 p-3 text-xs leading-relaxed dark:border-zinc-700/40 dark:bg-zinc-800/30 [&_pre]:overflow-x-auto">
+                        <Markdown remarkPlugins={[remarkGfm]}>{task.prompt}</Markdown>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      </div>
+    </section>
   )
 }

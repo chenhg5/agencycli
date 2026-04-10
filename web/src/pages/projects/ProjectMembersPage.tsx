@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Bot } from 'lucide-react'
+import { Users, Bot, User } from 'lucide-react'
 import { HireAgentDialog } from '../../components/project/HireAgentDialog'
 import { cn } from '../../lib/cn'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
@@ -18,6 +18,7 @@ const MODEL_COLORS: Record<string, string> = {
   iflow:         'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
   'generic-cli': 'bg-neutral-200 text-neutral-700 dark:bg-zinc-700 dark:text-zinc-300',
   'http-agent':  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  human:         'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 }
 
 type AgentRow = {
@@ -81,7 +82,15 @@ export default function ProjectMembersPage() {
         {agentsState.status === 'ok' && members.length > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {members.map((row) => {
+              const isHuman = row.model === 'human'
               const modelCls = MODEL_COLORS[row.model] ?? 'bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-400'
+              const IconCmp = isHuman ? User : Bot
+              const iconBg = isHuman
+                ? 'bg-indigo-100 dark:bg-indigo-900/30'
+                : 'bg-violet-100 dark:bg-violet-900/30'
+              const iconColor = isHuman
+                ? 'text-indigo-600 dark:text-indigo-400'
+                : 'text-violet-600 dark:text-violet-400'
               return (
                 <Link
                   key={row.name}
@@ -89,8 +98,8 @@ export default function ProjectMembersPage() {
                   className="group flex flex-col rounded-xl border border-neutral-200/80 bg-white p-4 transition-all duration-150 hover:border-neutral-300 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-zinc-700"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                      <Bot className="size-5 text-violet-600 dark:text-violet-400" strokeWidth={1.8} />
+                    <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', iconBg)}>
+                      <IconCmp className={cn('size-5', iconColor)} strokeWidth={1.8} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-mono text-sm font-semibold text-neutral-900 dark:text-zinc-100">{row.name}</p>

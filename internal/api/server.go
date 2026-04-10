@@ -152,6 +152,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/providers/{id}", s.handleUpdateProvider)
 	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
 
+	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
+	mux.HandleFunc("POST /api/v1/users", s.handleCreateUser)
+	mux.HandleFunc("GET /api/v1/users/{username}", s.handleGetUser)
+	mux.HandleFunc("PUT /api/v1/users/{username}", s.handleUpdateUser)
+	mux.HandleFunc("DELETE /api/v1/users/{username}", s.handleDeleteUser)
+
 	mux.HandleFunc("GET /api/v1/check-update", s.handleCheckUpdate)
 	mux.HandleFunc("GET /api/v1/daemon/status", s.handleDaemonStatus)
 
@@ -193,6 +199,11 @@ func (s *Server) withTokenAuth(next http.Handler) http.Handler {
 		if !ok {
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid or expired token"})
+			return
+		}
+		if u := s.users.GetUser(username); u != nil && u.Disabled {
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "account disabled"})
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxUserKey, username)
@@ -373,15 +384,21 @@ func (s *Server) handleTeamDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := s.st.ListProjects()
 	if err != nil {
 		s.serverError(w, err)
 		return
 	}
 	sort.Slice(projects, func(i, j int) bool { return projects[i].Name < projects[j].Name })
+	cur := s.currentUser(r)
 	out := make([]map[string]any, 0, len(projects))
 	for _, p := range projects {
+		if cur.Role != RoleAdmin {
+			if _, ok := s.users.HasProjectAccess(cur.Username, p.Name); !ok {
+				continue
+			}
+		}
 		out = append(out, map[string]any{
 			"name":        p.Name,
 			"description": p.Description,
@@ -391,8 +408,19 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
+func (s *Server) checkProjectAccess(w http.ResponseWriter, r *http.Request, project string) bool {
+	if !s.canAccessProject(r, project) {
+		s.jsonError(w, http.StatusForbidden, "no access to this project")
+		return false
+	}
+	return true
+}
+
 func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if !s.checkProjectAccess(w, r, name) {
+		return
+	}
 	p, err := s.st.Project(name)
 	if err != nil {
 		if isNotFoundErr(err) {
@@ -411,6 +439,9 @@ func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleProjectAgents(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if !s.checkProjectAccess(w, r, name) {
+		return
+	}
 	if _, err := s.st.Project(name); err != nil {
 		if isNotFoundErr(err) {
 			s.jsonError(w, http.StatusNotFound, "project not found")
@@ -460,6 +491,9 @@ type taskRow struct {
 
 func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if !s.checkProjectAccess(w, r, name) {
+		return
+	}
 	if _, err := s.st.Project(name); err != nil {
 		if isNotFoundErr(err) {
 			s.jsonError(w, http.StatusNotFound, "project not found")
@@ -565,6 +599,9 @@ type msgRow struct {
 
 func (s *Server) handleProjectMessages(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if !s.checkProjectAccess(w, r, name) {
+		return
+	}
 	if _, err := s.st.Project(name); err != nil {
 		if isNotFoundErr(err) {
 			s.jsonError(w, http.StatusNotFound, "project not found")

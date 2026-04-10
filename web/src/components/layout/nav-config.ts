@@ -32,11 +32,14 @@ export type NavItem = {
   icon: LucideIcon
   /** 为 true 时，子路径也算激活（如 /projects/demo/tasks） */
   activePrefix?: string
+  /** admin-only nav items are hidden for member users */
+  adminOnly?: boolean
 }
 
 export type ProjectNavItem = {
   segment: ProjectNavKey
   icon: LucideIcon
+  adminOnly?: boolean
 }
 
 /** 工作区一级导航（团队 = 编制，项目 = 干活入口） */
@@ -49,8 +52,8 @@ export const workspaceNav: NavItem[] = [
     icon: FolderKanban,
     activePrefix: '/projects',
   },
-  { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams' },
-  { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills' },
+  { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams', adminOnly: true },
+  { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills', adminOnly: true },
   { to: '/docs', navKey: 'docs', icon: BookOpen, activePrefix: '/docs' },
   { to: '/settings', navKey: 'settings', icon: Settings, activePrefix: '/settings' },
 ]
@@ -59,9 +62,9 @@ export const projectSubNav: ProjectNavItem[] = [
   { segment: 'tasks', icon: ListTodo },
   { segment: 'messages', icon: MessageSquare },
   { segment: 'members', icon: Users },
-  { segment: 'schedule', icon: CalendarClock },
+  { segment: 'schedule', icon: CalendarClock, adminOnly: true },
   { segment: 'runs', icon: BarChart3 },
-  { segment: 'settings', icon: Settings },
+  { segment: 'settings', icon: Settings, adminOnly: true },
 ]
 
 export function navKeyFromPath(pathname: string): NavKey {

@@ -31,55 +31,76 @@ func (s *Server) handleWorkbenchMessages(w http.ResponseWriter, r *http.Request)
 		direction = "all"
 	}
 
+	cur := s.currentUser(r)
+	isAdmin := cur.Role == RoleAdmin
 	useAll := archivedMode == "all" || archivedMode == "yes"
 	seen := map[string]bool{}
 	var msgs []*msgWithMailbox
 
-	// Inbox: messages TO human (stored in human mailbox)
-	if direction == "inbox" || direction == "all" {
-		var raw []*entity.Message
-		var err error
-		if useAll {
-			raw, err = s.ts.ListAllMessages("human")
-		} else {
-			raw, err = s.ts.ListMessages("human")
-		}
-		if err != nil {
-			s.serverError(w, err)
-			return
-		}
-		for _, m := range raw {
-			if m != nil && !seen[m.ID] {
-				seen[m.ID] = true
-				msgs = append(msgs, &msgWithMailbox{m, "human"})
+	if isAdmin {
+		// Admin: show all messages to/from human
+		if direction == "inbox" || direction == "all" {
+			var raw []*entity.Message
+			var err error
+			if useAll {
+				raw, err = s.ts.ListAllMessages("human")
+			} else {
+				raw, err = s.ts.ListMessages("human")
 			}
-		}
-	}
-
-	// Sent: messages FROM human (stored in each agent's mailbox)
-	if direction == "sent" || direction == "all" {
-		projects, err := s.ts.ListProjects()
-		if err != nil {
-			s.serverError(w, err)
-			return
-		}
-		for _, proj := range projects {
-			agents, err := s.ts.ListAgents(proj)
 			if err != nil {
-				continue
+				s.serverError(w, err)
+				return
 			}
-			for _, ag := range agents {
-				mailbox := proj + "/" + ag
+			for _, m := range raw {
+				if m != nil && !seen[m.ID] {
+					seen[m.ID] = true
+					msgs = append(msgs, &msgWithMailbox{m, "human"})
+				}
+			}
+		}
+		if direction == "sent" || direction == "all" {
+			projects, err := s.ts.ListProjects()
+			if err != nil {
+				s.serverError(w, err)
+				return
+			}
+			for _, proj := range projects {
+				agents, err := s.ts.ListAgents(proj)
+				if err != nil {
+					continue
+				}
+				for _, ag := range agents {
+					mailbox := proj + "/" + ag
+					var raw []*entity.Message
+					if useAll {
+						raw, _ = s.ts.ListAllMessages(mailbox)
+					} else {
+						raw, _ = s.ts.ListMessages(mailbox)
+					}
+					for _, m := range raw {
+						if m != nil && m.From == "human" && !seen[m.ID] {
+							seen[m.ID] = true
+							msgs = append(msgs, &msgWithMailbox{m, mailbox})
+						}
+					}
+				}
+			}
+		}
+	} else {
+		// Member: show messages for their linked agents only
+		linkedAgents := cur.LinkedAgents
+		for _, la := range linkedAgents {
+			if direction == "inbox" || direction == "all" {
 				var raw []*entity.Message
 				if useAll {
-					raw, _ = s.ts.ListAllMessages(mailbox)
+					raw, _ = s.ts.ListAllMessages(la)
 				} else {
-					raw, _ = s.ts.ListMessages(mailbox)
+					raw, _ = s.ts.ListMessages(la)
 				}
 				for _, m := range raw {
-					if m != nil && m.From == "human" && !seen[m.ID] {
+					if m != nil && !seen[m.ID] {
 						seen[m.ID] = true
-						msgs = append(msgs, &msgWithMailbox{m, mailbox})
+						msgs = append(msgs, &msgWithMailbox{m, la})
 					}
 				}
 			}
@@ -129,14 +150,26 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 	statusFilter := strings.TrimSpace(q.Get("status"))
 	projectFilter := strings.TrimSpace(q.Get("project"))
 
+	cur := s.currentUser(r)
+
 	isWakeup := func(t *entity.Task) bool {
 		return strings.HasPrefix(t.Title, "[wakeup]") || t.Type == "wakeup"
+	}
+
+	linkedSet := map[string]bool{}
+	for _, la := range cur.LinkedAgents {
+		linkedSet[la] = true
 	}
 
 	rows := make([]taskRow, 0)
 	for _, proj := range projects {
 		if projectFilter != "" && proj != projectFilter {
 			continue
+		}
+		if cur.Role != RoleAdmin {
+			if _, ok := s.users.HasProjectAccess(cur.Username, proj); !ok {
+				continue
+			}
 		}
 		agents, err := s.ts.ListAgents(proj)
 		if err != nil {
@@ -150,9 +183,16 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 				if t == nil || isWakeup(t) {
 					continue
 				}
-				if ag != "human" && t.Assignee != "human" {
-				continue
-			}
+				if cur.Role == RoleAdmin {
+					if ag != "human" && t.Assignee != "human" {
+						continue
+					}
+				} else {
+					agentID := proj + "/" + ag
+					if !linkedSet[agentID] && t.Assignee != cur.Username {
+						continue
+					}
+				}
 				if statusFilter != "" && string(t.Status) != statusFilter {
 					continue
 				}

@@ -23,7 +23,11 @@ PLATFORMS := \
 	windows/amd64 \
 	windows/arm64
 
-.PHONY: build build-go install clean test lint release release-all web web-install web-dev $(PLATFORMS)
+.PHONY: build build-go install deploy clean test lint release release-all web web-install web-dev $(PLATFORMS)
+
+# ── Local deploy paths ────────────────────────────────────────────────────────
+INSTALL_BIN ?= /root/.local/bin/agencycli
+AGENCY_DIR  ?= /root/code/TechStudio
 
 # ── Web frontend ──────────────────────────────────────────────────────────────
 
@@ -54,6 +58,20 @@ build: web build-go
 install: web
 	go install -ldflags "$(LDFLAGS)" $(MAIN)
 	@echo "Installed $(BINARY) $(VERSION) (with web console)"
+
+# ── One-step local deploy (build → install → restart supervisor) ──────────────
+
+deploy: build
+	@mkdir -p $(dir $(INSTALL_BIN))
+	cp -f $(BUILD_DIR)/$(BINARY) $(INSTALL_BIN)
+	@echo "  ✓ Installed to $(INSTALL_BIN)"
+	@if supervisorctl status agencycli >/dev/null 2>&1; then \
+		supervisorctl restart agencycli && echo "  ✓ Restarted supervisor:agencycli"; \
+	else \
+		echo "  ⚠ supervisor program 'agencycli' not found — run: supervisorctl reread && supervisorctl update"; \
+	fi
+	@echo ""
+	@echo "Deploy complete: $(INSTALL_BIN) ($(VERSION))"
 
 # ── Cross-platform release ────────────────────────────────────────────────────
 # Web is built once; each platform embeds the same dist/ via go:embed.

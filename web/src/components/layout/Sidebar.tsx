@@ -8,6 +8,7 @@ import {
   isNavActive,
 } from './nav-config'
 import { cn } from '../../lib/cn'
+import { useAuth } from '../../lib/auth'
 
 const linkBase =
   'group relative flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-all duration-150 outline-none select-none'
@@ -29,6 +30,8 @@ const subActive =
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation()
   const { pathname } = useLocation()
+  const { user } = useAuth()
+  const isAdmin = !user || user.role === 'admin'
   const projectId = projectIdFromPath(pathname)
 
   return (
@@ -61,7 +64,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         className={cn('flex flex-1 flex-col gap-0.5 overflow-y-auto py-3', collapsed ? 'px-1.5' : 'px-2')}
         aria-label={t('aria.mainNavigation')}
       >
-        {workspaceNav.map(({ to, navKey, icon: Icon, activePrefix }) => {
+        {workspaceNav.filter(item => !item.adminOnly || isAdmin).map(({ to, navKey, icon: Icon, activePrefix }) => {
           const end = to === '/'
           let active = isNavActive(pathname, to, end, activePrefix)
           if (navKey === 'projects' && projectId) {
@@ -109,7 +112,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                     {projectId}
                   </p>
                   <div className="space-y-px">
-                    {projectSubNav.map(({ segment, icon: SubIcon }) => {
+                    {projectSubNav.filter(item => !item.adminOnly || isAdmin).map(({ segment, icon: SubIcon }) => {
                       const subTo = `/projects/${encodeURIComponent(projectId)}/${segment}`
                       const subActiveState =
                         pathname === subTo || pathname.startsWith(`${subTo}/`)

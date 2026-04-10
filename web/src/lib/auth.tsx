@@ -3,9 +3,17 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 const TOKEN_KEY = 'agencycli-token'
 const USER_KEY = 'agencycli-user'
 
+export type ProjectAccess = {
+  project: string
+  role: string // viewer | operator | manager
+}
+
 export type AuthUser = {
   username: string
-  role: string
+  role: string // admin | member
+  displayName?: string
+  projects?: ProjectAccess[]
+  linkedAgents?: string[]
 }
 
 type AuthContextType = {
