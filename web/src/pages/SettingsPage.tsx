@@ -86,6 +86,7 @@ function ChangePasswordSection() {
 
 type UserRow = {
   username: string; role: string; displayName?: string
+  email?: string; avatar?: string; phone?: string; bio?: string
   projects?: { project: string; role: string }[]
   linkedAgents?: string[]; disabled?: boolean; createdAt?: string
 }
@@ -102,6 +103,7 @@ function UsersSection() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<{
     isNew: boolean; username: string; displayName: string; role: string
+    email: string; avatar: string; phone: string; bio: string
     password: string; disabled: boolean
     projects: { project: string; role: string }[]
     linkedAgents: string[]
@@ -125,13 +127,14 @@ function UsersSection() {
   useEffect(() => { void refresh() }, [refresh])
 
   function openNew() {
-    setEditing({ isNew: true, username: '', displayName: '', role: 'member', password: '', disabled: false, projects: [], linkedAgents: [] })
+    setEditing({ isNew: true, username: '', displayName: '', role: 'member', email: '', avatar: '', phone: '', bio: '', password: '', disabled: false, projects: [], linkedAgents: [] })
     setShowPwd(false); setErr(null)
   }
 
   function openEdit(u: UserRow) {
     setEditing({
       isNew: false, username: u.username, displayName: u.displayName ?? '',
+      email: u.email ?? '', avatar: u.avatar ?? '', phone: u.phone ?? '', bio: u.bio ?? '',
       role: u.role, password: '', disabled: u.disabled ?? false,
       projects: u.projects ?? [], linkedAgents: u.linkedAgents ?? [],
     })
@@ -149,6 +152,7 @@ function UsersSection() {
         await apiPost('/api/v1/users', {
           username: editing.username.trim(), password: editing.password,
           role: editing.role, displayName: editing.displayName,
+          email: editing.email, avatar: editing.avatar, phone: editing.phone, bio: editing.bio,
         })
         if (editing.projects.length || editing.linkedAgents.length) {
           await apiPut(`/api/v1/users/${encodeURIComponent(editing.username.trim())}`, {
@@ -158,6 +162,7 @@ function UsersSection() {
       } else {
         const body: Record<string, unknown> = {
           role: editing.role, displayName: editing.displayName,
+          email: editing.email, avatar: editing.avatar, phone: editing.phone, bio: editing.bio,
           disabled: editing.disabled, projects: editing.projects,
           linkedAgents: editing.linkedAgents,
         }
@@ -300,6 +305,30 @@ function UsersSection() {
                     {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
+              </label>
+
+              {/* Email */}
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.email')}</span>
+                <input type="email" value={editing.email} onChange={e => setEditing({ ...editing, email: e.target.value })} className={fieldCls} placeholder="alice@example.com" />
+              </label>
+
+              {/* Phone */}
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.phone')}</span>
+                <input value={editing.phone} onChange={e => setEditing({ ...editing, phone: e.target.value })} className={fieldCls} placeholder="+86 138..." />
+              </label>
+
+              {/* Avatar URL */}
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.avatar')}</span>
+                <input value={editing.avatar} onChange={e => setEditing({ ...editing, avatar: e.target.value })} className={fieldCls} placeholder="https://..." />
+              </label>
+
+              {/* Bio */}
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.bio')}</span>
+                <textarea value={editing.bio} onChange={e => setEditing({ ...editing, bio: e.target.value })} rows={2} className={cn(fieldCls, 'resize-none')} />
               </label>
 
               {/* Role */}

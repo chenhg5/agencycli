@@ -19,6 +19,8 @@ import ProjectTasksPage from './pages/projects/ProjectTasksPage'
 import TeamDetailPage from './pages/teams/TeamDetailPage'
 import TeamsPage from './pages/teams/TeamsPage'
 import DocsPage from './pages/docs/DocsPage'
+import PeoplePage from './pages/PeoplePage'
+import PersonDetailPage from './pages/PersonDetailPage'
 
 export default function App() {
   const { token, user, logout } = useAuth()
@@ -51,6 +53,8 @@ export default function App() {
           <Route path="runs" element={<ProjectRunsPage />} />
           {isAdmin && <Route path="settings" element={<ProjectSettingsPage />} />}
         </Route>
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="people/:username" element={<PersonDetailPage />} />
         <Route path="workbench" element={<WorkbenchPage />} />
         {isAdmin && <Route path="skills" element={<SkillsPage />} />}
         {isAdmin && <Route path="docs/*" element={<DocsPage />} />}

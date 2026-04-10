@@ -40,6 +40,10 @@ type userRecord struct {
 	Hash         string          `json:"hash"`
 	Role         string          `json:"role"` // admin | member
 	DisplayName  string          `json:"displayName,omitempty"`
+	Email        string          `json:"email,omitempty"`
+	Avatar       string          `json:"avatar,omitempty"` // URL
+	Phone        string          `json:"phone,omitempty"`
+	Bio          string          `json:"bio,omitempty"`
 	Projects     []projectAccess `json:"projects,omitempty"`
 	LinkedAgents []string        `json:"linkedAgents,omitempty"`
 	Disabled     bool            `json:"disabled,omitempty"`
@@ -129,7 +133,7 @@ func (s *UserStore) ListUsers() []userRecord {
 	return out
 }
 
-func (s *UserStore) CreateUser(username, password, role, displayName string) error {
+func (s *UserStore) CreateUser(username, password, role, displayName, email, avatar, phone, bio string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, u := range s.data.Users {
@@ -149,13 +153,17 @@ func (s *UserStore) CreateUser(username, password, role, displayName string) err
 		Hash:        string(hash),
 		Role:        role,
 		DisplayName: displayName,
+		Email:       email,
+		Avatar:      avatar,
+		Phone:       phone,
+		Bio:         bio,
 		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 	})
 	s.save()
 	return nil
 }
 
-func (s *UserStore) UpdateUser(username string, role, displayName *string, disabled *bool, projects []projectAccess, linkedAgents []string, newPassword *string) error {
+func (s *UserStore) UpdateUser(username string, role, displayName, email, avatar, phone, bio *string, disabled *bool, projects []projectAccess, linkedAgents []string, newPassword *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.data.Users {
@@ -168,6 +176,18 @@ func (s *UserStore) UpdateUser(username string, role, displayName *string, disab
 		}
 		if displayName != nil {
 			u.DisplayName = *displayName
+		}
+		if email != nil {
+			u.Email = *email
+		}
+		if avatar != nil {
+			u.Avatar = *avatar
+		}
+		if phone != nil {
+			u.Phone = *phone
+		}
+		if bio != nil {
+			u.Bio = *bio
 		}
 		if disabled != nil {
 			u.Disabled = *disabled
@@ -421,6 +441,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		"username":     user.Username,
 		"role":         user.Role,
 		"displayName":  user.DisplayName,
+		"email":        user.Email,
+		"avatar":       user.Avatar,
 		"projects":     user.Projects,
 		"linkedAgents": user.LinkedAgents,
 	})
@@ -437,6 +459,8 @@ func (s *Server) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		"username":     user.Username,
 		"role":         user.Role,
 		"displayName":  user.DisplayName,
+		"email":        user.Email,
+		"avatar":       user.Avatar,
 		"projects":     user.Projects,
 		"linkedAgents": user.LinkedAgents,
 	})
@@ -485,6 +509,10 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		Username     string          `json:"username"`
 		Role         string          `json:"role"`
 		DisplayName  string          `json:"displayName,omitempty"`
+		Email        string          `json:"email,omitempty"`
+		Avatar       string          `json:"avatar,omitempty"`
+		Phone        string          `json:"phone,omitempty"`
+		Bio          string          `json:"bio,omitempty"`
 		Projects     []projectAccess `json:"projects,omitempty"`
 		LinkedAgents []string        `json:"linkedAgents,omitempty"`
 		Disabled     bool            `json:"disabled,omitempty"`
@@ -496,6 +524,10 @@ func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
 			Username:     u.Username,
 			Role:         u.Role,
 			DisplayName:  u.DisplayName,
+			Email:        u.Email,
+			Avatar:       u.Avatar,
+			Phone:        u.Phone,
+			Bio:          u.Bio,
 			Projects:     u.Projects,
 			LinkedAgents: u.LinkedAgents,
 			Disabled:     u.Disabled,
@@ -514,6 +546,10 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Password    string `json:"password"`
 		Role        string `json:"role"`
 		DisplayName string `json:"displayName"`
+		Email       string `json:"email"`
+		Avatar      string `json:"avatar"`
+		Phone       string `json:"phone"`
+		Bio         string `json:"bio"`
 	}
 	if err := s.readJSON(w, r, &body); err != nil {
 		s.jsonError(w, http.StatusBadRequest, "invalid request body")
@@ -529,7 +565,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "password must be at least 6 characters")
 		return
 	}
-	if err := s.users.CreateUser(body.Username, body.Password, body.Role, body.DisplayName); err != nil {
+	if err := s.users.CreateUser(body.Username, body.Password, body.Role, body.DisplayName, body.Email, body.Avatar, body.Phone, body.Bio); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			s.jsonError(w, http.StatusConflict, err.Error())
 			return
@@ -557,6 +593,10 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 		"username":     u.Username,
 		"role":         u.Role,
 		"displayName":  u.DisplayName,
+		"email":        u.Email,
+		"avatar":       u.Avatar,
+		"phone":        u.Phone,
+		"bio":          u.Bio,
 		"projects":     u.Projects,
 		"linkedAgents": u.LinkedAgents,
 		"disabled":     u.Disabled,
@@ -572,6 +612,10 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Role         *string         `json:"role"`
 		DisplayName  *string         `json:"displayName"`
+		Email        *string         `json:"email"`
+		Avatar       *string         `json:"avatar"`
+		Phone        *string         `json:"phone"`
+		Bio          *string         `json:"bio"`
 		Disabled     *bool           `json:"disabled"`
 		Password     *string         `json:"password"`
 		Projects     []projectAccess `json:"projects"`
@@ -585,7 +629,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "password must be at least 6 characters")
 		return
 	}
-	if err := s.users.UpdateUser(target, body.Role, body.DisplayName, body.Disabled, body.Projects, body.LinkedAgents, body.Password); err != nil {
+	if err := s.users.UpdateUser(target, body.Role, body.DisplayName, body.Email, body.Avatar, body.Phone, body.Bio, body.Disabled, body.Projects, body.LinkedAgents, body.Password); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.jsonError(w, http.StatusNotFound, err.Error())
 			return

@@ -54,6 +54,14 @@ function useBreadcrumbs(): BreadcrumbSegment[] {
     ]
   }
 
+  if (pathname.startsWith('/people/') && pathname !== '/people') {
+    const id = decodeURIComponent(pathname.split('/')[2] ?? '')
+    return [
+      { label: t('nav.people'), to: '/people' },
+      { label: id },
+    ]
+  }
+
   if (pathname.startsWith('/teams/') && pathname !== '/teams') {
     const id = decodeURIComponent(pathname.split('/')[2] ?? '')
     return [

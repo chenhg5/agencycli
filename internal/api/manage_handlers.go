@@ -122,6 +122,37 @@ func (s *Server) handleHireAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-link user account when hiring a human
+	if entity.AgentModel(model) == entity.ModelHuman {
+		if u := s.users.GetUser(agentName); u != nil {
+			agentID := project + "/" + agentName
+			hasLink := false
+			for _, la := range u.LinkedAgents {
+				if la == agentID {
+					hasLink = true
+					break
+				}
+			}
+			if !hasLink {
+				newLinked := append(u.LinkedAgents, agentID)
+				hasProj := false
+				for _, pa := range u.Projects {
+					if pa.Project == project {
+						hasProj = true
+						break
+					}
+				}
+				var newProjects []projectAccess
+				if hasProj {
+					newProjects = u.Projects
+				} else {
+					newProjects = append(u.Projects, projectAccess{Project: project, Role: ProjectRoleOperator})
+				}
+				_ = s.users.UpdateUser(agentName, nil, nil, nil, nil, nil, nil, nil, newProjects, newLinked, nil)
+			}
+		}
+	}
+
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"ok":     true,
 		"output": string(out),

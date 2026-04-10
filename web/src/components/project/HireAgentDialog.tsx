@@ -18,6 +18,7 @@ const MODELS = [
 
 type TeamInfo = { path: string; name: string }
 type TeamDetail = { roles: { name: string; description?: string }[] }
+type PersonRow = { username: string; displayName?: string; linkedAgents?: string[] }
 
 type Props = {
   projectId: string
@@ -40,10 +41,14 @@ export function HireAgentDialog({ projectId, onHired }: Props) {
 
   const [teams, setTeams] = useState<TeamInfo[]>([])
   const [roles, setRoles] = useState<{ name: string; description?: string }[]>([])
+  const [people, setPeople] = useState<PersonRow[]>([])
 
   useEffect(() => {
     if (!open) return
     apiFetch<TeamInfo[]>('/api/v1/teams').then(setTeams).catch(() => {})
+    apiFetch<PersonRow[]>('/api/v1/users')
+      .then(users => setPeople((users ?? []).filter(u => (u as any).role === 'member')))
+      .catch(() => {})
   }, [open])
 
   useEffect(() => {
@@ -135,16 +140,35 @@ export function HireAgentDialog({ projectId, onHired }: Props) {
               </p>
             </div>
             <form onSubmit={onSubmit} className="space-y-3 px-4 py-3">
-              <label className="block text-sm">
-                <span className="text-neutral-600 dark:text-zinc-400">{t('members.agentName')} *</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={fieldCls}
-                  placeholder="e.g. dev-claude"
-                  autoFocus
-                />
-              </label>
+              {model === 'human' ? (
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('people.selectPerson')} *</span>
+                  <select value={name} onChange={(e) => setName(e.target.value)} className={fieldCls} autoFocus>
+                    <option value="">{t('people.selectPerson')}</option>
+                    {people
+                      .filter(p => !p.linkedAgents?.some(la => la.startsWith(projectId + '/')))
+                      .map(p => (
+                        <option key={p.username} value={p.username}>
+                          {p.displayName ? `${p.displayName} (@${p.username})` : p.username}
+                        </option>
+                      ))}
+                  </select>
+                  {people.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{t('people.createFirst')}</p>
+                  )}
+                </label>
+              ) : (
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('members.agentName')} *</span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={fieldCls}
+                    placeholder="e.g. dev-claude"
+                    autoFocus
+                  />
+                </label>
+              )}
 
               <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('members.team')} *</span>
@@ -174,7 +198,7 @@ export function HireAgentDialog({ projectId, onHired }: Props) {
 
               <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('members.model')} *</span>
-                <select value={model} onChange={(e) => setModel(e.target.value)} className={fieldCls}>
+                <select value={model} onChange={(e) => { setModel(e.target.value); setName('') }} className={fieldCls}>
                   {MODELS.map((m) => (
                     <option key={m} value={m}>{m}</option>
                   ))}

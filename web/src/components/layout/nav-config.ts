@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Puzzle,
   Settings,
+  User,
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -18,6 +19,7 @@ export type NavKey =
   | 'overview'
   | 'teams'
   | 'projects'
+  | 'people'
   | 'workbench'
   | 'skills'
   | 'docs'
@@ -52,6 +54,7 @@ export const workspaceNav: NavItem[] = [
     icon: FolderKanban,
     activePrefix: '/projects',
   },
+  { to: '/people', navKey: 'people', icon: User, activePrefix: '/people' },
   { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams', adminOnly: true },
   { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills', adminOnly: true },
   { to: '/docs', navKey: 'docs', icon: BookOpen, activePrefix: '/docs' },
@@ -73,6 +76,7 @@ export function navKeyFromPath(pathname: string): NavKey {
   const map: Record<string, NavKey> = {
     teams: 'teams',
     projects: 'projects',
+    people: 'people',
     workbench: 'workbench',
     skills: 'skills',
     docs: 'docs',
