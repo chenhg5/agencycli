@@ -362,6 +362,27 @@ func (s TaskStatus) IsTerminal() bool {
 	return s == TaskStatusDoneSuccess || s == TaskStatusDoneFailed || s == TaskStatusCancelled
 }
 
+// StatusGroup maps a TaskStatus into one of three board columns.
+type StatusGroup string
+
+const (
+	StatusGroupBacklog StatusGroup = "backlog"
+	StatusGroupActive  StatusGroup = "active"
+	StatusGroupDone    StatusGroup = "done"
+)
+
+// Group returns the kanban column group for a status.
+func (s TaskStatus) Group() StatusGroup {
+	switch s {
+	case TaskStatusPending:
+		return StatusGroupBacklog
+	case TaskStatusInProgress, TaskStatusAwaitingConfirmation, TaskStatusBlocked:
+		return StatusGroupActive
+	default:
+		return StatusGroupDone
+	}
+}
+
 // TaskType categorises the kind of work a task represents.
 type TaskType string
 
@@ -454,24 +475,30 @@ type ConfirmationRequest struct {
 // Task is the atomic unit of work assigned to an agent or human.
 // Stored in <agent-dir>/.agencycli/tasks.yaml (active) and .agencycli/tasks_archive.yaml (terminal).
 type Task struct {
-	ID       string     `yaml:"id"`
-	Title    string     `yaml:"title"`
-	Type     TaskType   `yaml:"type,omitempty"`
-	Priority int        `yaml:"priority"` // 0=critical 1=high 2=normal 3=low
-	Assignee string     `yaml:"assignee"` // "<project>/<agent>" or "human"
-	CreatedBy string    `yaml:"created_by,omitempty"`
-	Status   TaskStatus `yaml:"status"`
+	ID        string     `yaml:"id"`
+	Title     string     `yaml:"title"`
+	Type      TaskType   `yaml:"type,omitempty"`
+	Priority  int        `yaml:"priority"` // 0=critical 1=high 2=normal 3=low
+	Assignee  string     `yaml:"assignee"` // "<project>/<agent>" or "human"
+	CreatedBy string     `yaml:"created_by,omitempty"`
+	Status    TaskStatus `yaml:"status"`
 
-	Prompt  string            `yaml:"prompt"`
-	Context map[string]string `yaml:"context,omitempty"`
+	Description string            `yaml:"description,omitempty"` // human-readable detail; Prompt is for agents
+	Prompt      string            `yaml:"prompt"`
+	Context     map[string]string `yaml:"context,omitempty"`
 
 	// Summary is what the agent reports on completion (used by workflow routing).
 	Summary string `yaml:"summary,omitempty"`
+
+	Labels   []string `yaml:"labels,omitempty"`
+	ParentID string   `yaml:"parent_id,omitempty"` // sub-task parent
+	Position float64  `yaml:"position,omitempty"`   // manual sort order for kanban / list
 
 	CreatedAt  time.Time  `yaml:"created_at"`
 	UpdatedAt  time.Time  `yaml:"updated_at"`
 	StartedAt  *time.Time `yaml:"started_at,omitempty"`
 	FinishedAt *time.Time `yaml:"finished_at,omitempty"`
+	DueDate    *time.Time `yaml:"due_date,omitempty"`
 
 	DependsOn []string `yaml:"depends_on,omitempty"`
 
@@ -497,6 +524,25 @@ func NewTaskID() string {
 		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return fmt.Sprintf("t-%s-%s", time.Now().UTC().Format("20060102"), string(b))
+}
+
+// TaskComment is a comment on a task, posted by a human or agent.
+type TaskComment struct {
+	ID        string    `yaml:"id"         json:"id"`
+	TaskID    string    `yaml:"task_id"    json:"taskId"`
+	Author    string    `yaml:"author"     json:"author"` // "human" or "project/agent"
+	Body      string    `yaml:"body"       json:"body"`
+	CreatedAt time.Time `yaml:"created_at" json:"createdAt"`
+}
+
+// NewCommentID generates a unique comment ID.
+func NewCommentID() string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return fmt.Sprintf("c-%s-%s", time.Now().UTC().Format("20060102"), string(b))
 }
 
 // Message is an asynchronous, non-blocking communication between any two

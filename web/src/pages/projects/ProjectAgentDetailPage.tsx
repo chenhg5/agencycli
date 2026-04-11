@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, CheckCircle2,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -806,18 +806,12 @@ function HumanTasksPanel({ project, member }: { project: string; member: string 
   const fmt = useFormatDateTime()
   const [page, setPage] = useState(1)
   const perPage = 10
-  const [reloadKey, setReloadKey] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const state = useApiJson<HumanTask[]>(`/api/v1/projects/${encodeURIComponent(project)}/tasks?agent=${encodeURIComponent(member)}`, reloadKey)
+  const state = useApiJson<HumanTask[]>(`/api/v1/projects/${encodeURIComponent(project)}/tasks?agent=${encodeURIComponent(member)}`)
   const tasks = state.status === 'ok' ? (state.data ?? []) : []
   const totalPages = Math.ceil(tasks.length / perPage)
   const paged = useMemo(() => tasks.slice((page - 1) * perPage, page * perPage), [tasks, page])
-
-  async function completeTask(task: HumanTask) {
-    await apiPost('/api/v1/tasks/cancel', { project: task.project, agent: task.agent, id: task.id })
-    setReloadKey((k) => k + 1)
-  }
 
   return (
     <section>

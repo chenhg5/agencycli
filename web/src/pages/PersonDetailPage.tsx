@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, FolderKanban, Mail, ListTodo, Plus, X, ChevronDown, ChevronRight, Reply, Send, CheckCircle2, AtSign, Phone } from 'lucide-react'
+import { User, FolderKanban, Mail, ListTodo, Plus, X, ChevronDown, ChevronRight, Reply, Send, CheckCircle2, AtSign, Phone, Pencil, Eye, EyeOff } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { apiFetch, apiPost, apiPut } from '../lib/api'
 import { cn } from '../lib/cn'
 import { Pagination } from '../components/ui/Pagination'
+import { useFormatDateTime } from '../lib/format-datetime'
 
 type PersonInfo = {
   username: string; role: string; displayName?: string
@@ -31,6 +32,7 @@ const fieldCls = 'w-full rounded-md border border-neutral-200/80 bg-neutral-50/5
 export default function PersonDetailPage() {
   const { username } = useParams<{ username: string }>()
   const { t } = useTranslation()
+  const fmt = useFormatDateTime()
   const [person, setPerson] = useState<PersonInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'messages' | 'tasks'>('messages')
@@ -52,6 +54,14 @@ export default function PersonDetailPage() {
   const [replyText, setReplyText] = useState('')
   const [replying, setReplying] = useState(false)
   const [expandedTask, setExpandedTask] = useState<string | null>(null)
+
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({ displayName: '', email: '', phone: '', bio: '' })
+  const [editPwd, setEditPwd] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+  const [editDisabled, setEditDisabled] = useState(false)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editErr, setEditErr] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!username) return
@@ -95,6 +105,40 @@ export default function PersonDetailPage() {
     if (!assigning) return
     apiFetch<{ path: string; name: string }[]>('/api/v1/teams').then(setTeams).catch(() => {})
   }, [assigning])
+
+  function openEdit() {
+    if (!person) return
+    setEditForm({
+      displayName: person.displayName ?? '',
+      email: person.email ?? '',
+      phone: person.phone ?? '',
+      bio: person.bio ?? '',
+    })
+    setEditPwd('')
+    setShowPwd(false)
+    setEditDisabled(person.disabled ?? false)
+    setEditErr(null)
+    setEditing(true)
+  }
+
+  async function handleEditSave() {
+    if (!username) return
+    setEditBusy(true); setEditErr(null)
+    try {
+      const body: Record<string, unknown> = {
+        displayName: editForm.displayName.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim(),
+        bio: editForm.bio.trim(),
+        disabled: editDisabled,
+      }
+      if (editPwd) body.password = editPwd
+      await apiPut(`/api/v1/users/${encodeURIComponent(username)}`, body)
+      setEditing(false)
+      await refresh()
+    } catch (e) { setEditErr(e instanceof Error ? e.message : String(e)) }
+    finally { setEditBusy(false) }
+  }
 
   async function handleAssign() {
     if (!assignProject || !assignTeam || !username) return
@@ -157,15 +201,22 @@ export default function PersonDetailPage() {
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">
-            {person.displayName || person.username}
-          </h1>
-          {person.displayName && <p className="text-sm text-neutral-400 dark:text-zinc-500">@{person.username}</p>}
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">
+              {person.displayName || person.username}
+            </h1>
+            <button type="button" onClick={openEdit}
+              className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              title={t('people.edit')}>
+              <Pencil className="size-3.5" strokeWidth={2} />
+            </button>
+          </div>
+          {person.displayName && <p className="text-sm text-neutral-400 dark:text-zinc-500">{person.username}</p>}
           <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-neutral-400 dark:text-zinc-500">
             {person.email && <span className="flex items-center gap-1"><AtSign className="size-3" />{person.email}</span>}
             {person.phone && <span className="flex items-center gap-1"><Phone className="size-3" />{person.phone}</span>}
             {person.disabled && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">{t('users.disabled')}</span>}
-            {person.createdAt && <span>{t('people.createdAt')}: {new Date(person.createdAt).toLocaleDateString()}</span>}
+            {person.createdAt && <span>{t('people.createdAt')}: {fmt(person.createdAt)}</span>}
           </div>
           {person.bio && <p className="mt-1.5 text-sm text-neutral-500 dark:text-zinc-400">{person.bio}</p>}
         </div>
@@ -238,7 +289,7 @@ export default function PersonDetailPage() {
                       <span className="shrink-0 text-xs text-neutral-400 dark:text-zinc-500">{m.mailbox.split('/')[0]}</span>
                     </div>
                     <p className="truncate text-xs text-neutral-400 dark:text-zinc-500">
-                      {m.from} → {m.to} · {new Date(m.sentAt).toLocaleString()}
+                      {m.from} → {m.to} · {fmt(m.sentAt)}
                     </p>
                   </div>
                   <ChevronDown className={cn('size-4 shrink-0 text-neutral-400 transition-transform', isExpanded && 'rotate-180')} />
@@ -275,7 +326,7 @@ export default function PersonDetailPage() {
               </div>
             )
           })}
-          {msgs.length > PAGE_SIZE && <Pagination current={msgPage} total={Math.ceil(msgs.length / PAGE_SIZE)} onChange={setMsgPage} />}
+          {msgs.length > PAGE_SIZE && <Pagination page={msgPage} totalPages={Math.ceil(msgs.length / PAGE_SIZE)} onPageChange={setMsgPage} />}
         </div>
       )}
 
@@ -301,7 +352,7 @@ export default function PersonDetailPage() {
                       <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] dark:bg-zinc-800">{tk.status}</span>
                     </div>
                     <p className="truncate text-xs text-neutral-400 dark:text-zinc-500">
-                      {tk.project}/{tk.agent} · {new Date(tk.updatedAt).toLocaleString()}
+                      {tk.project}/{tk.agent} · {fmt(tk.updatedAt)}
                     </p>
                   </div>
                   <ChevronDown className={cn('size-4 shrink-0 text-neutral-400 transition-transform', isExpanded && 'rotate-180')} />
@@ -316,7 +367,7 @@ export default function PersonDetailPage() {
               </div>
             )
           })}
-          {tasks.length > PAGE_SIZE && <Pagination current={taskPage} total={Math.ceil(tasks.length / PAGE_SIZE)} onChange={setTaskPage} />}
+          {tasks.length > PAGE_SIZE && <Pagination page={taskPage} totalPages={Math.ceil(tasks.length / PAGE_SIZE)} onPageChange={setTaskPage} />}
         </div>
       )}
 
@@ -349,6 +400,59 @@ export default function PersonDetailPage() {
                 <button type="button" onClick={() => void handleAssign()} disabled={assignBusy || !assignProject || !assignTeam}
                   className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
                   {assignBusy ? t('members.hiring') : t('people.assign')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Dialog */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !editBusy && setEditing(false)}>
+          <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
+              <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('people.edit')}</h2>
+              <button type="button" onClick={() => setEditing(false)} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.displayName')}</span>
+                <input value={editForm.displayName} onChange={e => setEditForm({ ...editForm, displayName: e.target.value })} className={fieldCls} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.email')}</span>
+                <input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className={fieldCls} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('users.phone')}</span>
+                <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} className={fieldCls} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('people.bio')}</span>
+                <textarea value={editForm.bio} onChange={e => setEditForm({ ...editForm, bio: e.target.value })} rows={2} className={cn(fieldCls, 'resize-none')} />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('people.newPassword')}</span>
+                <div className="flex items-center gap-2">
+                  <input type={showPwd ? 'text' : 'password'} value={editPwd}
+                    onChange={e => setEditPwd(e.target.value)}
+                    className={cn(fieldCls, 'flex-1')} placeholder={t('people.leaveBlankKeep')} />
+                  <button type="button" onClick={() => setShowPwd(!showPwd)} className="rounded p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+                    {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={editDisabled} onChange={e => setEditDisabled(e.target.checked)} className="size-4 rounded border-neutral-300 accent-red-600" />
+                <span className="text-sm text-neutral-600 dark:text-zinc-400">{t('people.disableAccount')}</span>
+              </label>
+              {editErr && <p className="text-sm text-red-600 dark:text-red-400">{editErr}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditing(false)} disabled={editBusy} className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm dark:border-zinc-600">{t('forms.cancel')}</button>
+                <button type="button" onClick={() => void handleEditSave()} disabled={editBusy}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+                  {editBusy ? t('forms.saving') : t('forms.save')}
                 </button>
               </div>
             </div>

@@ -32,6 +32,7 @@ func newTaskCmd() *cobra.Command {
 		newTaskCancelCmd(),
 		newTaskStopAllCmd(),
 		newTaskTokensCmd(),
+		newTaskCommentCmd(),
 	)
 	return cmd
 }
@@ -40,16 +41,20 @@ func newTaskCmd() *cobra.Command {
 
 func newTaskAddCmd() *cobra.Command {
 	var (
-		project    string
-		agentName  string
-		title      string
-		taskType   string
-		priority   int
-		prompt     string
-		promptFile string
-		dependsOn  []string
-		assignee   string
-		createdBy  string
+		project     string
+		agentName   string
+		title       string
+		description string
+		taskType    string
+		priority    int
+		prompt      string
+		promptFile  string
+		dependsOn   []string
+		assignee    string
+		createdBy   string
+		labels      []string
+		parentID    string
+		dueDate     string
 	)
 
 	cmd := &cobra.Command{
@@ -116,17 +121,27 @@ func newTaskAddCmd() *cobra.Command {
 
 			now := time.Now().UTC()
 			t := &entity.Task{
-				ID:        entity.NewTaskID(),
-				Title:     title,
-				Type:      entity.TaskType(taskType),
-				Priority:  priority,
-				Assignee:  assignee,
-				CreatedBy: createdBy,
-				Status:    entity.TaskStatusPending,
-				Prompt:    promptText,
-				DependsOn: dependsOn,
-				CreatedAt: now,
-				UpdatedAt: now,
+				ID:          entity.NewTaskID(),
+				Title:       title,
+				Description: description,
+				Type:        entity.TaskType(taskType),
+				Priority:    priority,
+				Assignee:    assignee,
+				CreatedBy:   createdBy,
+				Status:      entity.TaskStatusPending,
+				Prompt:      promptText,
+				DependsOn:   dependsOn,
+				Labels:      labels,
+				ParentID:    parentID,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			if dueDate != "" {
+				if dd, err := time.Parse("2006-01-02", dueDate); err == nil {
+					t.DueDate = &dd
+				} else {
+					return fmt.Errorf("invalid --due-date format, use YYYY-MM-DD")
+				}
 			}
 
 			ts := taskstore.New(root)
@@ -162,6 +177,7 @@ func newTaskAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&project, "project", "", "project name")
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
 	cmd.Flags().StringVar(&title, "title", "", "task title")
+	cmd.Flags().StringVar(&description, "description", "", "human-readable description")
 	cmd.Flags().StringVar(&taskType, "type", "chore", "task type (feature|bug|review|triage|test|research|chore)")
 	cmd.Flags().IntVar(&priority, "priority", 2, "priority: 0=critical 1=high 2=normal 3=low")
 	cmd.Flags().StringVar(&prompt, "prompt", "", "task prompt text")
@@ -169,6 +185,9 @@ func newTaskAddCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&dependsOn, "depends-on", nil, "task IDs this task depends on")
 	cmd.Flags().StringVar(&assignee, "assignee", "", "assignee override (default: <project>/<agent>, or 'human')")
 	cmd.Flags().StringVar(&createdBy, "created-by", "human", "who created this task")
+	cmd.Flags().StringArrayVar(&labels, "label", nil, "labels/tags for the task (repeatable)")
+	cmd.Flags().StringVar(&parentID, "parent", "", "parent task ID for sub-task")
+	cmd.Flags().StringVar(&dueDate, "due-date", "", "due date (YYYY-MM-DD)")
 	return cmd
 }
 
@@ -299,6 +318,18 @@ func newTaskShowCmd() *cobra.Command {
 			fmt.Printf("Priority : %s (%d)\n", taskstore.PriorityLabel(t.Priority), t.Priority)
 			fmt.Printf("Assignee : %s\n", t.Assignee)
 			fmt.Printf("CreatedBy: %s\n", t.CreatedBy)
+			if len(t.Labels) > 0 {
+				fmt.Printf("Labels   : %s\n", strings.Join(t.Labels, ", "))
+			}
+			if t.ParentID != "" {
+				fmt.Printf("Parent   : %s\n", t.ParentID)
+			}
+			if t.DueDate != nil {
+				fmt.Printf("Due Date : %s\n", t.DueDate.Format("2006-01-02"))
+			}
+			if t.Description != "" {
+				fmt.Printf("Desc     : %s\n", t.Description)
+			}
 			fmt.Printf("Created  : %s\n", t.CreatedAt.Format(time.RFC3339))
 			if t.StartedAt != nil {
 				fmt.Printf("Started  : %s\n", t.StartedAt.Format(time.RFC3339))
@@ -1135,3 +1166,128 @@ func getEnvFloat(key string, def float64) float64 {
 
 // Ensure math is used (needed for potential future rounding).
 var _ = math.Round
+
+// ── task comment ─────────────────────────────────────────────────────────────
+
+func newTaskCommentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "comment",
+		Short: "Manage task comments",
+	}
+	cmd.AddCommand(
+		newTaskCommentAddCmd(),
+		newTaskCommentListCmd(),
+		newTaskCommentDeleteCmd(),
+	)
+	return cmd
+}
+
+func newTaskCommentAddCmd() *cobra.Command {
+	var body, author string
+	cmd := &cobra.Command{
+		Use:   "add <task-id>",
+		Short: "Add a comment to a task",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			taskID := args[0]
+
+			project, agent, _, findErr := ts.FindTaskByID(taskID)
+			if findErr != nil {
+				return fmt.Errorf("task %s not found: %w", taskID, findErr)
+			}
+
+			if body == "" {
+				return fmt.Errorf("--body is required")
+			}
+			if author == "" {
+				author = "human"
+			}
+
+			c := &entity.TaskComment{
+				ID:        entity.NewCommentID(),
+				TaskID:    taskID,
+				Author:    author,
+				Body:      body,
+				CreatedAt: time.Now().UTC(),
+			}
+			if err := ts.AddComment(project, agent, c); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Comment %s added to task %s\n", c.ID, taskID)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&body, "body", "", "Comment text (required)")
+	cmd.Flags().StringVar(&author, "author", "human", "Author: 'human' or 'project/agent'")
+	return cmd
+}
+
+func newTaskCommentListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list <task-id>",
+		Short: "List comments on a task",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			taskID := args[0]
+
+			project, agent, _, findErr := ts.FindTaskByID(taskID)
+			if findErr != nil {
+				return fmt.Errorf("task %s not found: %w", taskID, findErr)
+			}
+
+			comments, err := ts.ListComments(project, agent, taskID)
+			if err != nil {
+				return err
+			}
+			if len(comments) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "No comments.")
+				return nil
+			}
+			for _, c := range comments {
+				fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s  @%s\n  %s\n\n",
+					c.ID, c.CreatedAt.Format("2006-01-02 15:04"), c.Author, c.Body)
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
+func newTaskCommentDeleteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <task-id> <comment-id>",
+		Short: "Delete a comment from a task",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			ts := taskstore.New(root)
+			taskID := args[0]
+			commentID := args[1]
+
+			project, agent, _, findErr := ts.FindTaskByID(taskID)
+			if findErr != nil {
+				return fmt.Errorf("task %s not found: %w", taskID, findErr)
+			}
+
+			if err := ts.DeleteComment(project, agent, commentID); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Comment %s deleted.\n", commentID)
+			return nil
+		},
+	}
+	return cmd
+}

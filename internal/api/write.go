@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,13 +41,17 @@ func validTaskStatus(s string) bool {
 }
 
 type postTaskBody struct {
-	Agent     string `json:"agent"`
-	Title     string `json:"title"`
-	Prompt    string `json:"prompt"`
-	Type      string `json:"type"`
-	Priority  int    `json:"priority"`
-	Assignee  string `json:"assignee"`
-	CreatedBy string `json:"createdBy"`
+	Agent       string   `json:"agent"`
+	Title       string   `json:"title"`
+	Prompt      string   `json:"prompt"`
+	Description string   `json:"description"`
+	Type        string   `json:"type"`
+	Priority    int      `json:"priority"`
+	Assignee    string   `json:"assignee"`
+	CreatedBy   string   `json:"createdBy"`
+	Labels      []string `json:"labels"`
+	ParentID    string   `json:"parentId"`
+	DueDate     string   `json:"dueDate"` // YYYY-MM-DD
 }
 
 func (s *Server) handlePostProjectTask(w http.ResponseWriter, r *http.Request) {
@@ -103,16 +109,24 @@ func (s *Server) handlePostProjectTask(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	t := &entity.Task{
-		ID:        entity.NewTaskID(),
-		Title:     title,
-		Type:      entity.TaskType(taskType),
-		Priority:  priority,
-		Assignee:  assignee,
-		CreatedBy: createdBy,
-		Status:    entity.TaskStatusPending,
-		Prompt:    promptText,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:          entity.NewTaskID(),
+		Title:       title,
+		Description: strings.TrimSpace(body.Description),
+		Type:        entity.TaskType(taskType),
+		Priority:    priority,
+		Assignee:    assignee,
+		CreatedBy:   createdBy,
+		Status:      entity.TaskStatusPending,
+		Prompt:      promptText,
+		Labels:      body.Labels,
+		ParentID:    strings.TrimSpace(body.ParentID),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if body.DueDate != "" {
+		if dd, err := time.Parse("2006-01-02", body.DueDate); err == nil {
+			t.DueDate = &dd
+		}
 	}
 
 	if assignee == "human" {
@@ -221,13 +235,21 @@ func (s *Server) handlePostArchiveTask(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateTaskBody struct {
-	Project  string  `json:"project"`
-	Agent    string  `json:"agent"`
-	ID       string  `json:"id"`
-	Status   *string `json:"status,omitempty"`
-	Priority *int    `json:"priority,omitempty"`
-	Type     *string `json:"type,omitempty"`
-	Summary  *string `json:"summary,omitempty"`
+	Project     string    `json:"project"`
+	Agent       string    `json:"agent"`
+	ID          string    `json:"id"`
+	Title       *string   `json:"title,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Status      *string   `json:"status,omitempty"`
+	Priority    *int      `json:"priority,omitempty"`
+	Type        *string   `json:"type,omitempty"`
+	Summary     *string   `json:"summary,omitempty"`
+	Labels      *[]string `json:"labels,omitempty"`
+	ParentID    *string   `json:"parentId,omitempty"`
+	DueDate     *string   `json:"dueDate,omitempty"` // YYYY-MM-DD or "" to clear
+	Position    *float64  `json:"position,omitempty"`
+	Assignee    *string   `json:"assignee,omitempty"`
+	Prompt      *string   `json:"prompt,omitempty"`
 }
 
 func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
@@ -243,8 +265,11 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "project, agent, and id are required")
 		return
 	}
-	if body.Status == nil && body.Priority == nil && body.Type == nil && body.Summary == nil {
-		s.jsonError(w, http.StatusBadRequest, "at least one of status, priority, type, or summary is required")
+	hasUpdate := body.Status != nil || body.Priority != nil || body.Type != nil || body.Summary != nil ||
+		body.Title != nil || body.Description != nil || body.Labels != nil || body.ParentID != nil ||
+		body.DueDate != nil || body.Position != nil || body.Assignee != nil || body.Prompt != nil
+	if !hasUpdate {
+		s.jsonError(w, http.StatusBadRequest, "at least one field to update is required")
 		return
 	}
 
@@ -292,6 +317,35 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Summary != nil {
 		t.Summary = strings.TrimSpace(*body.Summary)
+	}
+	if body.Title != nil {
+		t.Title = strings.TrimSpace(*body.Title)
+	}
+	if body.Description != nil {
+		t.Description = strings.TrimSpace(*body.Description)
+	}
+	if body.Labels != nil {
+		t.Labels = *body.Labels
+	}
+	if body.ParentID != nil {
+		t.ParentID = strings.TrimSpace(*body.ParentID)
+	}
+	if body.DueDate != nil {
+		dd := strings.TrimSpace(*body.DueDate)
+		if dd == "" {
+			t.DueDate = nil
+		} else if parsed, err := time.Parse("2006-01-02", dd); err == nil {
+			t.DueDate = &parsed
+		}
+	}
+	if body.Position != nil {
+		t.Position = *body.Position
+	}
+	if body.Assignee != nil {
+		t.Assignee = strings.TrimSpace(*body.Assignee)
+	}
+	if body.Prompt != nil {
+		t.Prompt = strings.TrimSpace(*body.Prompt)
 	}
 
 	now := time.Now().UTC()
@@ -676,4 +730,112 @@ func (s *Server) notifyTaskDone(t *entity.Task, project, agent string) {
 		SentAt:  time.Now().UTC(),
 	}
 	_ = s.ts.SendMessage(msg)
+}
+
+// ── Task Comments ─────────────────────────────────────────────────────────────
+
+func (s *Server) handleGetComments(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("project")
+	agent := r.PathValue("agent")
+	taskID := r.PathValue("taskId")
+	comments, err := s.ts.ListComments(project, agent, taskID)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	if comments == nil {
+		comments = []*entity.TaskComment{}
+	}
+	_ = json.NewEncoder(w).Encode(comments)
+}
+
+func (s *Server) handlePostComment(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("project")
+	agent := r.PathValue("agent")
+	taskID := r.PathValue("taskId")
+	var body struct {
+		Author string `json:"author"`
+		Body   string `json:"body"`
+	}
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	body.Body = strings.TrimSpace(body.Body)
+	body.Author = strings.TrimSpace(body.Author)
+	if body.Body == "" {
+		s.jsonError(w, http.StatusBadRequest, "body is required")
+		return
+	}
+	if body.Author == "" {
+		cur := s.currentUser(r)
+		body.Author = cur.Username
+	}
+	c := &entity.TaskComment{
+		ID:        entity.NewCommentID(),
+		TaskID:    taskID,
+		Author:    body.Author,
+		Body:      body.Body,
+		CreatedAt: time.Now().UTC(),
+	}
+	if err := s.ts.AddComment(project, agent, c); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("project")
+	agent := r.PathValue("agent")
+	commentID := r.PathValue("commentId")
+	if err := s.ts.DeleteComment(project, agent, commentID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+func (s *Server) handleFireAgent(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("name")
+	agent := r.PathValue("agent")
+	if project == "" || agent == "" {
+		s.jsonError(w, http.StatusBadRequest, "project and agent are required")
+		return
+	}
+	if !s.checkProjectAccess(w, r, project) {
+		return
+	}
+	if _, err := s.st.AgentMeta(project, agent); err != nil {
+		s.jsonError(w, http.StatusNotFound, "agent not found")
+		return
+	}
+
+	force := r.URL.Query().Get("force") == "true"
+	agentDir := s.st.AgentDir(project, agent)
+
+	if force {
+		if err := os.RemoveAll(agentDir); err != nil {
+			s.serverError(w, fmt.Errorf("fire: %w", err))
+			return
+		}
+	} else {
+		timestamp := time.Now().UTC().Format("20060102-150405")
+		firedDirName := agent + "-" + timestamp
+		firedDir := s.st.FiredAgentDir(project, firedDirName)
+		if err := os.MkdirAll(filepath.Dir(firedDir), 0o755); err != nil {
+			s.serverError(w, fmt.Errorf("fire: %w", err))
+			return
+		}
+		if err := os.Rename(agentDir, firedDir); err != nil {
+			s.serverError(w, fmt.Errorf("fire: %w", err))
+			return
+		}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }

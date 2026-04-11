@@ -25,10 +25,13 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
   const [selectedProject, setSelectedProject] = useState(defaultProjectId)
   const [agent, setAgent] = useState('')
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [prompt, setPrompt] = useState('')
   const [taskType, setTaskType] = useState<string>('chore')
   const [priority, setPriority] = useState(2)
   const [assignee, setAssignee] = useState('')
+  const [labelsStr, setLabelsStr] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -48,10 +51,13 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
     setSelectedProject(defaultProjectId)
     setAgent('')
     setTitle('')
+    setDescription('')
     setPrompt('')
     setTaskType('chore')
     setPriority(2)
     setAssignee('')
+    setLabelsStr('')
+    setDueDate('')
     setErr(null)
   }
 
@@ -81,15 +87,19 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
     }
     setBusy(true)
     try {
+      const labels = labelsStr.split(',').map(l => l.trim()).filter(Boolean)
       await apiPost<{ id: string }>(
         `/api/v1/projects/${encodeURIComponent(selectedProject)}/tasks`,
         {
           agent: agent.trim(),
           title: title.trim(),
+          description: description.trim(),
           prompt: prompt.trim(),
           type: taskType,
           priority,
           ...(assignee ? { assignee } : {}),
+          ...(labels.length > 0 ? { labels } : {}),
+          ...(dueDate ? { dueDate } : {}),
         },
       )
       setOpen(false)
@@ -168,8 +178,13 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
               </label>
 
               <label className="block text-sm">
+                <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.description')}</span>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={cn(fieldCls, 'resize-y')} placeholder={t('tasks.descriptionHint')} />
+              </label>
+
+              <label className="block text-sm">
                 <span className="text-neutral-600 dark:text-zinc-400">{t('forms.prompt')}</span>
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={10} className={cn(fieldCls, 'resize-y')} />
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={8} className={cn(fieldCls, 'resize-y')} />
               </label>
 
               <div className="grid grid-cols-2 gap-3">
@@ -184,6 +199,17 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
                   <select value={priority} onChange={(e) => setPriority(Number(e.target.value))} className={fieldCls}>
                     {[0, 1, 2, 3].map((p) => <option key={p} value={p}>P{p} — {t(`forms.priorityLabel.${p}`)}</option>)}
                   </select>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.dueDate')}</span>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={fieldCls} />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.labels')}</span>
+                  <input value={labelsStr} onChange={(e) => setLabelsStr(e.target.value)} placeholder={t('tasks.labelsHint')} className={fieldCls} />
                 </label>
               </div>
 

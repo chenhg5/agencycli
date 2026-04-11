@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Bot, User } from 'lucide-react'
+import { Users, Bot, User, UserMinus } from 'lucide-react'
 import { HireAgentDialog } from '../../components/project/HireAgentDialog'
 import { cn } from '../../lib/cn'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
+import { apiDelete } from '../../lib/api'
 
 const MODEL_COLORS: Record<string, string> = {
   claudecode:    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
@@ -92,12 +93,14 @@ export default function ProjectMembersPage() {
                 ? 'text-indigo-600 dark:text-indigo-400'
                 : 'text-violet-600 dark:text-violet-400'
               return (
-                <Link
+                <div
                   key={row.name}
-                  to={`/projects/${encodeURIComponent(projectId!)}/members/${encodeURIComponent(row.name)}`}
-                  className="group flex flex-col rounded-xl border border-neutral-200/80 bg-white p-4 transition-all duration-150 hover:border-neutral-300 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-zinc-700"
+                  className="group relative flex flex-col rounded-xl border border-neutral-200/80 bg-white p-4 transition-all duration-150 hover:border-neutral-300 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-zinc-700"
                 >
-                  <div className="flex items-center gap-3">
+                  <Link
+                    to={`/projects/${encodeURIComponent(projectId!)}/members/${encodeURIComponent(row.name)}`}
+                    className="flex items-center gap-3"
+                  >
                     <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', iconBg)}>
                       <IconCmp className={cn('size-5', iconColor)} strokeWidth={1.8} />
                     </div>
@@ -105,14 +108,27 @@ export default function ProjectMembersPage() {
                       <p className="truncate font-mono text-sm font-semibold text-neutral-900 dark:text-zinc-100">{row.name}</p>
                       <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-zinc-500">{row.team}</p>
                     </div>
-                  </div>
+                  </Link>
                   <div className="mt-3 flex items-center gap-2">
                     <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wide', modelCls)}>
                       {row.model}
                     </span>
                     <span className="ml-auto text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(row.hiredAt)}</span>
+                    <button
+                      type="button"
+                      title={t('members.fire')}
+                      onClick={async (e) => {
+                        e.preventDefault()
+                        if (!confirm(t('members.confirmFire', { name: row.name }))) return
+                        await apiDelete(`/api/v1/projects/${encodeURIComponent(projectId!)}/agents/${encodeURIComponent(row.name)}`)
+                        setReloadKey((k) => k + 1)
+                      }}
+                      className="rounded p-1 text-neutral-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                    >
+                      <UserMinus className="size-3.5" strokeWidth={1.8} />
+                    </button>
                   </div>
-                </Link>
+                </div>
               )
             })}
           </div>

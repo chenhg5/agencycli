@@ -102,6 +102,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/tasks/archive", s.handlePostArchiveTask)
 	mux.HandleFunc("PUT /api/v1/tasks/update", s.handlePutUpdateTask)
 	mux.HandleFunc("POST /api/v1/tasks/delete", s.handlePostDeleteTask)
+	mux.HandleFunc("GET /api/v1/tasks/{project}/{agent}/{taskId}/comments", s.handleGetComments)
+	mux.HandleFunc("POST /api/v1/tasks/{project}/{agent}/{taskId}/comments", s.handlePostComment)
+	mux.HandleFunc("DELETE /api/v1/tasks/{project}/{agent}/{taskId}/comments/{commentId}", s.handleDeleteComment)
 	mux.HandleFunc("GET /api/v1/projects/{name}/tasks", s.handleProjectTasks)
 	mux.HandleFunc("GET /api/v1/projects/{name}/messages", s.handleProjectMessages)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents", s.handleProjectAgents)
@@ -126,6 +129,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/teams/skills", s.handlePostTeamSkillBind)
 	mux.HandleFunc("POST /api/v1/roles/create", s.handleCreateRole)
 	mux.HandleFunc("POST /api/v1/projects/{name}/hire", s.handleHireAgent)
+	mux.HandleFunc("DELETE /api/v1/projects/{name}/agents/{agent}", s.handleFireAgent)
 	mux.HandleFunc("POST /api/v1/run", s.handleRunAgent)
 	mux.HandleFunc("POST /api/v1/session/reset", s.handleSessionReset)
 	mux.HandleFunc("POST /api/v1/assistant/chat", s.handleAssistantChat)
@@ -473,20 +477,48 @@ func (s *Server) handleProjectAgents(w http.ResponseWriter, r *http.Request) {
 }
 
 type taskRow struct {
-	ID        string    `json:"id"`
-	Project   string    `json:"project"`
-	Agent     string    `json:"agent"`
-	Title     string    `json:"title"`
-	Type      string    `json:"type,omitempty"`
-	Assignee  string    `json:"assignee,omitempty"`
-	Prompt    string    `json:"prompt,omitempty"`
-	Priority  int       `json:"priority"`
-	Status    string    `json:"status"`
-	Archived  bool      `json:"archived"`
-	Summary   string    `json:"summary,omitempty"`
-	CreatedBy string    `json:"createdBy,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Project     string    `json:"project"`
+	Agent       string    `json:"agent"`
+	Title       string    `json:"title"`
+	Type        string    `json:"type,omitempty"`
+	Assignee    string    `json:"assignee,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Prompt      string    `json:"prompt,omitempty"`
+	Priority    int       `json:"priority"`
+	Status      string    `json:"status"`
+	StatusGroup string    `json:"statusGroup"`
+	Archived    bool      `json:"archived"`
+	Summary     string    `json:"summary,omitempty"`
+	Labels      []string  `json:"labels"`
+	ParentID    string    `json:"parentId,omitempty"`
+	Position    float64   `json:"position"`
+	CreatedBy   string    `json:"createdBy,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	DueDate     string    `json:"dueDate,omitempty"`
+}
+
+func taskToRow(t *entity.Task, project, agent string, archived bool) taskRow {
+	labels := t.Labels
+	if labels == nil {
+		labels = []string{}
+	}
+	r := taskRow{
+		ID: t.ID, Project: project, Agent: agent,
+		Title: t.Title, Type: string(t.Type), Assignee: t.Assignee,
+		Description: t.Description, Prompt: t.Prompt,
+		Priority: t.Priority, Status: string(t.Status),
+		StatusGroup: string(t.Status.Group()),
+		Archived: archived, Summary: t.Summary,
+		Labels: labels, ParentID: t.ParentID, Position: t.Position,
+		CreatedBy: t.CreatedBy,
+		CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
+	}
+	if t.DueDate != nil {
+		r.DueDate = t.DueDate.UTC().Format("2006-01-02")
+	}
+	return r
 }
 
 func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
@@ -506,7 +538,10 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 	qStatus := r.URL.Query().Get("status")
 	qAgent := r.URL.Query().Get("agent")
 	qPriority := r.URL.Query().Get("priority")
-	qScope := r.URL.Query().Get("scope") // "active" (default), "archived", "all"
+	qLabel := r.URL.Query().Get("label")
+	qParent := r.URL.Query().Get("parent_id")
+	qGroup := r.URL.Query().Get("status_group") // backlog, active, done
+	qScope := r.URL.Query().Get("scope")         // "active" (default), "archived", "all"
 	if qScope == "" {
 		qScope = "all"
 	}
@@ -531,6 +566,24 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 		if qPriority != "" && fmt.Sprintf("%d", t.Priority) != qPriority {
 			return false
 		}
+		if qGroup != "" && string(t.Status.Group()) != qGroup {
+			return false
+		}
+		if qLabel != "" {
+			found := false
+			for _, l := range t.Labels {
+				if l == qLabel {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		if qParent != "" && t.ParentID != qParent {
+			return false
+		}
 		return true
 	}
 
@@ -546,14 +599,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 					if !matchFilter(t) {
 						continue
 					}
-					rows = append(rows, taskRow{
-						ID: t.ID, Project: name, Agent: ag.Name,
-						Title: t.Title, Type: string(t.Type), Assignee: t.Assignee, Prompt: t.Prompt,
-						Priority: t.Priority,
-						Status: string(t.Status), Archived: false,
-						Summary: t.Summary, CreatedBy: t.CreatedBy,
-						CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
-					})
+					rows = append(rows, taskToRow(t, name, ag.Name, false))
 				}
 			}
 		}
@@ -564,14 +610,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 					if !matchFilter(t) {
 						continue
 					}
-					rows = append(rows, taskRow{
-						ID: t.ID, Project: name, Agent: ag.Name,
-						Title: t.Title, Type: string(t.Type), Assignee: t.Assignee, Prompt: t.Prompt,
-						Priority: t.Priority,
-						Status: string(t.Status), Archived: true,
-						Summary: t.Summary, CreatedBy: t.CreatedBy,
-						CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
-					})
+					rows = append(rows, taskToRow(t, name, ag.Name, true))
 				}
 			}
 		}

@@ -869,6 +869,70 @@ func (s *FSStore) loadAllMessages(recipient string) ([]*entity.Message, error) {
 	return msgs, nil
 }
 
+// ── Task Comments ─────────────────────────────────────────────────────────────
+
+const commentsFile = "task_comments.yaml"
+
+func (s *FSStore) commentsPath(project, agent string) string {
+	return filepath.Join(s.systemDir(project, agent), commentsFile)
+}
+
+func (s *FSStore) readComments(project, agent string) ([]*entity.TaskComment, error) {
+	data, err := os.ReadFile(s.commentsPath(project, agent))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var comments []*entity.TaskComment
+	if err := yaml.Unmarshal(data, &comments); err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
+func (s *FSStore) writeComments(project, agent string, comments []*entity.TaskComment) error {
+	return writeYAMLAtomic(s.commentsPath(project, agent), comments)
+}
+
+func (s *FSStore) AddComment(project, agent string, c *entity.TaskComment) error {
+	comments, err := s.readComments(project, agent)
+	if err != nil {
+		return err
+	}
+	comments = append(comments, c)
+	return s.writeComments(project, agent, comments)
+}
+
+func (s *FSStore) ListComments(project, agent, taskID string) ([]*entity.TaskComment, error) {
+	all, err := s.readComments(project, agent)
+	if err != nil {
+		return nil, err
+	}
+	var result []*entity.TaskComment
+	for _, c := range all {
+		if c.TaskID == taskID {
+			result = append(result, c)
+		}
+	}
+	return result, nil
+}
+
+func (s *FSStore) DeleteComment(project, agent, commentID string) error {
+	comments, err := s.readComments(project, agent)
+	if err != nil {
+		return err
+	}
+	for i, c := range comments {
+		if c.ID == commentID {
+			comments = slices.Delete(comments, i, i+1)
+			return s.writeComments(project, agent, comments)
+		}
+	}
+	return fmt.Errorf("comment %q not found", commentID)
+}
+
 // Compile-time assertion: FSStore must fully implement Store.
 // If a new method is added to Store, this line will fail to compile
 // until FSStore also implements it — ensuring no silent drift.

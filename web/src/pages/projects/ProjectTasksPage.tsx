@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Archive, ListTodo, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
+import { Archive, Kanban, LayoutList, ListTodo, Pencil, RefreshCw, Trash2, X } from 'lucide-react'
 import { CreateTaskDialog } from '../../components/project/CreateTaskDialog'
+import { TaskKanban } from '../../components/task/TaskKanban'
 import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
-import { apiPost } from '../../lib/api'
+import { apiPost, apiPut } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
@@ -21,6 +22,7 @@ import {
 
 type AgentRow = { name: string }
 
+type ViewMode = 'table' | 'board'
 type Filters = { status: string; agent: string; priority: string; scope: string }
 const defaultFilters: Filters = { status: '', agent: '', priority: '', scope: 'all' }
 
@@ -45,6 +47,7 @@ export default function ProjectTasksPage() {
       ? `/api/v1/projects/${encodeURIComponent(projectId)}`
       : null
 
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('agencycli_tasks_view') as ViewMode) || 'table')
   const [filters, setFilters] = useState<Filters>({ ...defaultFilters })
   const [reloadKey, setReloadKey] = useState(0)
   const [checked, setChecked] = useState<Set<string>>(new Set())
@@ -136,9 +139,30 @@ export default function ProjectTasksPage() {
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{t('projectNav.tasks')}</h1>
             <p className="mt-0.5 text-sm text-neutral-500 dark:text-zinc-500">{t('tasks.subtitle')}</p>
           </div>
-          {projectId != null && projectId !== '' && (
-            <CreateTaskDialog projectId={projectId} agents={agents} onCreated={reload} />
-          )}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
+              {([['table', LayoutList], ['board', Kanban]] as const).map(([mode, Icon]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setViewMode(mode); localStorage.setItem('agencycli_tasks_view', mode) }}
+                  className={cn(
+                    'p-1.5 transition-colors',
+                    viewMode === mode
+                      ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400'
+                      : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400',
+                    mode === 'table' ? 'rounded-l-md' : 'rounded-r-md',
+                  )}
+                  title={t(`tasks.view_${mode}`)}
+                >
+                  <Icon className="size-4" strokeWidth={1.8} />
+                </button>
+              ))}
+            </div>
+            {projectId != null && projectId !== '' && (
+              <CreateTaskDialog projectId={projectId} agents={agents} onCreated={reload} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -213,7 +237,14 @@ export default function ProjectTasksPage() {
           </div>
         )}
 
-        {state.status === 'ok' && tasks.length > 0 && (
+        {state.status === 'ok' && tasks.length > 0 && viewMode === 'board' && (
+          <TaskKanban tasks={tasks} onTaskClick={setDetailRow} onStatusChange={async (task, status) => {
+            await apiPut('/api/v1/tasks/update', { project: task.project, agent: task.agent, id: task.id, status })
+            reload()
+          }} />
+        )}
+
+        {state.status === 'ok' && tasks.length > 0 && viewMode === 'table' && (
           <>
             <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
             <table className="min-w-[900px] w-full">
@@ -253,6 +284,10 @@ export default function ProjectTasksPage() {
                           <span className={cn('text-[11px] font-bold', prio.cls)}>{prio.text}</span>
                           <span className="text-[13px] font-medium text-neutral-900 dark:text-zinc-100">{row.title}</span>
                           {row.type && <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">{t(`forms.taskType.${row.type}`, { defaultValue: row.type })}</span>}
+                          {row.labels?.map(l => (
+                            <span key={l} className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">{l}</span>
+                          ))}
+                          {row.dueDate && <span className="text-[10px] text-neutral-400 dark:text-zinc-500">{row.dueDate}</span>}
                           {row.archived && <Archive className="size-3.5 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />}
                         </div>
                         <span className="mt-0.5 block font-mono text-[11px] text-neutral-400 dark:text-zinc-500">{row.id}</span>

@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { FileText, Pencil, X } from 'lucide-react'
+import { FileText, MessageSquare, Pencil, Send, Trash2, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import { apiPut } from '../../lib/api'
+import { apiDelete, apiPost, apiPut } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
+import { useAuth } from '../../lib/auth'
 
 export type TaskRow = {
   id: string
@@ -16,13 +17,19 @@ export type TaskRow = {
   type?: string
   priority: number
   status: string
+  statusGroup: string
   archived: boolean
   assignee?: string
+  description?: string
   prompt?: string
   summary?: string
+  labels: string[]
+  parentId?: string
+  position: number
   createdBy?: string
   createdAt: string
   updatedAt: string
+  dueDate?: string
 }
 
 type RunRow = {
@@ -65,25 +72,38 @@ const fieldCls =
 
 export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation()
+  const [title, setTitle] = useState(task.title)
+  const [description, setDescription] = useState(task.description ?? '')
   const [status, setStatus] = useState(task.status)
   const [priority, setPriority] = useState(task.priority)
   const [taskType, setTaskType] = useState(task.type ?? '')
   const [summary, setSummary] = useState(task.summary ?? '')
+  const [labelsStr, setLabelsStr] = useState((task.labels ?? []).join(', '))
+  const [dueDate, setDueDate] = useState(task.dueDate ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   const showSummary = isTerminal(status)
-  const changed = status !== task.status || priority !== task.priority || taskType !== (task.type ?? '') || summary !== (task.summary ?? '')
+  const changed = title !== task.title || description !== (task.description ?? '') ||
+    status !== task.status || priority !== task.priority || taskType !== (task.type ?? '') ||
+    summary !== (task.summary ?? '') || labelsStr !== (task.labels ?? []).join(', ') ||
+    dueDate !== (task.dueDate ?? '')
 
   async function onSave() {
     setErr(null)
     setBusy(true)
     try {
       const body: Record<string, unknown> = { project: task.project, agent: task.agent, id: task.id }
+      if (title !== task.title) body.title = title
+      if (description !== (task.description ?? '')) body.description = description
       if (status !== task.status) body.status = status
       if (priority !== task.priority) body.priority = priority
       if (taskType !== (task.type ?? '')) body.type = taskType
       if (summary !== (task.summary ?? '')) body.summary = summary
+      if (labelsStr !== (task.labels ?? []).join(', ')) {
+        body.labels = labelsStr.split(',').map(l => l.trim()).filter(Boolean)
+      }
+      if (dueDate !== (task.dueDate ?? '')) body.dueDate = dueDate || ''
       await apiPut('/api/v1/tasks/update', body)
       onSaved()
       onClose()
@@ -96,42 +116,55 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !busy && onClose()}>
-      <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('tasks.edit')}</h2>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
         <div className="space-y-3 px-5 py-4">
-          <div className="text-sm font-medium text-neutral-700 dark:text-zinc-300">{task.title}</div>
           <div className="font-mono text-xs text-neutral-400 dark:text-zinc-500">{task.id}</div>
           <label className="block text-sm">
-            <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.filterStatus')}</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className={cn(fieldCls, 'mt-1')}>
-              {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
-            </select>
+            <span className="text-neutral-600 dark:text-zinc-400">{t('forms.title')}</span>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className={cn(fieldCls, 'mt-1')} />
           </label>
           <label className="block text-sm">
-            <span className="text-neutral-600 dark:text-zinc-400">{t('forms.priority')}</span>
-            <select value={priority} onChange={(e) => setPriority(Number(e.target.value))} className={cn(fieldCls, 'mt-1')}>
-              {[0, 1, 2, 3].map((p) => <option key={p} value={p}>P{p} — {t(`forms.priorityLabel.${p}`)}</option>)}
-            </select>
+            <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.description')}</span>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={cn(fieldCls, 'mt-1 resize-y')} />
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.filterStatus')}</span>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className={cn(fieldCls, 'mt-1')}>
+                {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('forms.priority')}</span>
+              <select value={priority} onChange={(e) => setPriority(Number(e.target.value))} className={cn(fieldCls, 'mt-1')}>
+                {[0, 1, 2, 3].map((p) => <option key={p} value={p}>P{p} — {t(`forms.priorityLabel.${p}`)}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('forms.type')}</span>
+              <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className={cn(fieldCls, 'mt-1')}>
+                {['chore', 'feature', 'bug', 'review', 'triage', 'test', 'research'].map((ty) => <option key={ty} value={ty}>{t(`forms.taskType.${ty}`, { defaultValue: ty })}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.dueDate')}</span>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={cn(fieldCls, 'mt-1')} />
+            </label>
+          </div>
           <label className="block text-sm">
-            <span className="text-neutral-600 dark:text-zinc-400">{t('forms.type')}</span>
-            <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className={cn(fieldCls, 'mt-1')}>
-              {['chore', 'feature', 'bug', 'review', 'triage', 'test', 'research'].map((ty) => <option key={ty} value={ty}>{t(`forms.taskType.${ty}`, { defaultValue: ty })}</option>)}
-            </select>
+            <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.labels')}</span>
+            <input value={labelsStr} onChange={(e) => setLabelsStr(e.target.value)} placeholder={t('tasks.labelsHint')} className={cn(fieldCls, 'mt-1')} />
           </label>
           {showSummary && (
             <label className="block text-sm">
               <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.summary')}</span>
-              <textarea
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                rows={6}
-                placeholder={t('tasks.summaryPlaceholder')}
-                className={cn(fieldCls, 'mt-1')}
-              />
+              <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={4} placeholder={t('tasks.summaryPlaceholder')} className={cn(fieldCls, 'mt-1')} />
               {task.createdBy && (
                 <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">
                   {t('tasks.willNotifyCreator', { creator: task.createdBy })}
@@ -196,7 +229,18 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           <InfoCell label={t('tasks.colAssignee')}>{task.assignee === 'human' ? <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">human</span> : <span className="font-mono">{task.agent}</span>}</InfoCell>
           <InfoCell label={t('forms.type')}>{task.type ? t(`forms.taskType.${task.type}`, { defaultValue: task.type }) : '—'}</InfoCell>
           <InfoCell label={t('api.taskColUpdated')}>{fmt(task.updatedAt)}</InfoCell>
+          {task.dueDate && <InfoCell label={t('tasks.dueDate')}><span className="tabular-nums">{task.dueDate}</span></InfoCell>}
           {task.createdBy && <InfoCell label={t('tasks.createdBy')}><span className="font-mono">{task.createdBy}</span></InfoCell>}
+          {task.parentId && <InfoCell label={t('tasks.parentTask')}><span className="font-mono text-xs">{task.parentId}</span></InfoCell>}
+          {task.labels && task.labels.length > 0 && (
+            <InfoCell label={t('tasks.labels')}>
+              <div className="flex flex-wrap gap-1">
+                {task.labels.map(l => (
+                  <span key={l} className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">{l}</span>
+                ))}
+              </div>
+            </InfoCell>
+          )}
           {matchingRun && (
             <>
               <InfoCell label={t('runs.model')}><span className="font-mono">{matchingRun.model ?? '—'}</span></InfoCell>
@@ -209,6 +253,15 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
             </>
           )}
         </div>
+
+        {task.description && (
+          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('tasks.description')}</span>
+            <div className="mt-1.5 text-sm text-neutral-700 dark:text-zinc-300">
+              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown></div>
+            </div>
+          </div>
+        )}
 
         {task.prompt && (
           <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
@@ -227,6 +280,8 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
             </div>
           </div>
         )}
+
+        <TaskCommentsSection project={task.project} agent={task.agent} taskId={task.id} />
 
         <div className="flex-1 overflow-y-auto">
           {matchingRun ? (
@@ -309,6 +364,94 @@ function ConversationLog({ content }: { content: string }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+/* ── Task Comments Section ── */
+
+type TaskCommentRow = {
+  id: string
+  taskId: string
+  author: string
+  body: string
+  createdAt: string
+}
+
+function TaskCommentsSection({ project, agent, taskId }: { project: string; agent: string; taskId: string }) {
+  const { t } = useTranslation()
+  const fmt = useFormatDateTime()
+  const { user } = useAuth()
+  const [body, setBody] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [ver, setVer] = useState(0)
+
+  const url = `/api/v1/tasks/${encodeURIComponent(project)}/${encodeURIComponent(agent)}/${encodeURIComponent(taskId)}/comments`
+  const state = useApiJson<TaskCommentRow[]>(url, ver)
+  const comments = state.status === 'ok' ? state.data ?? [] : []
+
+  const reload = useCallback(() => setVer((v) => v + 1), [])
+
+  async function handleAdd() {
+    if (!body.trim()) return
+    setBusy(true)
+    try {
+      await apiPost(url, { author: user?.username ?? 'human', body: body.trim() })
+      setBody('')
+      reload()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete(commentId: string) {
+    await apiDelete(`${url}/${encodeURIComponent(commentId)}`)
+    reload()
+  }
+
+  return (
+    <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+      <div className="flex items-center gap-1.5 mb-2">
+        <MessageSquare className="size-3.5 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
+        <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('tasks.comments')} ({comments.length})</span>
+      </div>
+
+      {comments.length > 0 && (
+        <div className="space-y-2 mb-3 max-h-56 overflow-y-auto">
+          {comments.map((c) => (
+            <div key={c.id} className="group rounded-lg bg-neutral-50 px-3 py-2 dark:bg-zinc-800/50">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-zinc-500">
+                  <span className="font-semibold text-neutral-700 dark:text-zinc-300">@{c.author}</span>
+                  <span>{fmt(c.createdAt)}</span>
+                </div>
+                {(user?.role === 'admin' || user?.username === c.author) && (
+                  <button type="button" onClick={() => void handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-neutral-400 hover:text-red-500 transition dark:text-zinc-600 dark:hover:text-red-400" title={t('forms.delete')}>
+                    <Trash2 className="size-3" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-1 text-sm text-neutral-700 dark:text-zinc-300 prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.body}</ReactMarkdown>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleAdd() } }}
+          placeholder={t('tasks.commentPlaceholder')}
+          className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm outline-none transition-colors focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+          disabled={busy}
+        />
+        <button type="button" onClick={() => void handleAdd()} disabled={busy || !body.trim()} className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+          <Send className="size-3.5" />
+        </button>
+      </div>
     </div>
   )
 }

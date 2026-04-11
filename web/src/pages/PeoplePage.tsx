@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { User, UserPlus, FolderKanban, X, Eye, EyeOff, ShieldCheck, Shield } from 'lucide-react'
+import { User, UserPlus, FolderKanban, X, Eye, EyeOff } from 'lucide-react'
 import { apiFetch, apiPost } from '../lib/api'
 import { cn } from '../lib/cn'
 
@@ -100,7 +100,7 @@ export default function PeoplePage() {
                     {p.disabled && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">{t('users.disabled')}</span>}
                   </div>
                   {p.displayName && (
-                    <p className="truncate text-xs text-neutral-400 dark:text-zinc-500">@{p.username}</p>
+                    <p className="truncate text-xs text-neutral-400 dark:text-zinc-500">{p.username}</p>
                   )}
                   {p.email && (
                     <p className="truncate text-xs text-neutral-400 dark:text-zinc-500">{p.email}</p>

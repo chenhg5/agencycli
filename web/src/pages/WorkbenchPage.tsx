@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   CheckCircle2,
+  KanbanSquare,
+  List,
   ListTodo,
   Mail,
   MessageSquare,
@@ -14,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { apiFetch, apiPost } from '../lib/api'
+import { apiFetch, apiPost, apiPut } from '../lib/api'
 import { useFormatDateTime } from '../lib/format-datetime'
 import { useApiJson } from '../lib/use-api'
 import {
@@ -25,6 +27,7 @@ import { CreateMessageDialog } from '../components/project/CreateMessageDialog'
 import { CreateTaskDialog } from '../components/project/CreateTaskDialog'
 import { RunAgentDialog } from '../components/project/RunAgentDialog'
 import { Pagination } from '../components/ui/Pagination'
+import { TaskKanban } from '../components/task/TaskKanban'
 import {
   EditTaskModal,
   TaskDetailModal,
@@ -430,9 +433,12 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
 
 /* ── Tasks panel ──────────────────────────────────────────────────────────── */
 
+type TaskView = 'list' | 'kanban'
+
 function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
+  const [view, setView] = useState<TaskView>('list')
   const [statusFilter, setStatusFilter] = useState('pending')
   const [projectFilter, setProjectFilter] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
@@ -443,7 +449,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const firstProject = projectsAgents[0]
 
   const qp = new URLSearchParams()
-  if (statusFilter) qp.set('status', statusFilter)
+  if (view === 'list' && statusFilter) qp.set('status', statusFilter)
   if (projectFilter) qp.set('project', projectFilter)
   const qs = qp.toString() ? `?${qp.toString()}` : ''
   const [wbTaskPage, setWbTaskPage] = useState(1)
@@ -466,6 +472,11 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   }, [tasks])
 
   const reload = useCallback(() => { setReloadKey((k) => k + 1); setChecked(new Set()) }, [])
+
+  async function handleKanbanStatusChange(task: TaskRow, newStatus: string) {
+    await apiPut('/api/v1/tasks/update', { project: task.project, agent: task.agent, id: task.id, status: newStatus })
+    reload()
+  }
 
   const allChecked = tasks.length > 0 && checked.size === tasks.length
   const someChecked = checked.size > 0
@@ -527,10 +538,27 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
       {/* Filters */}
       <div className="shrink-0 px-8 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setChecked(new Set()) }} className={selectCls}>
-            <option value="">{t('tasks.filterStatus')}: {t('messages.readAll')}</option>
-            {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
-          </select>
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
+            <button type="button" onClick={() => setView('list')} className={cn(
+              'flex items-center gap-1.5 rounded-l-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              view === 'list' ? 'bg-neutral-100 text-neutral-800 dark:bg-zinc-800 dark:text-zinc-200' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400'
+            )}>
+              <List className="size-3.5" strokeWidth={2} />
+            </button>
+            <button type="button" onClick={() => setView('kanban')} className={cn(
+              'flex items-center gap-1.5 rounded-r-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              view === 'kanban' ? 'bg-neutral-100 text-neutral-800 dark:bg-zinc-800 dark:text-zinc-200' : 'text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400'
+            )}>
+              <KanbanSquare className="size-3.5" strokeWidth={2} />
+            </button>
+          </div>
+          {view === 'list' && (
+            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setChecked(new Set()) }} className={selectCls}>
+              <option value="">{t('tasks.filterStatus')}: {t('messages.readAll')}</option>
+              {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
+            </select>
+          )}
           {projects.length > 1 && (
             <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setChecked(new Set()) }} className={cn(selectCls, 'font-mono')}>
               <option value="">{t('workbench.filterProject')}: {t('workbench.allProjects')}</option>
@@ -569,7 +597,28 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
       {editRow && <EditTaskModal task={editRow} onClose={() => setEditRow(null)} onSaved={reload} />}
       {detailRow && <TaskDetailModal task={detailRow} onClose={() => setDetailRow(null)} onEdit={(r) => { setDetailRow(null); setEditRow(r) }} />}
 
-      {/* List */}
+      {/* Kanban view */}
+      {view === 'kanban' && (
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-8 pb-8 pt-2">
+          {state.status === 'loading' && (
+            <div className="flex items-center gap-2 py-20 justify-center">
+              <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
+              <span className="text-sm text-neutral-500">{t('api.loading')}</span>
+            </div>
+          )}
+          {state.status === 'ok' && (
+            <TaskKanban
+              tasks={tasks}
+              onTaskClick={setDetailRow}
+              onStatusChange={(task, status) => void handleKanbanStatusChange(task, status)}
+              showProject
+            />
+          )}
+        </div>
+      )}
+
+      {/* List view */}
+      {view === 'list' && (
       <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2">
         {state.status === 'loading' && (
           <div className="flex items-center gap-2 py-20 justify-center">
@@ -680,6 +729,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

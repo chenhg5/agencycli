@@ -143,6 +143,17 @@ type Store interface {
 	// or ("", "", nil, error) when not found.
 	FindTaskByID(id string) (project, agent string, task *entity.Task, err error)
 
+	// ── Task Comments ────────────────────────────────────────────────────────
+
+	// AddComment persists a comment for a task.
+	AddComment(project, agent string, c *entity.TaskComment) error
+
+	// ListComments returns all comments for a task, oldest first.
+	ListComments(project, agent, taskID string) ([]*entity.TaskComment, error)
+
+	// DeleteComment removes a comment by ID.
+	DeleteComment(project, agent, commentID string) error
+
 	// ── Run logs ─────────────────────────────────────────────────────────────
 
 	// RunLogDir returns (and creates) the directory where execution logs for

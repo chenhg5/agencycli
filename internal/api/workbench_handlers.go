@@ -197,22 +197,7 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				isArchived := t.Status.IsTerminal() && !containsTask(active, t.ID)
-				rows = append(rows, taskRow{
-					ID:        t.ID,
-					Project:   proj,
-					Agent:     ag,
-					Title:     t.Title,
-					Type:      string(t.Type),
-					Assignee:  t.Assignee,
-					Prompt:    t.Prompt,
-					Priority:  int(t.Priority),
-					Status:    string(t.Status),
-					Archived:  isArchived,
-					Summary:   t.Summary,
-					CreatedBy: t.CreatedBy,
-					CreatedAt: t.CreatedAt,
-					UpdatedAt: t.UpdatedAt,
-				})
+				rows = append(rows, taskToRow(t, proj, ag, isArchived))
 			}
 		}
 	}
