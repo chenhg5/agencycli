@@ -1,5 +1,61 @@
 # Changelog
 
+## [v0.4.0] - 2026-04-06
+
+### Added
+
+**Goal management (OKR & Milestones)**
+- OKR system: Objectives with Key Results supporting number/percentage/boolean/currency metric types
+- Milestone management: project-level milestones with completion criteria, task labels, and due dates
+- OKR web dashboard with inline KR value editing, create/edit/delete modals, and description fields
+- Milestone panel with create/edit modal, progress tracking, and i18n-aware date formatting
+- CLI commands: `agencycli okr list/create/update/delete` with `kr add/update` and `review` subcommands
+- CLI commands: `agencycli milestone list/create/show/update/delete`
+- Agent context injection: active OKR and milestone summaries auto-injected into agent prompts
+- Web AI assistant prompt updated with goal management awareness
+
+**Multi-user support**
+- People management page: create/edit/delete user accounts with username/password
+- RBAC permission model design
+- Person detail page with editable profile fields (email, avatar, phone, bio)
+- Human hiring flow via web UI
+
+**IM platform integration (cc-connect)**
+- cc-connect API proxy: connect agents to Feishu/WeChat via QR code scanning
+- Settings page: one-stop cc-connect configuration panel
+- Agent detail page: IM connection panel for binding IM accounts per agent
+- Explicit project creation wizard with auto-restart polling
+
+**Task & workbench enhancements**
+- Kanban board view: list/board toggle with drag-and-drop status changes
+- Batch operations: bulk cancel/archive/delete tasks
+- Workbench kanban: unified message/task kanban in workbench
+- Fire/remove agent or human member from projects
+
+**Scheduler & operations**
+- Heartbeat session management with SessionID tracking
+- Context usage statistics (token consumption per agent)
+- Unified API provider management via web UI (key + base URL configuration)
+- AI assistant interactive permissions: allow/deny/allow-all for tool calls
+- Run records track actual API model and base URL used
+- Graceful scheduler shutdown on Ctrl+C
+
+### Fixed
+- Claude thinking signature validation error auto-retry (backtick variant)
+- Codex Docker sandbox seccomp permission (`bwrap` namespace creation)
+- Knowledge base third-level directory navigation
+- Scheduler `ActiveDays` configuration not being respected
+- Workbench reply textarea hiding while typing
+- cc-connect project name path encoding with URL-safe separators
+- Dark mode select dropdown option styling across all pages
+- React error #310 in workbench message detail modal
+
+### Changed
+- Page header buttons unified to outline style across OKR, milestone, people, and task pages
+- Date display follows i18n locale conventions (Intl.DateTimeFormat)
+- Workbench defaults to inbox tab; reply available from message detail modal
+- Markdown rendering in message detail modal
+
 ## [v0.3.0] - 2026-04-03
 
 ### Added
