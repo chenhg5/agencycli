@@ -21,6 +21,8 @@ import TeamsPage from './pages/teams/TeamsPage'
 import DocsPage from './pages/docs/DocsPage'
 import PeoplePage from './pages/PeoplePage'
 import PersonDetailPage from './pages/PersonDetailPage'
+import OKRPage from './pages/OKRPage'
+import ProjectMilestonePage from './pages/projects/ProjectMilestonePage'
 
 export default function App() {
   const { token, user, logout } = useAuth()
@@ -46,6 +48,7 @@ export default function App() {
         <Route path="projects/:projectId" element={<ProjectBranch />}>
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<ProjectTasksPage />} />
+          <Route path="milestones" element={<ProjectMilestonePage />} />
           <Route path="messages" element={<ProjectMessagesPage />} />
           <Route path="members" element={<ProjectMembersPage />} />
           <Route path="members/:agentName" element={<ProjectAgentDetailPage />} />
@@ -53,6 +56,7 @@ export default function App() {
           <Route path="runs" element={<ProjectRunsPage />} />
           {isAdmin && <Route path="settings" element={<ProjectSettingsPage />} />}
         </Route>
+        <Route path="goals" element={<OKRPage />} />
         <Route path="people" element={<PeoplePage />} />
         <Route path="people/:username" element={<PersonDetailPage />} />
         <Route path="workbench" element={<WorkbenchPage />} />

@@ -85,6 +85,8 @@ func init() {
 		newCheckUpdateCmd(),
 		newUpdateCmd(),
 		newDocsCmd(),
+		newOKRCmd(),
+		newMilestoneCmd(),
 	)
 }
 

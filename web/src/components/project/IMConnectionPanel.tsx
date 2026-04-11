@@ -63,7 +63,7 @@ export function IMConnectionPanel({ project, agentName, model, workDir }: {
   const [setupWorkDir, setSetupWorkDir] = useState('')
   const [setupAgentType, setSetupAgentType] = useState('')
 
-  const defaultProjectName = `${project}--${agentName}`
+  const defaultProjectName = `agencycli--${project}--${agentName}`
 
   const ccFetch = useCallback(async (path: string): Promise<Response | null> => {
     try {

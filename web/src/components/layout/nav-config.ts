@@ -6,9 +6,11 @@ import {
   FolderKanban,
   LayoutDashboard,
   ListTodo,
+  Milestone,
   MessageSquare,
   Puzzle,
   Settings,
+  Target,
   User,
   Users,
 } from 'lucide-react'
@@ -21,12 +23,13 @@ export type NavKey =
   | 'projects'
   | 'people'
   | 'workbench'
+  | 'goals'
   | 'skills'
   | 'docs'
   | 'settings'
 
 /** 项目内执行面：`projectNav.*` */
-export type ProjectNavKey = 'tasks' | 'messages' | 'members' | 'schedule' | 'runs' | 'settings'
+export type ProjectNavKey = 'tasks' | 'milestones' | 'messages' | 'members' | 'schedule' | 'runs' | 'settings'
 
 export type NavItem = {
   to: string
@@ -54,6 +57,7 @@ export const workspaceNav: NavItem[] = [
     icon: FolderKanban,
     activePrefix: '/projects',
   },
+  { to: '/goals', navKey: 'goals', icon: Target, activePrefix: '/goals' },
   { to: '/people', navKey: 'people', icon: User, activePrefix: '/people' },
   { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams', adminOnly: true },
   { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills', adminOnly: true },
@@ -63,6 +67,7 @@ export const workspaceNav: NavItem[] = [
 
 export const projectSubNav: ProjectNavItem[] = [
   { segment: 'tasks', icon: ListTodo },
+  { segment: 'milestones', icon: Milestone },
   { segment: 'messages', icon: MessageSquare },
   { segment: 'members', icon: Users },
   { segment: 'schedule', icon: CalendarClock, adminOnly: true },
@@ -77,6 +82,7 @@ export function navKeyFromPath(pathname: string): NavKey {
     teams: 'teams',
     projects: 'projects',
     people: 'people',
+    goals: 'goals',
     workbench: 'workbench',
     skills: 'skills',
     docs: 'docs',
@@ -94,7 +100,7 @@ export function projectIdFromPath(pathname: string): string | null {
 
 export function projectNavKeyFromPath(pathname: string): ProjectNavKey | null {
   const m =
-    /^\/projects\/[^/]+\/(tasks|messages|members|schedule|runs|settings)(?:\/|$)/.exec(pathname)
+    /^\/projects\/[^/]+\/(tasks|milestones|messages|members|schedule|runs|settings)(?:\/|$)/.exec(pathname)
   return (m?.[1] as ProjectNavKey) ?? null
 }
 

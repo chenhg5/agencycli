@@ -228,6 +228,12 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 	if meta.Provider != "" {
 		resp["provider"] = meta.Provider
 	}
+
+	goalSummary := s.buildGoalSummary(project)
+	if goalSummary != "" {
+		resp["goals"] = goalSummary
+	}
+
 	_ = json.NewEncoder(w).Encode(resp)
 }
 

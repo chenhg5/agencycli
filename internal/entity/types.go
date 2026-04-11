@@ -117,6 +117,9 @@ type Agency struct {
 	// (inbox notifications, wakeup triggers, etc.).
 	// Supported values: "en" (default), "zh".
 	Lang string `yaml:"lang,omitempty"`
+
+	Vision  string `yaml:"vision,omitempty"`
+	Mission string `yaml:"mission,omitempty"`
 }
 
 // Team represents a functional group inside the agency.
@@ -490,9 +493,10 @@ type Task struct {
 	// Summary is what the agent reports on completion (used by workflow routing).
 	Summary string `yaml:"summary,omitempty"`
 
-	Labels   []string `yaml:"labels,omitempty"`
-	ParentID string   `yaml:"parent_id,omitempty"` // sub-task parent
-	Position float64  `yaml:"position,omitempty"`   // manual sort order for kanban / list
+	Labels      []string `yaml:"labels,omitempty"`
+	ParentID    string   `yaml:"parent_id,omitempty"`    // sub-task parent
+	Position    float64  `yaml:"position,omitempty"`     // manual sort order for kanban / list
+	MilestoneID string   `yaml:"milestone_id,omitempty"` // linked project milestone
 
 	CreatedAt  time.Time  `yaml:"created_at"`
 	UpdatedAt  time.Time  `yaml:"updated_at"`
@@ -748,6 +752,174 @@ type Cron struct {
 	LastRun       *time.Time `yaml:"last_run,omitempty"`
 	LastRunStatus string     `yaml:"last_run_status,omitempty"`
 	RunCount      int        `yaml:"run_count,omitempty"`
+}
+
+// ─────────────────────────────────────────────
+// OKR (Objectives and Key Results)
+// ─────────────────────────────────────────────
+
+// OKRStatus represents the health status of an OKR.
+type OKRStatus string
+
+const (
+	OKRStatusOnTrack  OKRStatus = "on_track"
+	OKRStatusAtRisk   OKRStatus = "at_risk"
+	OKRStatusOffTrack OKRStatus = "off_track"
+	OKRStatusAchieved OKRStatus = "achieved"
+)
+
+// MetricType defines how a Key Result is measured.
+type MetricType string
+
+const (
+	MetricTypePercentage MetricType = "percentage"
+	MetricTypeNumber     MetricType = "number"
+	MetricTypeBoolean    MetricType = "boolean"
+	MetricTypeCurrency   MetricType = "currency"
+)
+
+// KeyResult is a measurable outcome that drives an Objective forward.
+type KeyResult struct {
+	ID          string     `yaml:"id"           json:"id"`
+	Description string     `yaml:"description"  json:"description"`
+	MetricType  MetricType `yaml:"metric_type"  json:"metricType"`
+	TargetValue float64    `yaml:"target_value" json:"targetValue"`
+	CurrentValue float64   `yaml:"current_value" json:"currentValue"`
+	Unit        string     `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Weight      float64    `yaml:"weight,omitempty" json:"weight,omitempty"` // 0 = equal weight
+	LinkedMilestones []string `yaml:"linked_milestones,omitempty" json:"linkedMilestones,omitempty"`
+}
+
+// Progress returns 0-100 completion percentage.
+func (kr *KeyResult) Progress() float64 {
+	if kr.MetricType == MetricTypeBoolean {
+		if kr.CurrentValue > 0 {
+			return 100
+		}
+		return 0
+	}
+	if kr.TargetValue == 0 {
+		return 0
+	}
+	p := kr.CurrentValue / kr.TargetValue * 100
+	if p > 100 {
+		p = 100
+	}
+	if p < 0 {
+		p = 0
+	}
+	return p
+}
+
+// ReviewNote records a periodic check-in on an OKR.
+type ReviewNote struct {
+	Date   string `yaml:"date"   json:"date"`
+	Note   string `yaml:"note"   json:"note"`
+	Author string `yaml:"author" json:"author"`
+}
+
+// OKR is an Objective with its associated Key Results.
+// Stored in <root>/.agencycli/okrs.yaml.
+type OKR struct {
+	ID          string       `yaml:"id"          json:"id"`
+	Objective   string       `yaml:"objective"   json:"objective"`
+	Description string       `yaml:"description,omitempty" json:"description,omitempty"`
+	Owner       string       `yaml:"owner"       json:"owner"`
+	Quarter     string       `yaml:"quarter"     json:"quarter"`
+	Status      OKRStatus    `yaml:"status"      json:"status"`
+	KeyResults  []KeyResult  `yaml:"key_results" json:"keyResults"`
+	ReviewNotes []ReviewNote `yaml:"review_notes,omitempty" json:"reviewNotes,omitempty"`
+
+	CreatedAt time.Time `yaml:"created_at" json:"createdAt"`
+	UpdatedAt time.Time `yaml:"updated_at" json:"updatedAt"`
+}
+
+// Progress returns the weighted average progress across all Key Results.
+func (o *OKR) Progress() float64 {
+	if len(o.KeyResults) == 0 {
+		return 0
+	}
+	var totalWeight, weightedSum float64
+	for i := range o.KeyResults {
+		w := o.KeyResults[i].Weight
+		if w <= 0 {
+			w = 1
+		}
+		totalWeight += w
+		weightedSum += w * o.KeyResults[i].Progress()
+	}
+	if totalWeight == 0 {
+		return 0
+	}
+	return weightedSum / totalWeight
+}
+
+// OKRFile is the top-level structure for okrs.yaml.
+type OKRFile struct {
+	CurrentQuarter string `yaml:"current_quarter" json:"currentQuarter"`
+	OKRs           []OKR  `yaml:"okrs"            json:"okrs"`
+}
+
+func NewOKRID() string {
+	now := time.Now().UTC()
+	q := (now.Month()-1)/3 + 1
+	return fmt.Sprintf("okr-%dq%d-%s", now.Year(), q, randomString(6))
+}
+
+func NewKRID() string {
+	return "kr-" + randomString(6)
+}
+
+// helper shared by all ID generators
+func randomString(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(b)
+}
+
+// ─────────────────────────────────────────────
+// Milestone
+// ─────────────────────────────────────────────
+
+// MilestoneStatus represents the lifecycle state of a milestone.
+type MilestoneStatus string
+
+const (
+	MilestoneStatusPlanned    MilestoneStatus = "planned"
+	MilestoneStatusInProgress MilestoneStatus = "in_progress"
+	MilestoneStatusCompleted  MilestoneStatus = "completed"
+	MilestoneStatusCancelled  MilestoneStatus = "cancelled"
+)
+
+// Milestone is a project-level deliverable goal.
+// Stored in <root>/projects/<project>/.agencycli/milestones.yaml.
+type Milestone struct {
+	ID          string          `yaml:"id"          json:"id"`
+	Title       string          `yaml:"title"       json:"title"`
+	Description string          `yaml:"description,omitempty" json:"description,omitempty"`
+	Status      MilestoneStatus `yaml:"status"      json:"status"`
+	DueDate     *time.Time      `yaml:"due_date,omitempty" json:"dueDate,omitempty"`
+	Owner       string          `yaml:"owner,omitempty" json:"owner,omitempty"`
+	Progress    int             `yaml:"progress"    json:"progress"` // 0-100, manual or auto-calc
+
+	Criteria    []string `yaml:"criteria,omitempty"    json:"criteria,omitempty"`
+	LinkedKR    []string `yaml:"linked_kr,omitempty"   json:"linkedKR,omitempty"`
+	TaskLabels  []string `yaml:"task_labels,omitempty" json:"taskLabels,omitempty"`
+
+	CreatedAt time.Time `yaml:"created_at" json:"createdAt"`
+	UpdatedAt time.Time `yaml:"updated_at" json:"updatedAt"`
+}
+
+// MilestoneFile is the top-level structure for milestones.yaml.
+type MilestoneFile struct {
+	Milestones []Milestone `yaml:"milestones" json:"milestones"`
+}
+
+func NewMilestoneID() string {
+	return "ms-" + randomString(8)
 }
 
 // ─────────────────────────────────────────────

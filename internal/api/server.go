@@ -40,6 +40,8 @@ type Server struct {
 	users        *UserStore
 	sched        *SchedulerManager
 	ccStore      *store.CCConnectStore
+	okrStore     *store.OKRStore
+	msStore      *store.MilestoneStore
 	updateCheck       UpdateChecker
 	daemonStatus      DaemonStatusFunc
 	assistantMu       sync.Mutex
@@ -56,7 +58,9 @@ func NewServer(root, apiKey string) *Server {
 		ts:      taskstore.New(root),
 		users:   newUserStore(root),
 		sched:   newSchedulerManager(root),
-		ccStore: store.NewCCConnectStore(root),
+		ccStore:   store.NewCCConnectStore(root),
+		okrStore:  store.NewOKRStore(root),
+		msStore:   store.NewMilestoneStore(root),
 	}
 }
 
@@ -163,6 +167,22 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/users/{username}", s.handleGetUser)
 	mux.HandleFunc("PUT /api/v1/users/{username}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /api/v1/users/{username}", s.handleDeleteUser)
+
+	// ── Goals (OKR + Milestones) ──
+	mux.HandleFunc("GET /api/v1/okrs", s.handleListOKRs)
+	mux.HandleFunc("POST /api/v1/okrs", s.handleCreateOKR)
+	mux.HandleFunc("GET /api/v1/okrs/{id}", s.handleGetOKR)
+	mux.HandleFunc("PUT /api/v1/okrs/{id}", s.handleUpdateOKR)
+	mux.HandleFunc("DELETE /api/v1/okrs/{id}", s.handleDeleteOKR)
+	mux.HandleFunc("POST /api/v1/okrs/{id}/key-results", s.handleAddKR)
+	mux.HandleFunc("PUT /api/v1/okrs/{id}/key-results/{krId}", s.handleUpdateKR)
+	mux.HandleFunc("DELETE /api/v1/okrs/{id}/key-results/{krId}", s.handleDeleteKR)
+	mux.HandleFunc("POST /api/v1/okrs/{id}/reviews", s.handleAddReviewNote)
+	mux.HandleFunc("GET /api/v1/projects/{name}/milestones", s.handleListMilestones)
+	mux.HandleFunc("POST /api/v1/projects/{name}/milestones", s.handleCreateMilestone)
+	mux.HandleFunc("GET /api/v1/projects/{name}/milestones/{msId}", s.handleGetMilestone)
+	mux.HandleFunc("PUT /api/v1/projects/{name}/milestones/{msId}", s.handleUpdateMilestone)
+	mux.HandleFunc("DELETE /api/v1/projects/{name}/milestones/{msId}", s.handleDeleteMilestone)
 
 	mux.HandleFunc("GET /api/v1/ccconnect/config", s.handleCCConnectGetConfig)
 	mux.HandleFunc("PUT /api/v1/ccconnect/config", s.handleCCConnectPutConfig)

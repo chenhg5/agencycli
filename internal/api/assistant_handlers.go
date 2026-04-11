@@ -88,7 +88,7 @@ func (s *Server) handleAssistantChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	skill := s.loadAssistantSkill()
-	prompt := buildAssistantPrompt(skill, s.root, body.History, msg)
+	prompt := s.buildAssistantPromptWithGoals(skill, s.root, body.History, msg)
 
 	wantStream := strings.Contains(r.Header.Get("Accept"), "text/event-stream")
 
@@ -455,21 +455,38 @@ Key commands:
 - agencycli inbox messages - View messages
 - agencycli scheduler start - Start the scheduler
 - agencycli sync - Sync agent context
+- agencycli okr list/create/show/update/delete - Manage OKRs
+- agencycli okr kr add/update - Manage Key Results
+- agencycli milestone list/create/show/update/delete - Manage milestones
 
 Always use --dir flag pointing to the agency workspace root when running commands.
 Run 'agencycli --help' for full command reference.
 `
 
-func buildAssistantPrompt(skill, root string, history []assistantChatMsg, message string) string {
+func (s *Server) buildAssistantPromptWithGoals(skill, root string, history []assistantChatMsg, message string) string {
+	goalSummary := s.buildGoalSummary("")
+	return buildAssistantPrompt(skill, root, goalSummary, history, message)
+}
+
+func buildAssistantPrompt(skill, root, goalSummary string, history []assistantChatMsg, message string) string {
 	var sb strings.Builder
 
 	sb.WriteString(skill)
 	sb.WriteString("\n\n---\n\n")
 	sb.WriteString(fmt.Sprintf("## Environment\n\nAgency workspace: `%s`\nAlways use `--dir %s` when running agencycli commands.\n\n", root, root))
+
+	if goalSummary != "" {
+		sb.WriteString("## Current Goals & OKRs\n\n")
+		sb.WriteString(goalSummary)
+		sb.WriteString("\n---\n\n")
+	}
+
 	sb.WriteString("## Instructions\n\n")
 	sb.WriteString("You are an assistant integrated into the agencycli web console. ")
 	sb.WriteString("The user will ask you to perform tasks related to managing their AI agent agency. ")
 	sb.WriteString("You should execute agencycli CLI commands to fulfill their requests. ")
+	sb.WriteString("You are aware of the agency's OKRs and milestones — reference them when relevant. ")
+	sb.WriteString("When the user asks about goals, progress, or what to focus on, consult the Current Goals section. ")
 	sb.WriteString("Always explain what you're doing and show the results. ")
 	sb.WriteString("Respond concisely in the same language as the user's message.\n\n")
 

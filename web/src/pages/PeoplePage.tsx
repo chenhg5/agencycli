@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { User, UserPlus, FolderKanban, X, Eye, EyeOff } from 'lucide-react'
+import { User, FolderKanban, X, Eye, EyeOff } from 'lucide-react'
 import { apiFetch, apiPost } from '../lib/api'
 import { cn } from '../lib/cn'
 
@@ -62,8 +62,7 @@ export default function PeoplePage() {
           <p className="mt-0.5 text-sm text-neutral-500 dark:text-zinc-500">{t('people.subtitle')}</p>
         </div>
         <button type="button" onClick={() => { setCreating(true); setErr(null); setShowPwd(false) }}
-          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700">
-          <UserPlus className="size-4" strokeWidth={1.8} />
+          className="rounded-lg border border-sky-600 bg-white px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-500 dark:bg-zinc-900 dark:text-sky-400 dark:hover:bg-zinc-800">
           {t('people.add')}
         </button>
       </div>
