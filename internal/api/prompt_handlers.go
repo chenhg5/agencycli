@@ -217,6 +217,7 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		"role":        meta.Role,
 		"syncedAt":    meta.SyncedAt,
 		"skills":      skills,
+		"workDir":     agentDir,
 	}
 	if meta.HTTPAgent != nil {
 		resp["httpAgent"] = meta.HTTPAgent

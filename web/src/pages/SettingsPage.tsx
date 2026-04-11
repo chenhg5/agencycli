@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyRound, Plus, Server, Trash2, Pencil, X, Eye, EyeOff, Users, Shield, ShieldCheck, UserPlus } from 'lucide-react'
+import { KeyRound, Plus, Server, Trash2, Pencil, X, Eye, EyeOff, Users, Shield, ShieldCheck, UserPlus, Link2, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { i18n } from '../i18n'
 import type { ThemeMode } from '../theme/ThemeProvider'
 import { useTheme } from '../theme/ThemeProvider'
@@ -601,6 +601,120 @@ function ProvidersSection() {
   )
 }
 
+function CCConnectSection() {
+  const { t } = useTranslation()
+  const [apiUrl, setApiUrl] = useState('')
+  const [token, setToken] = useState('')
+  const [hasToken, setHasToken] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; version?: string; error?: string } | null>(null)
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [showToken, setShowToken] = useState(false)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const cfg = await apiFetch<{ apiUrl: string; hasToken: boolean }>('/api/v1/ccconnect/config')
+        setApiUrl(cfg.apiUrl || '')
+        setHasToken(cfg.hasToken)
+      } catch { /* ignore */ }
+      finally { setLoading(false) }
+    })()
+  }, [])
+
+  async function handleSave() {
+    setSaving(true); setMsg(null)
+    try {
+      await apiPut('/api/v1/ccconnect/config', { apiUrl, token: token || undefined })
+      setMsg({ type: 'ok', text: t('ccconnect.saved') })
+      if (token) { setHasToken(true); setToken('') }
+    } catch (e) {
+      setMsg({ type: 'err', text: e instanceof Error ? e.message : String(e) })
+    } finally { setSaving(false) }
+  }
+
+  async function handleTest() {
+    setTesting(true); setTestResult(null)
+    try {
+      const res = await apiPost<{ ok: boolean; data?: { version?: string }; error?: string }>('/api/v1/ccconnect/test', {})
+      if (res.ok) {
+        setTestResult({ ok: true, version: res.data?.version })
+      } else {
+        setTestResult({ ok: false, error: res.error })
+      }
+    } catch (e) {
+      setTestResult({ ok: false, error: e instanceof Error ? e.message : String(e) })
+    } finally { setTesting(false) }
+  }
+
+  if (loading) return null
+
+  return (
+    <section className="rounded-xl border border-neutral-200/80 bg-white p-5 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center gap-2 pb-3">
+        <Link2 className="size-4 text-neutral-500 dark:text-zinc-500" strokeWidth={1.8} />
+        <h3 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('ccconnect.title')}</h3>
+      </div>
+      <p className="mb-4 text-sm text-neutral-500 dark:text-zinc-500">{t('ccconnect.description')}</p>
+
+      <div className="space-y-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">{t('ccconnect.apiUrl')}</span>
+          <input
+            value={apiUrl} onChange={e => setApiUrl(e.target.value)}
+            placeholder="http://localhost:9820"
+            className={inputCls + ' max-w-md'}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-neutral-600 dark:text-zinc-400">
+            {t('ccconnect.token')} {hasToken && <span className="text-xs text-emerald-500">({t('ccconnect.tokenSet')})</span>}
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type={showToken ? 'text' : 'password'}
+              value={token} onChange={e => setToken(e.target.value)}
+              placeholder={hasToken ? t('ccconnect.tokenKeep') : t('ccconnect.tokenPlaceholder')}
+              className={inputCls + ' max-w-md'}
+            />
+            <button type="button" onClick={() => setShowToken(p => !p)} className="rounded-md p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+              {showToken ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </label>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button type="button" onClick={() => void handleSave()} disabled={saving || !apiUrl.trim()}
+            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700 disabled:opacity-50">
+            {saving ? t('prompt.saving') : t('prompt.save')}
+          </button>
+          <button type="button" onClick={() => void handleTest()} disabled={testing || !apiUrl.trim()}
+            className="flex items-center gap-1.5 rounded-lg border border-neutral-200/80 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
+            {testing ? <Loader2 className="size-3.5 animate-spin" /> : <Link2 className="size-3.5" />}
+            {t('ccconnect.testConnection')}
+          </button>
+        </div>
+
+        {testResult && (
+          <div className={cn('flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+            testResult.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400')}>
+            {testResult.ok ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}
+            {testResult.ok ? `${t('ccconnect.connected')}${testResult.version ? ` (v${testResult.version})` : ''}` : `${t('ccconnect.connectionFailed')}: ${testResult.error}`}
+          </div>
+        )}
+
+        {msg && (
+          <p className={`rounded-md px-3 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+            {msg.text}
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
@@ -672,6 +786,9 @@ export default function SettingsPage() {
 
         {/* API Providers (admin only) */}
         {user?.role === 'admin' && <ProvidersSection />}
+
+        {/* cc-connect (admin only) */}
+        {user?.role === 'admin' && <CCConnectSection />}
 
         {/* Change Password */}
         <ChangePasswordSection />

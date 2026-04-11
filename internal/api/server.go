@@ -39,6 +39,7 @@ type Server struct {
 	ts           taskstore.Store
 	users        *UserStore
 	sched        *SchedulerManager
+	ccStore      *store.CCConnectStore
 	updateCheck       UpdateChecker
 	daemonStatus      DaemonStatusFunc
 	assistantMu       sync.Mutex
@@ -49,12 +50,13 @@ type Server struct {
 // If apiKey is non-empty, requests must send Authorization: Bearer <apiKey>.
 func NewServer(root, apiKey string) *Server {
 	return &Server{
-		root:   root,
-		apiKey: strings.TrimSpace(apiKey),
-		st:     store.NewFS(root),
-		ts:     taskstore.New(root),
-		users:  newUserStore(root),
-		sched:  newSchedulerManager(root),
+		root:    root,
+		apiKey:  strings.TrimSpace(apiKey),
+		st:      store.NewFS(root),
+		ts:      taskstore.New(root),
+		users:   newUserStore(root),
+		sched:   newSchedulerManager(root),
+		ccStore: store.NewCCConnectStore(root),
 	}
 }
 
@@ -161,6 +163,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/users/{username}", s.handleGetUser)
 	mux.HandleFunc("PUT /api/v1/users/{username}", s.handleUpdateUser)
 	mux.HandleFunc("DELETE /api/v1/users/{username}", s.handleDeleteUser)
+
+	mux.HandleFunc("GET /api/v1/ccconnect/config", s.handleCCConnectGetConfig)
+	mux.HandleFunc("PUT /api/v1/ccconnect/config", s.handleCCConnectPutConfig)
+	mux.HandleFunc("POST /api/v1/ccconnect/test", s.handleCCConnectTest)
+	mux.HandleFunc("GET /api/v1/ccconnect/projects", s.handleCCProxyProjects)
+	mux.HandleFunc("GET /api/v1/ccconnect/projects/{name}", s.handleCCProxyProjectDetail)
+	mux.HandleFunc("DELETE /api/v1/ccconnect/projects/{name}", s.handleCCProxyProjectDelete)
+	mux.HandleFunc("POST /api/v1/ccconnect/projects/{name}/add-platform", s.handleCCProxyAddPlatform)
+	mux.HandleFunc("GET /api/v1/ccconnect/projects/{name}/sessions", s.handleCCProxyProjectSessions)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/feishu/begin", s.handleCCProxySetupFeishuBegin)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/feishu/poll", s.handleCCProxySetupFeishuPoll)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/feishu/save", s.handleCCProxySetupFeishuSave)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/weixin/begin", s.handleCCProxySetupWeixinBegin)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/weixin/poll", s.handleCCProxySetupWeixinPoll)
+	mux.HandleFunc("POST /api/v1/ccconnect/setup/weixin/save", s.handleCCProxySetupWeixinSave)
+	mux.HandleFunc("POST /api/v1/ccconnect/reload", s.handleCCProxyReload)
+	mux.HandleFunc("POST /api/v1/ccconnect/restart", s.handleCCProxyRestart)
 
 	mux.HandleFunc("GET /api/v1/check-update", s.handleCheckUpdate)
 	mux.HandleFunc("GET /api/v1/daemon/status", s.handleDaemonStatus)

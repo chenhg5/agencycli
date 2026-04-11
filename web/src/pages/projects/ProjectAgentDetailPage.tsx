@@ -13,6 +13,7 @@ import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 import { apiFetch, apiPost, apiPut } from '../../lib/api'
 import { Pagination } from '../../components/ui/Pagination'
+import { IMConnectionPanel } from '../../components/project/IMConnectionPanel'
 
 const AGENT_MODELS = [
   'claudecode', 'codex', 'cursor', 'gemini',
@@ -54,6 +55,7 @@ type AgentContext = {
   httpAgent?: HTTPAgentConfig
   env?: Record<string, string>
   provider?: string
+  workDir?: string
 }
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
@@ -453,6 +455,14 @@ export default function ProjectAgentDetailPage() {
                   </div>
                 </div>
               </section>
+
+              {/* IM Connections */}
+              <IMConnectionPanel
+                project={projectId}
+                agentName={agentName}
+                model={ctx.model}
+                workDir={ctx.workDir}
+              />
 
               {/* Wakeup prompt */}
               <PromptEditor
