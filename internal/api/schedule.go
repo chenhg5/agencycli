@@ -127,6 +127,7 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		"jitter":                h.Jitter,
 		"maxTasksPerCycle":      h.MaxTasksPerCycle,
 		"maxCycleDuration":      h.MaxCycleDuration,
+		"triggers":              h.Triggers,
 		"pid":                   h.PID,
 		"lastWakeupStatus":      h.LastWakeupStatus,
 		"sessionId":             h.SessionID,
@@ -227,9 +228,10 @@ type patchHeartbeatBody struct {
 	// WakeupCondition is intentionally excluded from API PATCH for security.
 	// Setting this field via API would allow command injection since it's
 	// executed with sh -c. Use CLI 'scheduler configure --wakeup-condition' instead.
-	WakeupPreset     *string `json:"wakeupPreset,omitempty"`
-	MaxTasksPerCycle *int    `json:"maxTasksPerCycle,omitempty"`
-	MaxCycleDuration *string `json:"maxCycleDuration,omitempty"`
+	WakeupPreset     *string              `json:"wakeupPreset,omitempty"`
+	Triggers         *[]entity.TriggerType `json:"triggers"` // null = not sent, [] = clear
+	MaxTasksPerCycle *int                 `json:"maxTasksPerCycle,omitempty"`
+	MaxCycleDuration *string              `json:"maxCycleDuration,omitempty"`
 }
 
 func (s *Server) handleGetHeartbeat(w http.ResponseWriter, r *http.Request) {
@@ -317,6 +319,16 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	// command injection vulnerability. Use CLI 'scheduler configure' instead.
 	if body.WakeupPreset != nil {
 		hb.WakeupPreset = strings.TrimSpace(*body.WakeupPreset)
+	}
+	if body.Triggers != nil {
+		valid := make([]entity.TriggerType, 0, len(*body.Triggers))
+		for _, t := range *body.Triggers {
+			switch t {
+			case entity.TriggerOnMessage, entity.TriggerOnTask:
+				valid = append(valid, t)
+			}
+		}
+		hb.Triggers = valid
 	}
 	if body.MaxTasksPerCycle != nil {
 		hb.MaxTasksPerCycle = *body.MaxTasksPerCycle

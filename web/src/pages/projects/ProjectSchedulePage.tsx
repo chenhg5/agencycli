@@ -26,6 +26,7 @@ type HeartbeatRow = {
   wakeupCount?: number; wakeupCountToday?: number; nextWakeupAt?: string
   schedulerStartedAt?: string; lastConditionStatus?: string
   sessionScope?: string; sessionId?: string; sessionStartedAt?: string
+  triggers?: string[]
 }
 
 type CronRow = {
@@ -352,6 +353,12 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
 
   // Wakeup preset
   const [wakeupPreset, setWakeupPreset] = useState(hb.wakeupPreset ?? '')
+
+  // Triggers
+  const TRIGGER_TYPES = ['message', 'task'] as const
+  const [triggers, setTriggers] = useState<string[]>(hb.triggers ?? [])
+  const toggleTrigger = (t: string) => setTriggers(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -378,6 +385,7 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
         maxTasksPerCycle: maxTasks,
         maxCycleDuration: maxDurStr,
         wakeupPreset: wakeupPreset,
+        triggers: triggers,
         sessionScope: sessionScope,
         sessionId: sessionId !== (hb.sessionId ?? '') ? sessionId : undefined,
       })
@@ -454,6 +462,19 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
               <option value="require_messages">{t('schedule.presetRequireMessages')}</option>
               <option value="require_any">{t('schedule.presetRequireAny')}</option>
             </select>
+          </Field>
+
+          {/* Triggers */}
+          <Field label={t('schedule.triggers')}>
+            <div className="flex flex-wrap gap-2">
+              {TRIGGER_TYPES.map(trig => (
+                <button key={trig} type="button" onClick={() => toggleTrigger(trig)}
+                  className={cn(chipCls, triggers.includes(trig) ? chipActive : chipInactive)}>
+                  {t(`schedule.trigger_${trig}`)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.triggersHint')}</p>
           </Field>
 
           {/* Session */}
@@ -828,11 +849,22 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                     </select>
                   </td>
                   <td className={tdCls}>
-                    {hb.wakeupCondition ? (
-                      hb.lastConditionStatus === 'met' ? <StatusBadge color="emerald">Met</StatusBadge>
-                      : hb.lastConditionStatus === 'not_met' ? <StatusBadge color="amber">Not met</StatusBadge>
-                      : <StatusBadge color="neutral">—</StatusBadge>
-                    ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
+                    <div className="flex flex-col gap-1">
+                      {hb.wakeupCondition ? (
+                        hb.lastConditionStatus === 'met' ? <StatusBadge color="emerald">Met</StatusBadge>
+                        : hb.lastConditionStatus === 'not_met' ? <StatusBadge color="amber">Not met</StatusBadge>
+                        : <StatusBadge color="neutral">—</StatusBadge>
+                      ) : !hb.triggers?.length ? <span className="text-neutral-400 dark:text-zinc-500">—</span> : null}
+                      {hb.triggers && hb.triggers.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {hb.triggers.map(tr => (
+                            <span key={tr} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/20 dark:text-violet-400">
+                              <Zap className="size-2.5" />{t(`schedule.trigger_${tr}`)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1">

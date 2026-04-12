@@ -220,6 +220,7 @@ type projectOverview struct {
 	Project          string `json:"project"`
 	AgentCount       int    `json:"agentCount"`
 	HeartbeatEnabled int    `json:"heartbeatEnabled"`
+	RunningAgents    int    `json:"runningAgents"`
 	SchedulerRunning bool   `json:"schedulerRunning"`
 	PendingTasks     int    `json:"pendingTasks"`
 	RunningTasks     int    `json:"runningTasks"`
@@ -262,8 +263,13 @@ func (s *Server) handleWorkbenchOverview(w http.ResponseWriter, r *http.Request)
 
 		for _, ag := range agentNames {
 			hb, err := s.ts.GetHeartbeat(proj, ag)
-			if err == nil && hb.Enabled {
-				ov.HeartbeatEnabled++
+			if err == nil {
+				if hb.Enabled {
+					ov.HeartbeatEnabled++
+				}
+				if hb.LastWakeupStatus == "running" && hb.PID > 0 {
+					ov.RunningAgents++
+				}
 			}
 		}
 

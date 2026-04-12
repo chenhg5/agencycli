@@ -156,6 +156,9 @@ func (s *Server) handlePostProjectTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fire trigger if configured for this agent.
+	s.triggers.Fire(name, agentName, entity.TriggerOnTask, "task "+t.ID)
+
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"id":      t.ID,
@@ -518,6 +521,11 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ids = append(ids, msg.ID)
+
+		// Fire trigger if configured for the recipient agent.
+		if parts := strings.SplitN(recipient, "/", 2); len(parts) == 2 {
+			s.triggers.Fire(parts[0], parts[1], entity.TriggerOnMessage, "from "+from)
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)

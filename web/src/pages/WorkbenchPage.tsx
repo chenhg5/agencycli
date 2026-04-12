@@ -744,6 +744,7 @@ type ProjectOverview = {
   project: string
   agentCount: number
   heartbeatEnabled: number
+  runningAgents: number
   schedulerRunning: boolean
   pendingTasks: number
   runningTasks: number
@@ -874,11 +875,11 @@ function OverviewPanel() {
                       <div className="text-[11px] font-medium text-neutral-400 dark:text-zinc-500">{t('workbench.ovAgents')}</div>
                       <div className="mt-0.5 text-lg font-bold text-neutral-800 dark:text-zinc-200">
                         {p.agentCount}
-                        {p.heartbeatEnabled > 0 && (
-                          <span className="ml-1.5 text-xs font-normal text-sky-600 dark:text-sky-400">
-                            {p.heartbeatEnabled} {t('workbench.ovHeartbeat')}
-                          </span>
-                        )}
+                        <span className="ml-1.5 text-xs font-normal text-neutral-500 dark:text-zinc-500">
+                          {p.heartbeatEnabled > 0 && <span className="text-sky-600 dark:text-sky-400">{p.heartbeatEnabled} {t('workbench.ovHeartbeat')}</span>}
+                          {p.heartbeatEnabled > 0 && p.runningAgents > 0 && ' · '}
+                          {p.runningAgents > 0 && <span className="text-emerald-600 dark:text-emerald-400">{p.runningAgents} {t('workbench.ovRunningAgents')}</span>}
+                        </span>
                       </div>
                     </div>
                     <div className="rounded-lg bg-neutral-50 px-3 py-2 dark:bg-zinc-800/40">

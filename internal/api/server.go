@@ -39,6 +39,7 @@ type Server struct {
 	ts           taskstore.Store
 	users        *UserStore
 	sched        *SchedulerManager
+	triggers     *triggerManager
 	ccStore      *store.CCConnectStore
 	okrStore     *store.OKRStore
 	msStore      *store.MilestoneStore
@@ -51,13 +52,16 @@ type Server struct {
 // NewServer builds an API server for the given workspace root.
 // If apiKey is non-empty, requests must send Authorization: Bearer <apiKey>.
 func NewServer(root, apiKey string) *Server {
+	sched := newSchedulerManager(root)
+	ts := taskstore.New(root)
 	return &Server{
-		root:    root,
-		apiKey:  strings.TrimSpace(apiKey),
-		st:      store.NewFS(root),
-		ts:      taskstore.New(root),
-		users:   newUserStore(root),
-		sched:   newSchedulerManager(root),
+		root:      root,
+		apiKey:    strings.TrimSpace(apiKey),
+		st:        store.NewFS(root),
+		ts:        ts,
+		users:     newUserStore(root),
+		sched:     sched,
+		triggers:  newTriggerManager(root, sched.binPath, ts),
 		ccStore:   store.NewCCConnectStore(root),
 		okrStore:  store.NewOKRStore(root),
 		msStore:   store.NewMilestoneStore(root),

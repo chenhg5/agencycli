@@ -1524,6 +1524,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 		activeDays       string
 		wakeupPromptFile string
 		wakeupCondition  string
+		triggerStr       string
 	)
 
 	cmd := &cobra.Command{
@@ -1553,7 +1554,15 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 
   # Set a wakeup routine (runs when queue is empty)
   agencycli scheduler heartbeat configure --project cc-connect --agent pm \
-    --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/.agencycli-context/wakeup.md`,
+    --wakeup-prompt-file /root/code/TechStudio/projects/cc-connect/agents/pm/.agencycli-context/wakeup.md
+
+  # Enable event triggers: wake immediately on message or task
+  agencycli scheduler heartbeat configure --project cc-connect --agent dev \
+    --trigger "message,task"
+
+  # Trigger-only agent (no periodic heartbeat, wakes only on events)
+  agencycli scheduler heartbeat configure --project cc-connect --agent on-call \
+    --disable --trigger "message,task"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -1650,6 +1659,22 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 				hb.WakeupCondition = wakeupCondition
 				changed = true
 			}
+			if cmd.Flags().Changed("trigger") {
+				var triggers []entity.TriggerType
+				if triggerStr != "" {
+					for _, tok := range strings.Split(triggerStr, ",") {
+						t := entity.TriggerType(strings.TrimSpace(tok))
+						switch t {
+						case entity.TriggerOnMessage, entity.TriggerOnTask:
+							triggers = append(triggers, t)
+						default:
+							return fmt.Errorf("unknown trigger type %q (supported: message, task)", tok)
+						}
+					}
+				}
+				hb.Triggers = triggers
+				changed = true
+			}
 
 			if changed {
 				if err := ts.SaveHeartbeat(project, agentName, hb); err != nil {
@@ -1707,6 +1732,13 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 						hb.LastConditionAt.Local().Format("01-02 15:04:05"))
 				}
 			}
+			if len(hb.Triggers) > 0 {
+				tt := make([]string, len(hb.Triggers))
+				for i, t := range hb.Triggers {
+					tt[i] = string(t)
+				}
+				fmt.Printf("  Triggers: %s\n", strings.Join(tt, ", "))
+			}
 			if hb.LastWakeup != nil {
 				fmt.Printf("  Last    : %s  (%s)\n",
 					hb.LastWakeup.Format(time.RFC3339), hb.LastWakeupStatus)
@@ -1729,6 +1761,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 	cmd.Flags().StringVar(&jitter, "jitter", "", `random delay added before each wakeup, e.g. "5m", "10m" (empty = full interval on first cycle only)`)
 	cmd.Flags().StringVar(&wakeupPromptFile, "wakeup-prompt-file", "", "path to a markdown file used as the default wakeup routine when queue is empty")
 	cmd.Flags().StringVar(&wakeupCondition, "wakeup-condition", "", `shell command evaluated before each wakeup; exit 0 = proceed, non-zero = skip cycle (e.g. "gh issue list --state open | grep -q .")`)
+	cmd.Flags().StringVar(&triggerStr, "trigger", "", `event triggers for immediate wakeup, comma-separated: "message", "task", or "message,task" (empty = disable triggers)`)
 	return cmd
 }
 

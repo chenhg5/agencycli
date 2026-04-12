@@ -635,6 +635,14 @@ const (
 	SessionScopeTask  SessionScope = "task"  // each task gets a fresh session resume
 )
 
+// TriggerType identifies an event that can trigger an immediate agent wakeup.
+type TriggerType string
+
+const (
+	TriggerOnMessage TriggerType = "message" // incoming message to this agent
+	TriggerOnTask    TriggerType = "task"    // task assigned to this agent
+)
+
 // HeartbeatConfig holds the per-agent heartbeat configuration and runtime state.
 // Stored at <agent-dir>/heartbeat.yaml.
 type HeartbeatConfig struct {
@@ -707,6 +715,13 @@ type HeartbeatConfig struct {
 	// if it pushes the total over the limit.
 	MaxCycleDuration string `yaml:"max_cycle_duration,omitempty"`
 
+	// Triggers lists event types that trigger an immediate wakeup.
+	// Supported values: "message" (incoming message), "task" (task assigned).
+	// When an event fires, the agent is woken up asynchronously if not already
+	// running. Works independently of heartbeat Enabled — an agent can be
+	// trigger-only with no periodic heartbeat.
+	Triggers []TriggerType `yaml:"triggers,omitempty" json:"triggers,omitempty"`
+
 	// Runtime state (mutated by scheduler / runner).
 	PID               int        `yaml:"pid,omitempty"`
 	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
@@ -733,6 +748,16 @@ type HeartbeatConfig struct {
 	LastCycleDuration string    `yaml:"last_cycle_duration,omitempty"`
 	NextWakeupAt     *time.Time `yaml:"next_wakeup_at,omitempty"`
 	SchedulerStartedAt *time.Time `yaml:"scheduler_started_at,omitempty"`
+}
+
+// HasTrigger reports whether the heartbeat config includes the given trigger type.
+func (h *HeartbeatConfig) HasTrigger(t TriggerType) bool {
+	for _, tr := range h.Triggers {
+		if tr == t {
+			return true
+		}
+	}
+	return false
 }
 
 // ─────────────────────────────────────────────
