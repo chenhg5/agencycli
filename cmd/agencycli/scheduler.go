@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -1243,6 +1244,125 @@ func parseDayName(s string) (time.Weekday, error) {
 
 // ── wakeup condition ──────────────────────────────────────────────────────────
 
+// validateWakeupCondition checks that a wakeup condition is safe to execute.
+// It blocks shell metacharacters that could enable command injection and
+// validates that the command starts with a whitelisted safe command.
+//
+// Allowed patterns:
+//   - Commands: gh, agencycli, git, grep, jq, test, [, [[
+//   - Safe env vars: $AGENCY_DIR, $PROJECT, $AGENT_NAME
+//   - Single pipe for chaining: cmd1 | cmd2
+//
+// Blocked patterns:
+//   - Command separators: ;, &&, ||
+//   - Command substitution: $(), backticks
+//   - Redirection: >, <, >>, 2>
+//   - Background: &
+//   - Other unsafe chars: newlines, wildcards in dangerous positions
+func validateWakeupCondition(condition string) error {
+	if condition == "" {
+		return nil // Empty condition is valid (no condition check)
+	}
+
+	// Block dangerous shell metacharacters that enable command injection.
+	dangerousPatterns := []string{
+		";",     // command separator
+		"&&",    // AND operator
+		"||",    // OR operator
+		"$(",    // command substitution
+		"`",     // backtick command substitution
+		">",     // output redirection
+		"<",     // input redirection
+		">>",    // append redirection
+		"&",     // background execution
+		"\n",    // newline (could hide commands)
+		"\r",    // carriage return
+	}
+
+	// Check for dangerous patterns
+	condLower := strings.ToLower(condition)
+	for _, pattern := range dangerousPatterns {
+		if strings.Contains(condLower, pattern) {
+			return fmt.Errorf("wakeup condition contains blocked pattern '%s' (command injection risk)", pattern)
+		}
+	}
+
+	// Allow only whitelisted commands as the first word in each pipe segment.
+	// Split by pipe and validate each segment's command.
+	allowedCommands := []string{
+		"gh",        // GitHub CLI
+		"agencycli", // agencycli itself
+		"git",       // git commands
+		"grep",      // grep for filtering
+		"jq",        // jq for JSON processing
+		"test",      // test command
+		"[",         // test synonym
+		"[[",        // bash extended test
+		"true",      // always succeed
+		"false",     // always fail
+	}
+
+	// Validate ALL commands in pipe chain (split by |)
+	pipeSegments := strings.Split(condition, "|")
+	for i, segment := range pipeSegments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return fmt.Errorf("wakeup condition has empty pipe segment at position %d", i+1)
+		}
+		// Get the first word (the command name) of this segment
+		fields := strings.Fields(segment)
+		if len(fields) == 0 {
+			return fmt.Errorf("wakeup condition has invalid pipe segment at position %d", i+1)
+		}
+		cmdName := fields[0]
+
+		// Check if the command is allowed
+		isAllowed := false
+		for _, allowed := range allowedCommands {
+			if cmdName == allowed {
+				isAllowed = true
+				break
+			}
+		}
+		if !isAllowed {
+			position := "first"
+			if i > 0 {
+				position = fmt.Sprintf("after pipe at position %d", i+1)
+			}
+			return fmt.Errorf("wakeup condition %s must use an allowed command (gh, agencycli, git, grep, jq, test, true, false), got: %s", position, cmdName)
+		}
+	}
+
+	// Validate environment variable references are safe.
+	// Only allow $AGENCY_DIR, $PROJECT, $AGENT_NAME and standard positional vars like $1, $?
+	safeEnvVars := []string{"AGENCY_DIR", "PROJECT", "AGENT_NAME"}
+	envVarPattern := regexp.MustCompile(`\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?`)
+	matches := envVarPattern.FindAllStringSubmatch(condition, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		varName := match[1]
+		// Allow safe predefined vars
+		isSafeVar := false
+		for _, safe := range safeEnvVars {
+			if varName == safe {
+				isSafeVar = true
+				break
+			}
+		}
+		// Allow numeric positional params ($1, $2, etc.) and $? (exit status)
+		if regexp.MustCompile(`^[0-9?]$`).MatchString(varName) {
+			isSafeVar = true
+		}
+		if !isSafeVar {
+			return fmt.Errorf("wakeup condition contains unsafe env var '$%s' (only $AGENCY_DIR, $PROJECT, $AGENT_NAME allowed)", varName)
+		}
+	}
+
+	return nil
+}
+
 // checkWakeupCondition runs the condition shell command and returns whether
 // the condition is met (exit 0 = met, non-zero = not met).
 // output contains trimmed stdout+stderr (useful for logging on failure).
@@ -1515,6 +1635,10 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 				changed = true
 			}
 			if cmd.Flags().Changed("wakeup-condition") {
+				// Validate the condition to prevent command injection.
+				if err := validateWakeupCondition(wakeupCondition); err != nil {
+					return fmt.Errorf("invalid --wakeup-condition: %w", err)
+				}
 				hb.WakeupCondition = wakeupCondition
 				changed = true
 			}

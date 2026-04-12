@@ -224,7 +224,9 @@ type patchHeartbeatBody struct {
 	SessionScope     *string `json:"sessionScope,omitempty"`
 	SessionID        *string `json:"sessionId,omitempty"`
 	WakeupPrompt     *string `json:"wakeupPrompt,omitempty"`
-	WakeupCondition  *string `json:"wakeupCondition,omitempty"`
+	// WakeupCondition is intentionally excluded from API PATCH for security.
+	// Setting this field via API would allow command injection since it's
+	// executed with sh -c. Use CLI 'scheduler configure --wakeup-condition' instead.
 	WakeupPreset     *string `json:"wakeupPreset,omitempty"`
 	MaxTasksPerCycle *int    `json:"maxTasksPerCycle,omitempty"`
 	MaxCycleDuration *string `json:"maxCycleDuration,omitempty"`
@@ -310,9 +312,9 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if body.WakeupPrompt != nil {
 		hb.WakeupPrompt = *body.WakeupPrompt
 	}
-	if body.WakeupCondition != nil {
-		hb.WakeupCondition = *body.WakeupCondition
-	}
+	// WakeupCondition is NOT accepted via API for security reasons.
+	// It's executed with sh -c, so allowing arbitrary input would be a
+	// command injection vulnerability. Use CLI 'scheduler configure' instead.
 	if body.WakeupPreset != nil {
 		hb.WakeupPreset = strings.TrimSpace(*body.WakeupPreset)
 	}
