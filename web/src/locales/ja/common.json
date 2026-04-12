@@ -881,5 +881,26 @@
     "statusCancelled": "キャンセル",
     "overdue": "{{days}}日超過",
     "dueSoon": "{{days}}日後に期限"
+  },
+  "secrets": {
+    "title": "ワークスペースシークレット",
+    "hint": "シークレットはエージェントプロセスに環境変数として注入されます。グローバルまたは特定エージェントに適用可能。",
+    "add": "シークレット追加",
+    "key": "キー",
+    "value": "値",
+    "scope": "スコープ",
+    "scopeGlobal": "グローバル",
+    "scopeAgents": "指定エージェント",
+    "agents": "エージェント",
+    "description": "説明",
+    "descPlaceholder": "任意、用途を説明",
+    "leaveEmpty": "空欄の場合は変更なし",
+    "confirmDelete": "このシークレットを削除しますか？"
+  },
+  "agentEnv": {
+    "title": "環境変数",
+    "hint": "エージェント固有の環境変数は最優先で、ワークスペースシークレットやプロバイダ設定を上書きします。",
+    "add": "変数追加",
+    "empty": "環境変数は設定されていません"
   }
 }

@@ -787,11 +787,24 @@ func remapPromptFile(args []string, hostPath, containerPath string) []string {
 	return out
 }
 
-// resolveProviderEnv loads the API provider's env vars (if any) and merges
-// them with the agent's per-agent env. Provider env is applied first, then
-// agent env overrides, so agent-level settings always win.
+// resolveProviderEnv loads env vars from all sources and merges them.
+// Resolution priority (lowest → highest):
+//   1. Workspace global secrets
+//   2. Workspace agent-scoped secrets
+//   3. API provider env
+//   4. Per-agent env (AgentMeta.Env)
 func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
 	merged := make(map[string]string)
+
+	// 1+2: workspace secrets (global first, then agent-scoped overrides)
+	ss := store.NewSecretStore(root)
+	if secretEnv, err := ss.ResolveEnvForAgent(meta.Project, meta.Name); err == nil {
+		for k, v := range secretEnv {
+			merged[k] = v
+		}
+	}
+
+	// 3: API provider env
 	if meta.Provider != "" {
 		ps := store.NewProviderStore(root)
 		if provEnv, err := ps.ResolveEnv(meta.Provider); err == nil {
@@ -800,6 +813,8 @@ func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
 			}
 		}
 	}
+
+	// 4: per-agent env (highest priority)
 	for k, v := range meta.Env {
 		merged[k] = v
 	}

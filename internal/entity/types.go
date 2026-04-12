@@ -978,3 +978,31 @@ type TemplateManifest struct {
 	License     string   `json:"license,omitempty"`
 	CreatedAt   string   `json:"createdAt,omitempty"` // RFC3339
 }
+
+// ─────────────────────────────────────────────
+// Workspace Secrets
+// ─────────────────────────────────────────────
+
+// SecretScope defines whether a secret applies globally or to specific agents.
+type SecretScope string
+
+const (
+	SecretScopeGlobal SecretScope = "global" // applied to all agents
+	SecretScopeAgents SecretScope = "agents" // applied to listed agents only
+)
+
+// Secret is a workspace-level environment variable entry stored in secrets.yaml.
+// Secrets are injected into agent processes at runtime and forwarded into Docker
+// containers automatically. Resolution priority (lowest → highest):
+//
+//	workspace global secrets → agent-scoped secrets → API provider env → per-agent env
+type Secret struct {
+	ID          string      `yaml:"id"          json:"id"`
+	Key         string      `yaml:"key"         json:"key"`
+	Value       string      `yaml:"value"       json:"-"`
+	Scope       SecretScope `yaml:"scope"       json:"scope"`
+	Agents      []string    `yaml:"agents,omitempty" json:"agents,omitempty"`
+	Description string      `yaml:"description,omitempty" json:"description,omitempty"`
+	CreatedAt   time.Time   `yaml:"created_at"  json:"createdAt"`
+	UpdatedAt   time.Time   `yaml:"updated_at"  json:"updatedAt"`
+}

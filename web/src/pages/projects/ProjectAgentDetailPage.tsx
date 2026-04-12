@@ -5,13 +5,13 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
-import { apiFetch, apiPost, apiPut } from '../../lib/api'
+import { apiFetch, apiPost, apiPut, apiDelete } from '../../lib/api'
 import { Pagination } from '../../components/ui/Pagination'
 import { IMConnectionPanel } from '../../components/project/IMConnectionPanel'
 
@@ -82,6 +82,93 @@ const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
     keys: ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'OPENAI_API_KEY', 'OPENAI_BASE_URL'],
     hint: 'OpenCode supports multiple providers',
   },
+}
+
+// ── Agent Env Panel ─────────────────────────────────────────────────────────
+
+const envInputCls = 'block w-full rounded-md border border-neutral-200/80 bg-neutral-50/50 px-2.5 py-1.5 text-sm text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-sky-400 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-200 dark:placeholder:text-zinc-600'
+
+function AgentEnvPanel({ project, agent }: { project: string; agent: string }) {
+  const { t } = useTranslation()
+  type Entry = { key: string; hasValue: boolean }
+  const [entries, setEntries] = useState<Entry[]>([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [newKey, setNewKey] = useState('')
+  const [newVal, setNewVal] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env`)
+      setEntries(data as Entry[])
+    } catch { /* ignore */ }
+  }, [project, agent])
+
+  useEffect(() => { load() }, [load])
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newKey.trim()) return
+    try {
+      await apiPost(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env`, { key: newKey.trim(), value: newVal })
+      setNewKey(''); setNewVal(''); setShowAdd(false); load()
+    } catch { /* ignore */ }
+  }
+
+  async function handleRemove(key: string) {
+    try {
+      await apiDelete(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env?key=${encodeURIComponent(key)}`)
+      load()
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <section className="rounded-xl border border-neutral-200/70 bg-white p-5 dark:border-zinc-700/50 dark:bg-zinc-900">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-zinc-100">
+          <KeyRound className="size-4 text-sky-600" />
+          {t('agentEnv.title')}
+        </h3>
+        {!showAdd && (
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 rounded-md border border-sky-600 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-500 dark:text-sky-400 dark:hover:bg-zinc-800">
+            <Plus className="size-3" />
+            {t('agentEnv.add')}
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-neutral-500 dark:text-zinc-500">{t('agentEnv.hint')}</p>
+
+      {showAdd && (
+        <form onSubmit={handleAdd} className="mt-3 flex items-end gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-zinc-400">KEY</label>
+            <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="MY_TOKEN" required className={envInputCls} />
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-zinc-400">VALUE</label>
+            <input type="password" value={newVal} onChange={e => setNewVal(e.target.value)} placeholder="****" required className={envInputCls} />
+          </div>
+          <button type="submit" className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700">{t('common.save')}</button>
+          <button type="button" onClick={() => { setShowAdd(false); setNewKey(''); setNewVal('') }} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800">{t('common.cancel')}</button>
+        </form>
+      )}
+
+      {entries.length > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          {entries.map(e => (
+            <div key={e.key} className="flex items-center justify-between rounded-lg bg-neutral-50/70 px-3 py-2 dark:bg-zinc-800/30">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{e.key}</span>
+                <span className="text-[10px] text-neutral-400 dark:text-zinc-600">= ••••••</span>
+              </div>
+              <button onClick={() => handleRemove(e.key)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      ) : !showAdd ? (
+        <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('agentEnv.empty')}</p>
+      ) : null}
+    </section>
+  )
 }
 
 function PromptEditor({ label, icon: Icon, apiPath, initialContent }: { label: string; icon: LucideIcon; apiPath: string; initialContent: string }) {
@@ -463,6 +550,9 @@ export default function ProjectAgentDetailPage() {
                 model={ctx.model}
                 workDir={ctx.workDir}
               />
+
+              {/* Environment Variables */}
+              <AgentEnvPanel project={projectId} agent={agentName} />
 
               {/* Wakeup prompt */}
               <PromptEditor

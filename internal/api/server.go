@@ -97,6 +97,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/heartbeat/resume", s.handlePostHeartbeatResume)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/heartbeat", s.handleGetHeartbeat)
 	mux.HandleFunc("PATCH /api/v1/projects/{name}/agents/{agent}/heartbeat", s.handlePatchHeartbeat)
+	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/env", s.handleGetAgentEnv)
+	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/env", s.handleSetAgentEnv)
+	mux.HandleFunc("DELETE /api/v1/projects/{name}/agents/{agent}/env", s.handleDeleteAgentEnv)
 	mux.HandleFunc("GET /api/v1/projects/{name}/schedule", s.handleGetProjectSchedule)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/live-log", s.handleAgentLiveLog)
 	mux.HandleFunc("POST /api/v1/messages/delete", s.handlePostDeleteMessage)
@@ -166,6 +169,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/providers", s.handleAddProvider)
 	mux.HandleFunc("PUT /api/v1/providers/{id}", s.handleUpdateProvider)
 	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
+
+	mux.HandleFunc("GET /api/v1/secrets", s.handleListSecrets)
+	mux.HandleFunc("POST /api/v1/secrets", s.handleCreateSecret)
+	mux.HandleFunc("PUT /api/v1/secrets/{id}", s.handleUpdateSecret)
+	mux.HandleFunc("DELETE /api/v1/secrets/{id}", s.handleDeleteSecret)
 
 	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
 	mux.HandleFunc("POST /api/v1/users", s.handleCreateUser)

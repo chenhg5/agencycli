@@ -881,5 +881,26 @@
     "statusCancelled": "Cancelled",
     "overdue": "{{days}} days overdue",
     "dueSoon": "Due in {{days}} days"
+  },
+  "secrets": {
+    "title": "Workspace Secrets",
+    "hint": "Secrets are injected as environment variables into agent processes. Can be applied globally or to specific agents.",
+    "add": "Add Secret",
+    "key": "Key",
+    "value": "Value",
+    "scope": "Scope",
+    "scopeGlobal": "Global",
+    "scopeAgents": "Specific Agents",
+    "agents": "Agents",
+    "description": "Description",
+    "descPlaceholder": "Optional, describe the purpose",
+    "leaveEmpty": "leave empty to keep unchanged",
+    "confirmDelete": "Are you sure you want to delete this secret?"
+  },
+  "agentEnv": {
+    "title": "Environment Variables",
+    "hint": "Agent-specific env vars have the highest priority, overriding workspace secrets and provider settings.",
+    "add": "Add Variable",
+    "empty": "No environment variables set"
   }
 }

@@ -881,5 +881,26 @@
     "statusCancelled": "已取消",
     "overdue": "已逾期 {{days}} 天",
     "dueSoon": "{{days}} 天後到期"
+  },
+  "secrets": {
+    "title": "工作區密鑰",
+    "hint": "密鑰會作為環境變數注入到 Agent 執行程序中，支援全域或指定 Agent 套用。",
+    "add": "新增密鑰",
+    "key": "變數名",
+    "value": "值",
+    "scope": "作用域",
+    "scopeGlobal": "全域",
+    "scopeAgents": "指定 Agent",
+    "agents": "Agent 列表",
+    "description": "描述",
+    "descPlaceholder": "選填，說明用途",
+    "leaveEmpty": "留空則不修改",
+    "confirmDelete": "確定刪除這個密鑰嗎？"
+  },
+  "agentEnv": {
+    "title": "環境變數",
+    "hint": "Agent 專屬環境變數，優先順序最高，會覆蓋工作區密鑰和 Provider 設定。",
+    "add": "新增變數",
+    "empty": "尚未設定環境變數"
   }
 }

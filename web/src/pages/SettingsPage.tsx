@@ -715,6 +715,150 @@ function CCConnectSection() {
   )
 }
 
+// ── Workspace Secrets ──────────────────────────────────────────────────────
+
+type SecretRow = { id: string; key: string; scope: string; agents?: string[]; description?: string; hasValue: boolean; createdAt: string; updatedAt: string }
+
+function SecretsSection() {
+  const { t } = useTranslation()
+  const [secrets, setSecrets] = useState<SecretRow[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [key, setKey] = useState('')
+  const [value, setValue] = useState('')
+  const [scope, setScope] = useState<'global' | 'agents'>('global')
+  const [agents, setAgents] = useState('')
+  const [desc, setDesc] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/v1/secrets')
+      setSecrets(data as SecretRow[])
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  function resetForm() {
+    setShowForm(false); setEditId(null); setKey(''); setValue(''); setScope('global'); setAgents(''); setDesc('')
+  }
+
+  function startEdit(s: SecretRow) {
+    setEditId(s.id); setKey(s.key); setValue(''); setScope(s.scope as 'global' | 'agents'); setAgents(s.agents?.join(', ') ?? ''); setDesc(s.description ?? ''); setShowForm(true)
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    const body: Record<string, unknown> = { key, scope, description: desc, agents: scope === 'agents' ? agents.split(',').map(a => a.trim()).filter(Boolean) : [] }
+    if (value) body.value = value
+    try {
+      if (editId) {
+        await apiPut(`/api/v1/secrets/${editId}`, body)
+      } else {
+        body.value = value
+        await apiPost('/api/v1/secrets', body)
+      }
+      resetForm(); load()
+    } catch { /* toast handled by apiFetch */ }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm(t('secrets.confirmDelete'))) return
+    try { await apiDelete(`/api/v1/secrets/${id}`); load() } catch { /* ignore */ }
+  }
+
+  return (
+    <section className="rounded-xl border border-neutral-200/70 bg-white p-5 dark:border-zinc-700/50 dark:bg-zinc-900">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-base font-semibold text-neutral-800 dark:text-zinc-100">
+          <KeyRound className="size-4 text-sky-600" />
+          {t('secrets.title')}
+        </h3>
+        {!showForm && (
+          <button onClick={() => { resetForm(); setShowForm(true) }} className="rounded-lg border border-sky-600 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-500 dark:bg-zinc-900 dark:text-sky-400 dark:hover:bg-zinc-800">
+            {t('secrets.add')}
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-neutral-500 dark:text-zinc-500">{t('secrets.hint')}</p>
+
+      {showForm && (
+        <form onSubmit={handleSave} className="mt-4 space-y-3 rounded-lg border border-neutral-200/70 bg-neutral-50/50 p-4 dark:border-zinc-700/50 dark:bg-zinc-800/30">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.key')}</label>
+              <input value={key} onChange={e => setKey(e.target.value)} placeholder="GITHUB_TOKEN" required className={inputCls + ' !max-w-none'} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.value')} {editId && <span className="text-neutral-400">({t('secrets.leaveEmpty')})</span>}</label>
+              <input type="password" value={value} onChange={e => setValue(e.target.value)} placeholder="****" className={inputCls + ' !max-w-none'} required={!editId} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.scope')}</label>
+              <select value={scope} onChange={e => setScope(e.target.value as 'global' | 'agents')} className={selectCls + ' !max-w-none'}>
+                <option value="global">{t('secrets.scopeGlobal')}</option>
+                <option value="agents">{t('secrets.scopeAgents')}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.description')}</label>
+              <input value={desc} onChange={e => setDesc(e.target.value)} placeholder={t('secrets.descPlaceholder')} className={inputCls + ' !max-w-none'} />
+            </div>
+          </div>
+          {scope === 'agents' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.agents')}</label>
+              <input value={agents} onChange={e => setAgents(e.target.value)} placeholder="project/agent, project2/agent2" className={inputCls + ' !max-w-none'} />
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button type="submit" className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700">{editId ? t('common.save') : t('secrets.add')}</button>
+            <button type="button" onClick={resetForm} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800">{t('common.cancel')}</button>
+          </div>
+        </form>
+      )}
+
+      {secrets.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200/60 text-left text-xs font-medium text-neutral-500 dark:border-zinc-700/50 dark:text-zinc-500">
+                <th className="pb-2 pr-4">{t('secrets.key')}</th>
+                <th className="pb-2 pr-4">{t('secrets.scope')}</th>
+                <th className="pb-2 pr-4">{t('secrets.agents')}</th>
+                <th className="pb-2 pr-4">{t('secrets.description')}</th>
+                <th className="pb-2 text-right">{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {secrets.map(s => (
+                <tr key={s.id} className="border-b border-neutral-100/60 dark:border-zinc-800/40">
+                  <td className="py-2.5 pr-4 font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{s.key}</td>
+                  <td className="py-2.5 pr-4">
+                    <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      s.scope === 'global' ? 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400' : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                    )}>
+                      {s.scope === 'global' ? t('secrets.scopeGlobal') : t('secrets.scopeAgents')}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4 text-xs text-neutral-500 dark:text-zinc-500">{s.agents?.join(', ') || '—'}</td>
+                  <td className="py-2.5 pr-4 text-xs text-neutral-500 dark:text-zinc-500">{s.description || '—'}</td>
+                  <td className="py-2.5 text-right">
+                    <button onClick={() => startEdit(s)} className="mr-2 text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400"><Pencil className="size-3.5" /></button>
+                    <button onClick={() => handleDelete(s.id)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
@@ -789,6 +933,9 @@ export default function SettingsPage() {
 
         {/* cc-connect (admin only) */}
         {user?.role === 'admin' && <CCConnectSection />}
+
+        {/* Workspace Secrets (admin only) */}
+        {user?.role === 'admin' && <SecretsSection />}
 
         {/* Change Password */}
         <ChangePasswordSection />
