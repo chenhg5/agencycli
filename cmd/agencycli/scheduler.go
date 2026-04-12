@@ -1287,8 +1287,8 @@ func validateWakeupCondition(condition string) error {
 		}
 	}
 
-	// Allow only whitelisted commands as the first word.
-	// Extract the first command (before any pipe or space).
+	// Allow only whitelisted commands as the first word in each pipe segment.
+	// Split by pipe and validate each segment's command.
 	allowedCommands := []string{
 		"gh",        // GitHub CLI
 		"agencycli", // agencycli itself
@@ -1302,28 +1302,35 @@ func validateWakeupCondition(condition string) error {
 		"false",     // always fail
 	}
 
-	// Parse the first command word (handle pipes for chained commands)
-	firstPart := condition
-	if idx := strings.Index(firstPart, "|"); idx > 0 {
-		firstPart = strings.TrimSpace(firstPart[:idx])
-	}
-	// Get the first word (the command name)
-	fields := strings.Fields(firstPart)
-	if len(fields) == 0 {
-		return fmt.Errorf("wakeup condition is empty or invalid")
-	}
-	cmdName := fields[0]
-
-	// Check if the command is allowed
-	isAllowed := false
-	for _, allowed := range allowedCommands {
-		if cmdName == allowed {
-			isAllowed = true
-			break
+	// Validate ALL commands in pipe chain (split by |)
+	pipeSegments := strings.Split(condition, "|")
+	for i, segment := range pipeSegments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return fmt.Errorf("wakeup condition has empty pipe segment at position %d", i+1)
 		}
-	}
-	if !isAllowed {
-		return fmt.Errorf("wakeup condition must start with an allowed command (gh, agencycli, git, grep, jq, test, true, false), got: %s", cmdName)
+		// Get the first word (the command name) of this segment
+		fields := strings.Fields(segment)
+		if len(fields) == 0 {
+			return fmt.Errorf("wakeup condition has invalid pipe segment at position %d", i+1)
+		}
+		cmdName := fields[0]
+
+		// Check if the command is allowed
+		isAllowed := false
+		for _, allowed := range allowedCommands {
+			if cmdName == allowed {
+				isAllowed = true
+				break
+			}
+		}
+		if !isAllowed {
+			position := "first"
+			if i > 0 {
+				position = fmt.Sprintf("after pipe at position %d", i+1)
+			}
+			return fmt.Errorf("wakeup condition %s must use an allowed command (gh, agencycli, git, grep, jq, test, true, false), got: %s", position, cmdName)
+		}
 	}
 
 	// Validate environment variable references are safe.
