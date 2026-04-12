@@ -19,6 +19,7 @@
   },
   "projectNav": {
     "tasks": "Tasks",
+    "goals": "OKR",
     "milestones": "Milestones",
     "messages": "Messages",
     "members": "Members",
@@ -251,7 +252,21 @@
     "replyTo": "Reply",
     "replySent": "Sent",
     "filterProject": "Project",
-    "allProjects": "All projects"
+    "allProjects": "All projects",
+    "tabOverview": "Overview",
+    "noProjects": "No projects",
+    "schedulerOn": "Running",
+    "schedulerOff": "Stopped",
+    "ovAgents": "Agents",
+    "ovHeartbeat": "heartbeat on",
+    "ovTasks": "Tasks",
+    "ovPending": "pending",
+    "ovRunning": "running",
+    "ovMessages": "Messages",
+    "ovUnread": "unread",
+    "ovViewSchedule": "View schedule",
+    "startAll": "Start All",
+    "stopAll": "Stop All"
   },
   "docs": {
     "title": "Knowledge Base",
@@ -272,6 +287,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "download": "Download",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit Fullscreen",
     "searchResults": "Search results",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
@@ -418,6 +435,7 @@
     "idle": "Idle",
     "failed": "Failed",
     "waiting": "Pending",
+    "outsideWindow": "Outside Window",
     "lastWakeup": "Last wakeup",
     "wakeupCountLabel": "Wakeups",
     "today": "today",
@@ -559,7 +577,20 @@
     "logTruncated": "Log truncated (too large to display in full).",
     "logEmpty": "(empty log)",
     "viewRaw": "Raw log",
-    "viewConversation": "Conversation"
+    "viewConversation": "Conversation",
+    "status": {
+      "success": "Success",
+      "done_success": "Success",
+      "failed": "Failed",
+      "done_failed": "Failed",
+      "error": "Error",
+      "running": "Running",
+      "in_progress": "Running",
+      "awaiting": "Awaiting",
+      "awaiting_confirmation": "Awaiting Confirm",
+      "cancelled": "Cancelled",
+      "pending": "Pending"
+    }
   },
   "auth": {
     "loginTitle": "Sign in to AgencyCli",
@@ -814,9 +845,17 @@
     "metricBoolean": "Yes/No",
     "metricCurrency": "Currency",
     "status_on_track": "On Track",
+    "status_in_progress": "In Progress",
     "status_at_risk": "At Risk",
     "status_off_track": "Off Track",
-    "status_achieved": "Achieved"
+    "status_achieved": "Achieved",
+    "scopeAgency": "Agency",
+    "scopeProject": "Project",
+    "scopeAgent": "Agent",
+    "allScopes": "All Levels",
+    "allProjects": "All Projects",
+    "parentOKR": "Parent OKR",
+    "noParent": "None"
   },
   "milestone": {
     "title": "Milestones",

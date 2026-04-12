@@ -96,6 +96,10 @@ const statusCls: Record<string, string> = {
   awaiting_confirmation: 'text-amber-700 dark:text-amber-400',
 }
 
+function isFailed(status: string) {
+  return status === 'failed' || status === 'done_failed' || status === 'error'
+}
+
 const kindStyles: Record<string, { text: string; cls: string }> = {
   wakeup: { text: 'Wakeup', cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' },
   task: { text: 'Task', cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
@@ -309,7 +313,7 @@ export default function ProjectRunsPage() {
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={filterSelect}>
               <option value="all">{t('runs.filterStatus')}</option>
               {statusOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>{t(`runs.status.${s}`, { defaultValue: s })}</option>
               ))}
             </select>
             {agentOptions.length > 1 && (
@@ -358,7 +362,12 @@ export default function ProjectRunsPage() {
                           <span className="ml-1.5 text-[13px] text-neutral-500 dark:text-zinc-500">{r.taskTitle}</span>
                         )}
                       </td>
-                      <td className={cn('whitespace-nowrap px-4 py-3 text-center text-[13px] font-medium', statusCls[r.status] ?? 'text-neutral-600 dark:text-zinc-400')}>{r.status}</td>
+                      <td className={cn('px-4 py-3 text-center text-[13px] font-medium', statusCls[r.status] ?? 'text-neutral-600 dark:text-zinc-400')}>
+                        <span>{t(`runs.status.${r.status}`, { defaultValue: r.status })}</span>
+                        {isFailed(r.status) && r.errorMsg && (
+                          <p className="mt-0.5 max-w-[240px] truncate text-[11px] font-normal text-red-500/80 dark:text-red-400/70" title={r.errorMsg}>{r.errorMsg}</p>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-center text-[13px] tabular-nums text-neutral-500 dark:text-zinc-500">
                         {fmtNum((r.inputTokens ?? 0) + (r.outputTokens ?? 0) + (r.cacheReadTokens ?? 0))}
                       </td>
@@ -400,7 +409,7 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
           <div className="flex items-center gap-3">
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', kl.cls)}>{kl.text}</span>
             <span className="font-mono text-sm font-medium text-neutral-900 dark:text-zinc-100">{run.project}/{run.agent}</span>
-            <span className={cn('text-sm font-medium', statusCls[run.status] ?? 'text-neutral-600')}>{run.status}</span>
+            <span className={cn('text-sm font-medium', statusCls[run.status] ?? 'text-neutral-600')}>{t(`runs.status.${run.status}`, { defaultValue: run.status })}</span>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300">
             <X className="size-4" strokeWidth={2} />

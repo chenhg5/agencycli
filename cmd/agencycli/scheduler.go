@@ -468,13 +468,14 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			if !isInActiveWindowAt(projectedNext, hb) {
 				insideNow := isInActiveWindow(hb)
 				if !insideNow {
-					// We are currently outside the window: sleep until it opens.
-					nextWake := nextWindowStart(hb)
-					if nextWake > 0 {
-						hb.NextWakeupAt = nil
-						_ = ts.SaveHeartbeat(project, agentName, hb)
-						agentLog("%s outside active window — sleeping %s until window opens at %s",
-							colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
+				// We are currently outside the window: sleep until it opens.
+				nextWake := nextWindowStart(hb)
+				if nextWake > 0 {
+					nextOpenUTC := time.Now().Add(nextWake).UTC()
+					hb.NextWakeupAt = &nextOpenUTC
+					_ = ts.SaveHeartbeat(project, agentName, hb)
+					agentLog("%s outside active window — sleeping %s until window opens at %s",
+						colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
 						select {
 						case <-ctx.Done():
 							return
@@ -496,18 +497,24 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			// (less than 1 second after window capping). Sleep until the window
 			// opens instead so the cycle check handles it correctly without
 			// hammering the agent with back-to-back wakes.
-			if waitDur < time.Second {
+		if waitDur < time.Second {
+			nextOpen := nextWindowStart(hb)
+			if nextOpen > 0 {
+				nextOpenUTC := time.Now().Add(nextOpen).UTC()
+				hb.NextWakeupAt = &nextOpenUTC
+			} else {
 				hb.NextWakeupAt = nil
-				_ = ts.SaveHeartbeat(project, agentName, hb)
-				if hb.LastWakeup == nil {
-					agentLog("%s first wakeup deferred — waiting for active window at %s",
-						colorDim+"○", hb.ActiveHours)
-				} else {
-					agentLog("%s next wakeup deferred — waiting for active window at %s",
-						colorDim+"○", hb.ActiveHours)
-				}
-				continue
 			}
+			_ = ts.SaveHeartbeat(project, agentName, hb)
+			if hb.LastWakeup == nil {
+				agentLog("%s first wakeup deferred — waiting for active window at %s",
+					colorDim+"○", hb.ActiveHours)
+			} else {
+				agentLog("%s next wakeup deferred — waiting for active window at %s",
+					colorDim+"○", hb.ActiveHours)
+			}
+			continue
+		}
 
 		nextAt := nextAtStr(projectedNext)
 		nextUTC := projectedNext.UTC()
@@ -536,7 +543,8 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		if !isInActiveWindow(hb) {
 			nextWake := nextWindowStart(hb)
 			if nextWake > 0 {
-				hb.NextWakeupAt = nil
+				nextOpenUTC := time.Now().Add(nextWake).UTC()
+				hb.NextWakeupAt = &nextOpenUTC
 				_ = ts.SaveHeartbeat(project, agentName, hb)
 				agentLog("%s outside active window — sleeping %s until window opens",
 					colorDim+"○", nextWake.Round(time.Minute))
@@ -1274,7 +1282,7 @@ func validateWakeupCondition(condition string) error {
 		">",     // output redirection
 		"<",     // input redirection
 		">>",    // append redirection
-		"&",     // background execution
+"&",     // background execution
 		"\n",    // newline (could hide commands)
 		"\r",    // carriage return
 	}
@@ -1287,7 +1295,7 @@ func validateWakeupCondition(condition string) error {
 		}
 	}
 
-	// Allow only whitelisted commands as the first word in each pipe segment.
+// Allow only whitelisted commands as the first word in each pipe segment.
 	// Split by pipe and validate each segment's command.
 	allowedCommands := []string{
 		"gh",        // GitHub CLI
@@ -1302,7 +1310,7 @@ func validateWakeupCondition(condition string) error {
 		"false",     // always fail
 	}
 
-	// Validate ALL commands in pipe chain (split by |)
+// Validate ALL commands in pipe chain (split by |)
 	pipeSegments := strings.Split(condition, "|")
 	for i, segment := range pipeSegments {
 		segment = strings.TrimSpace(segment)

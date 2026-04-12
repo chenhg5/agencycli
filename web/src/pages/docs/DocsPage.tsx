@@ -7,7 +7,7 @@ import rehypeHighlight from 'rehype-highlight'
 import type { Components } from 'react-markdown'
 import {
   BookOpen, ChevronRight, ChevronDown, FileText, FolderOpen, Folder,
-  Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
+  Maximize2, Minimize2, Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
   Calendar, User, Tag, FolderTree, Download, PanelLeftClose, PanelLeft,
 } from 'lucide-react'
 import { apiFetch, apiPost, apiUrl } from '../../lib/api'
@@ -28,6 +28,17 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+function useLocaleDate() {
+  const { i18n } = useTranslation()
+  const locale = i18n.language ?? 'en'
+  return useCallback((dateStr: string | null | undefined) => {
+    if (!dateStr) return '—'
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    return new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+  }, [locale])
+}
+
 type DocEntry = {
   id: string; title: string; filePath: string; index: string
   createdBy: string; tags?: string[]; description?: string
@@ -43,6 +54,7 @@ export default function DocsPage() {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
+  const fmtDate = useLocaleDate()
   const [tree, setTree] = useState<TreeNode | null>(null)
   const [allDocs, setAllDocs] = useState<DocEntry[]>([])
   const [selectedIndex, setSelectedIndex] = useState<string | null>(null)
@@ -238,7 +250,7 @@ export default function DocsPage() {
                       )}
                       <div className="mt-2 flex items-center gap-3 text-xs text-neutral-400 dark:text-zinc-500">
                         <span className="flex items-center gap-1"><User className="size-3" />{d.createdBy}</span>
-                        <span className="flex items-center gap-1"><Calendar className="size-3" />{new Date(d.createdAt).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-1"><Calendar className="size-3" />{fmtDate(d.createdAt)}</span>
                         {d.tags?.map(tag => (
                           <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 dark:bg-zinc-800">{tag}</span>
                         ))}
@@ -445,11 +457,21 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
   sidebarOpen: boolean; onToggleSidebar: () => void
 }) {
   const { t } = useTranslation()
+  const fmtDate = useLocaleDate()
   const [editing, setEditing] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const [editTitle, setEditTitle] = useState(doc.title)
   const [editDesc, setEditDesc] = useState(doc.description ?? '')
   const [editIndex, setEditIndex] = useState(doc.index)
   const [editTags, setEditTags] = useState((doc.tags ?? []).join(', '))
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && fullscreen) setFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   async function downloadDoc(d: DocEntry) {
     try {
@@ -485,6 +507,30 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
     onUpdated()
   }
 
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-zinc-950">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-100 dark:border-zinc-800/60">
+          <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100 truncate">{doc.title}</h2>
+          <button onClick={() => setFullscreen(false)} className={btnGhost}>
+            <Minimize2 className="size-3.5" /> {t('docs.exitFullscreen')}
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <article className="mx-auto max-w-4xl px-10 py-10">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={mdComponents}
+            >
+              {stripFrontmatter(content)}
+            </ReactMarkdown>
+          </article>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
@@ -512,6 +558,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             </>
           ) : (
             <>
+              <button onClick={() => setFullscreen(true)} className={btnGhost}><Maximize2 className="size-3.5" /> {t('docs.fullscreen')}</button>
               <button onClick={() => downloadDoc(doc)} className={btnGhost}><Download className="size-3.5" /> {t('docs.download')}</button>
               <button onClick={() => setEditing(true)} className={btnGhost}><Pencil className="size-3.5" /> {t('docs.edit')}</button>
               <button onClick={onRemove} className={`${btnGhost} text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20`}>
@@ -526,7 +573,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
       <div className="flex items-center gap-5 border-b border-neutral-100 dark:border-zinc-800 px-5 py-2 text-xs text-neutral-400 dark:text-zinc-500">
         <span className="flex items-center gap-1"><FolderTree className="size-3.5" /> {doc.index}</span>
         <span className="flex items-center gap-1"><User className="size-3.5" /> {doc.createdBy}</span>
-        <span className="flex items-center gap-1"><Calendar className="size-3.5" /> {new Date(doc.createdAt).toLocaleDateString()}</span>
+        <span className="flex items-center gap-1"><Calendar className="size-3.5" /> {fmtDate(doc.createdAt)}</span>
         {doc.tags && doc.tags.length > 0 && (
           <span className="flex items-center gap-1">
             <Tag className="size-3.5" />

@@ -30,12 +30,19 @@ func newOKRCmd() *cobra.Command {
 }
 
 func newOKRListCmd() *cobra.Command {
-	var quarter string
+	var (
+		quarter  string
+		scope    string
+		scopeRef string
+	)
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all OKRs",
+		Short: "List OKRs, optionally filtered by scope and quarter",
 		Example: `  agencycli okr list
-  agencycli okr list --quarter 2026-Q2`,
+  agencycli okr list --quarter 2026-Q2
+  agencycli okr list --scope agency
+  agencycli okr list --scope project --scope-ref my-service
+  agencycli okr list --scope agent --scope-ref my-service/dev`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -51,7 +58,10 @@ func newOKRListCmd() *cobra.Command {
 				fmt.Printf("Current quarter: %s\n\n", f.CurrentQuarter)
 			}
 
-			okrs := f.OKRs
+			okrs, err := s.ListOKRs(entity.OKRScope(scope), scopeRef)
+			if err != nil {
+				return err
+			}
 			if quarter != "" {
 				var filtered []entity.OKR
 				for _, o := range okrs {
@@ -68,31 +78,46 @@ func newOKRListCmd() *cobra.Command {
 			}
 
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "STATUS\tPROGRESS\tID\tQUARTER\tOBJECTIVE")
-			fmt.Fprintln(w, "──────\t────────\t──\t───────\t─────────")
+			fmt.Fprintln(w, "STATUS\tPROGRESS\tSCOPE\tID\tQUARTER\tOBJECTIVE")
+			fmt.Fprintln(w, "──────\t────────\t─────\t──\t───────\t─────────")
 			for _, o := range okrs {
 				icon := statusIcon(string(o.Status))
-				fmt.Fprintf(w, "%s %s\t%.0f%%\t%s\t%s\t%s\n",
-					icon, o.Status, o.Progress(), o.ID, o.Quarter, o.Objective)
+				scopeStr := string(o.Scope)
+				if o.ScopeRef != "" {
+					scopeStr += ":" + o.ScopeRef
+				}
+				if scopeStr == "" {
+					scopeStr = "agency"
+				}
+				fmt.Fprintf(w, "%s %s\t%.0f%%\t%s\t%s\t%s\t%s\n",
+					icon, o.Status, o.Progress(), scopeStr, o.ID, o.Quarter, o.Objective)
 			}
 			w.Flush()
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&quarter, "quarter", "", "filter by quarter (e.g. 2026-Q2)")
+	cmd.Flags().StringVar(&scope, "scope", "", "filter by scope (agency|project|agent)")
+	cmd.Flags().StringVar(&scopeRef, "scope-ref", "", "scope reference (project name or project/agent)")
 	return cmd
 }
 
 func newOKRCreateCmd() *cobra.Command {
 	var (
-		objective string
-		owner     string
-		quarter   string
+		objective   string
+		description string
+		owner       string
+		quarter     string
+		scope       string
+		scopeRef    string
+		parentID    string
 	)
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new OKR",
-		Example: `  agencycli okr create --objective "Ship v2.0" --owner human --quarter 2026-Q2`,
+		Example: `  agencycli okr create --objective "Ship v2.0" --owner human --quarter 2026-Q2
+  agencycli okr create --objective "Reduce latency" --scope project --scope-ref my-service
+  agencycli okr create --objective "Agent autonomy" --scope agent --scope-ref my-service/dev --parent okr-xxx`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -103,21 +128,29 @@ func newOKRCreateCmd() *cobra.Command {
 			}
 			s := store.NewOKRStore(root)
 			okr := entity.OKR{
-				Objective: objective,
-				Owner:     owner,
-				Quarter:   quarter,
+				Objective:   objective,
+				Description: description,
+				Owner:       owner,
+				Quarter:     quarter,
+				Scope:       entity.OKRScope(scope),
+				ScopeRef:    scopeRef,
+				ParentID:    parentID,
 			}
 			created, err := s.CreateOKR(okr)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("✓ OKR %s created: %s\n", created.ID, created.Objective)
+			fmt.Printf("✓ OKR %s created: %s (scope: %s)\n", created.ID, created.Objective, created.Scope)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&objective, "objective", "", "objective text (required)")
+	cmd.Flags().StringVar(&description, "description", "", "detailed description")
 	cmd.Flags().StringVar(&owner, "owner", "human", "owner")
 	cmd.Flags().StringVar(&quarter, "quarter", "", "quarter (e.g. 2026-Q2)")
+	cmd.Flags().StringVar(&scope, "scope", "agency", "scope level (agency|project|agent)")
+	cmd.Flags().StringVar(&scopeRef, "scope-ref", "", "scope reference (project name or project/agent)")
+	cmd.Flags().StringVar(&parentID, "parent", "", "parent OKR ID for hierarchical alignment")
 	return cmd
 }
 
@@ -138,6 +171,17 @@ func newOKRShowCmd() *cobra.Command {
 			}
 			fmt.Printf("ID        : %s\n", o.ID)
 			fmt.Printf("Objective : %s\n", o.Objective)
+			if o.Description != "" {
+				fmt.Printf("Desc      : %s\n", o.Description)
+			}
+			fmt.Printf("Scope     : %s", o.Scope)
+			if o.ScopeRef != "" {
+				fmt.Printf(" (%s)", o.ScopeRef)
+			}
+			fmt.Println()
+			if o.ParentID != "" {
+				fmt.Printf("Parent    : %s\n", o.ParentID)
+			}
 			fmt.Printf("Status    : %s %s\n", statusIcon(string(o.Status)), o.Status)
 			fmt.Printf("Progress  : %.0f%%\n", o.Progress())
 			fmt.Printf("Owner     : %s\n", o.Owner)
@@ -171,17 +215,22 @@ func newOKRShowCmd() *cobra.Command {
 
 func newOKRUpdateCmd() *cobra.Command {
 	var (
-		objective string
-		owner     string
-		quarter   string
-		status    string
+		objective   string
+		description string
+		owner       string
+		quarter     string
+		status      string
+		scope       string
+		scopeRef    string
+		parentID    string
 	)
 	cmd := &cobra.Command{
 		Use:   "update <okr-id>",
 		Short: "Update an OKR",
 		Args:  cobra.ExactArgs(1),
-		Example: `  agencycli okr update okr-2026q2-abc123 --status at_risk
-  agencycli okr update okr-2026q2-abc123 --objective "Ship v2.0 with auth"`,
+		Example: `  agencycli okr update okr-xxx --status at_risk
+  agencycli okr update okr-xxx --scope project --scope-ref my-service
+  agencycli okr update okr-xxx --parent okr-yyy`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -192,6 +241,9 @@ func newOKRUpdateCmd() *cobra.Command {
 				if cmd.Flags().Changed("objective") {
 					o.Objective = objective
 				}
+				if cmd.Flags().Changed("description") {
+					o.Description = description
+				}
 				if cmd.Flags().Changed("owner") {
 					o.Owner = owner
 				}
@@ -200,6 +252,15 @@ func newOKRUpdateCmd() *cobra.Command {
 				}
 				if cmd.Flags().Changed("status") {
 					o.Status = entity.OKRStatus(status)
+				}
+				if cmd.Flags().Changed("scope") {
+					o.Scope = entity.OKRScope(scope)
+				}
+				if cmd.Flags().Changed("scope-ref") {
+					o.ScopeRef = scopeRef
+				}
+				if cmd.Flags().Changed("parent") {
+					o.ParentID = parentID
 				}
 			})
 			if err != nil {
@@ -210,9 +271,13 @@ func newOKRUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&objective, "objective", "", "new objective")
+	cmd.Flags().StringVar(&description, "description", "", "new description")
 	cmd.Flags().StringVar(&owner, "owner", "", "new owner")
 	cmd.Flags().StringVar(&quarter, "quarter", "", "new quarter")
-	cmd.Flags().StringVar(&status, "status", "", "new status (on_track|at_risk|off_track|achieved)")
+	cmd.Flags().StringVar(&status, "status", "", "new status (on_track|in_progress|at_risk|off_track|achieved)")
+	cmd.Flags().StringVar(&scope, "scope", "", "new scope (agency|project|agent)")
+	cmd.Flags().StringVar(&scopeRef, "scope-ref", "", "new scope reference")
+	cmd.Flags().StringVar(&parentID, "parent", "", "parent OKR ID")
 	return cmd
 }
 
@@ -383,6 +448,8 @@ func statusIcon(status string) string {
 	switch status {
 	case "on_track":
 		return "🟢"
+	case "in_progress":
+		return "🔵"
 	case "at_risk":
 		return "🟡"
 	case "off_track":
@@ -391,8 +458,6 @@ func statusIcon(status string) string {
 		return "🔵"
 	case "planned":
 		return "⚪"
-	case "in_progress":
-		return "🔵"
 	case "completed":
 		return "✅"
 	case "cancelled":

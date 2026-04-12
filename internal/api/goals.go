@@ -16,12 +16,22 @@ func (s *Server) handleListOKRs(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	scope := entity.OKRScope(r.URL.Query().Get("scope"))
+	scopeRef := r.URL.Query().Get("scopeRef")
+	okrs, err := s.okrStore.ListOKRs(scope, scopeRef)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
 	type krJSON struct {
 		entity.KeyResult
 		Progress float64 `json:"progress"`
 	}
 	type okrJSON struct {
 		ID          string              `json:"id"`
+		Scope       entity.OKRScope     `json:"scope,omitempty"`
+		ScopeRef    string              `json:"scopeRef,omitempty"`
+		ParentID    string              `json:"parentId,omitempty"`
 		Objective   string              `json:"objective"`
 		Description string              `json:"description,omitempty"`
 		Owner       string              `json:"owner"`
@@ -37,13 +47,18 @@ func (s *Server) handleListOKRs(w http.ResponseWriter, r *http.Request) {
 		CurrentQuarter string    `json:"currentQuarter"`
 		OKRs           []okrJSON `json:"okrs"`
 	}{CurrentQuarter: f.CurrentQuarter}
-	for _, o := range f.OKRs {
+	for _, o := range okrs {
 		krs := make([]krJSON, 0, len(o.KeyResults))
 		for _, kr := range o.KeyResults {
 			krs = append(krs, krJSON{KeyResult: kr, Progress: kr.Progress()})
 		}
+		oScope := o.Scope
+		if oScope == "" {
+			oScope = entity.OKRScopeAgency
+		}
 		out.OKRs = append(out.OKRs, okrJSON{
-			ID: o.ID, Objective: o.Objective, Description: o.Description,
+			ID: o.ID, Scope: oScope, ScopeRef: o.ScopeRef, ParentID: o.ParentID,
+			Objective: o.Objective, Description: o.Description,
 			Owner: o.Owner, Quarter: o.Quarter,
 			Status: o.Status, KeyResults: krs, ReviewNotes: o.ReviewNotes,
 			Progress: o.Progress(), CreatedAt: o.CreatedAt, UpdatedAt: o.UpdatedAt,
@@ -72,6 +87,9 @@ func (s *Server) handleGetOKR(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"id":          o.ID,
+		"scope":       o.Scope,
+		"scopeRef":    o.ScopeRef,
+		"parentId":    o.ParentID,
 		"objective":   o.Objective,
 		"description": o.Description,
 		"owner":       o.Owner,
@@ -87,6 +105,9 @@ func (s *Server) handleGetOKR(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateOKR(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Scope       entity.OKRScope    `json:"scope"`
+		ScopeRef    string             `json:"scopeRef"`
+		ParentID    string             `json:"parentId"`
 		Objective   string             `json:"objective"`
 		Description string             `json:"description"`
 		Owner       string             `json:"owner"`
@@ -103,6 +124,9 @@ func (s *Server) handleCreateOKR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	okr := entity.OKR{
+		Scope:       req.Scope,
+		ScopeRef:    req.ScopeRef,
+		ParentID:    req.ParentID,
 		Objective:   req.Objective,
 		Description: req.Description,
 		Owner:       req.Owner,
@@ -127,6 +151,9 @@ func (s *Server) handleUpdateOKR(w http.ResponseWriter, r *http.Request) {
 		Owner       *string            `json:"owner"`
 		Quarter     *string            `json:"quarter"`
 		Status      *entity.OKRStatus  `json:"status"`
+		Scope       *entity.OKRScope   `json:"scope"`
+		ScopeRef    *string            `json:"scopeRef"`
+		ParentID    *string            `json:"parentId"`
 		KeyResults  []entity.KeyResult `json:"keyResults"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -148,6 +175,15 @@ func (s *Server) handleUpdateOKR(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Status != nil {
 			o.Status = *req.Status
+		}
+		if req.Scope != nil {
+			o.Scope = *req.Scope
+		}
+		if req.ScopeRef != nil {
+			o.ScopeRef = *req.ScopeRef
+		}
+		if req.ParentID != nil {
+			o.ParentID = *req.ParentID
 		}
 		if req.KeyResults != nil {
 			o.KeyResults = req.KeyResults

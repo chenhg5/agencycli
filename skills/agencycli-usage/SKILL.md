@@ -212,6 +212,66 @@ agencycli --dir $AGENCY_DIR cron disable <cron-id> --project <project> --agent <
 
 ---
 
+## OKRs (Objectives and Key Results)
+
+OKRs support three scope levels: **agency** (global), **project**, and **agent**. Child OKRs can link to a parent via `--parent` for hierarchical alignment.
+
+```bash
+# List — filter by scope and/or quarter
+agencycli --dir $AGENCY_DIR okr list
+agencycli --dir $AGENCY_DIR okr list --quarter 2026-Q2
+agencycli --dir $AGENCY_DIR okr list --scope project --scope-ref my-service
+agencycli --dir $AGENCY_DIR okr list --scope agent --scope-ref my-service/dev
+
+# Create — specify scope level
+agencycli --dir $AGENCY_DIR okr create \
+  --objective "Ship v2.0" --owner human --quarter 2026-Q2
+agencycli --dir $AGENCY_DIR okr create \
+  --objective "Reduce latency" --scope project --scope-ref my-service
+agencycli --dir $AGENCY_DIR okr create \
+  --objective "Improve autonomy" --scope agent --scope-ref my-service/dev \
+  --parent <parent-okr-id> --description "Detailed description"
+
+# Show / Update / Delete
+agencycli --dir $AGENCY_DIR okr show <okr-id>
+agencycli --dir $AGENCY_DIR okr update <okr-id> --status at_risk
+agencycli --dir $AGENCY_DIR okr update <okr-id> --scope project --scope-ref my-service
+agencycli --dir $AGENCY_DIR okr delete <okr-id>
+
+# Key Results
+agencycli --dir $AGENCY_DIR okr kr add \
+  --okr <okr-id> --description "Reduce p95 latency" --target 200 --unit ms
+agencycli --dir $AGENCY_DIR okr kr update \
+  --okr <okr-id> --kr <kr-id> --current 150
+
+# Review notes
+agencycli --dir $AGENCY_DIR okr review \
+  --okr <okr-id> --note "Good progress this week" --author human
+```
+
+OKR scope: agency (default), project, agent. Status: on_track, in_progress, at_risk, off_track, achieved. Progress is auto-calculated from Key Results.
+
+When completing a task, check if it advances any Key Result and update accordingly.
+
+---
+
+## Milestones
+
+```bash
+agencycli --dir $AGENCY_DIR milestone list --project <project>
+agencycli --dir $AGENCY_DIR milestone create --project <project> \
+  --title "Beta Release" --due-date 2026-05-01 --owner human \
+  --criteria "All P0 bugs fixed" --criteria "Docs updated"
+agencycli --dir $AGENCY_DIR milestone show <ms-id> --project <project>
+agencycli --dir $AGENCY_DIR milestone update <ms-id> --project <project> \
+  --progress 75 --status in_progress
+agencycli --dir $AGENCY_DIR milestone delete <ms-id> --project <project>
+```
+
+Milestone status: planned, in_progress, completed, cancelled.
+
+---
+
 ## Context sync
 
 ```bash

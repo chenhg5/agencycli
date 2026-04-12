@@ -92,7 +92,7 @@ export function TaskKanban({ tasks, onTaskClick, onStatusChange, showProject }: 
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4">
+    <div className="flex min-h-[480px] gap-3 overflow-x-auto pb-4">
       {columns.map(col => (
         <div
           key={col.status}

@@ -213,3 +213,109 @@ func containsTask(tasks []*entity.Task, id string) bool {
 	}
 	return false
 }
+
+// ── Project overview for workbench ──────────────────────────────────────────
+
+type projectOverview struct {
+	Project          string `json:"project"`
+	AgentCount       int    `json:"agentCount"`
+	HeartbeatEnabled int    `json:"heartbeatEnabled"`
+	SchedulerRunning bool   `json:"schedulerRunning"`
+	PendingTasks     int    `json:"pendingTasks"`
+	RunningTasks     int    `json:"runningTasks"`
+	CompletedTasks   int    `json:"completedTasks"`
+	TotalTasks       int    `json:"totalTasks"`
+	UnreadMessages   int    `json:"unreadMessages"`
+	TotalMessages    int    `json:"totalMessages"`
+}
+
+func (s *Server) handleWorkbenchOverview(w http.ResponseWriter, r *http.Request) {
+	projects, err := s.ts.ListProjects()
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+
+	cur := s.currentUser(r)
+
+	schedStatuses := s.sched.Status()
+	schedRunning := map[string]bool{}
+	for _, ss := range schedStatuses {
+		if ss.Running {
+			schedRunning[ss.Key] = true
+		}
+	}
+
+	rows := make([]projectOverview, 0, len(projects))
+	for _, proj := range projects {
+		if cur.Role != RoleAdmin {
+			if _, ok := s.users.HasProjectAccess(cur.Username, proj); !ok {
+				continue
+			}
+		}
+		agentNames, err := s.ts.ListAgents(proj)
+		if err != nil {
+			continue
+		}
+
+		ov := projectOverview{Project: proj, AgentCount: len(agentNames)}
+
+		for _, ag := range agentNames {
+			hb, err := s.ts.GetHeartbeat(proj, ag)
+			if err == nil && hb.Enabled {
+				ov.HeartbeatEnabled++
+			}
+		}
+
+		if schedRunning["all"] || schedRunning[proj] {
+			ov.SchedulerRunning = true
+		} else {
+			for _, ag := range agentNames {
+				if schedRunning[proj+"/"+ag] {
+					ov.SchedulerRunning = true
+					break
+				}
+			}
+		}
+
+		isWakeup := func(t *entity.Task) bool {
+			return strings.HasPrefix(t.Title, "[wakeup]") || t.Type == "wakeup"
+		}
+		for _, ag := range agentNames {
+			tasks, _ := s.ts.ListTasks(proj, ag)
+			for _, t := range tasks {
+				if t == nil || isWakeup(t) {
+					continue
+				}
+				ov.TotalTasks++
+				switch {
+				case t.Status == entity.TaskStatusPending:
+					ov.PendingTasks++
+				case t.Status == entity.TaskStatusInProgress:
+					ov.RunningTasks++
+				case t.Status.IsTerminal():
+					ov.CompletedTasks++
+				}
+			}
+		}
+
+		for _, ag := range agentNames {
+			mailbox := proj + "/" + ag
+			msgs, _ := s.ts.ListMessages(mailbox)
+			for _, m := range msgs {
+				if m == nil {
+					continue
+				}
+				ov.TotalMessages++
+				if m.ReadAt == nil {
+					ov.UnreadMessages++
+				}
+			}
+		}
+
+		rows = append(rows, ov)
+	}
+
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Project < rows[j].Project })
+	_ = json.NewEncoder(w).Encode(rows)
+}

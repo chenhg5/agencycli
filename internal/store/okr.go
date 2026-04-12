@@ -10,7 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// OKRStore manages agency-level OKRs stored in .agencycli/okrs.yaml.
+// OKRStore manages OKRs stored in .agencycli/okrs.yaml.
+// All scopes (agency / project / agent) live in the same file.
 type OKRStore struct {
 	root string
 }
@@ -54,12 +55,26 @@ func (s *OKRStore) Load() (*entity.OKRFile, error) {
 	return s.load()
 }
 
-func (s *OKRStore) ListOKRs() ([]entity.OKR, error) {
+// ListOKRs returns all OKRs, optionally filtered by scope and scopeRef.
+func (s *OKRStore) ListOKRs(scope entity.OKRScope, scopeRef string) ([]entity.OKR, error) {
 	f, err := s.load()
 	if err != nil {
 		return nil, err
 	}
-	return f.OKRs, nil
+	if scope == "" {
+		return f.OKRs, nil
+	}
+	var out []entity.OKR
+	for _, o := range f.OKRs {
+		s := o.Scope
+		if s == "" {
+			s = entity.OKRScopeAgency
+		}
+		if s == scope && (scopeRef == "" || o.ScopeRef == scopeRef) {
+			out = append(out, o)
+		}
+	}
+	return out, nil
 }
 
 func (s *OKRStore) GetOKR(id string) (*entity.OKR, error) {
@@ -88,6 +103,9 @@ func (s *OKRStore) CreateOKR(okr entity.OKR) (*entity.OKR, error) {
 	okr.UpdatedAt = now
 	if okr.Status == "" {
 		okr.Status = entity.OKRStatusOnTrack
+	}
+	if okr.Scope == "" {
+		okr.Scope = entity.OKRScopeAgency
 	}
 	f.OKRs = append(f.OKRs, okr)
 	if err := s.save(f); err != nil {
@@ -134,7 +152,6 @@ func (s *OKRStore) SetCurrentQuarter(q string) error {
 	return s.save(f)
 }
 
-// AddKR appends a Key Result to the specified OKR.
 func (s *OKRStore) AddKR(okrID string, kr entity.KeyResult) (*entity.KeyResult, error) {
 	if kr.ID == "" {
 		kr.ID = entity.NewKRID()
@@ -148,7 +165,6 @@ func (s *OKRStore) AddKR(okrID string, kr entity.KeyResult) (*entity.KeyResult, 
 	return &kr, nil
 }
 
-// UpdateKR modifies a specific Key Result within an OKR.
 func (s *OKRStore) UpdateKR(okrID, krID string, fn func(*entity.KeyResult)) error {
 	return s.UpdateOKR(okrID, func(o *entity.OKR) {
 		for i := range o.KeyResults {

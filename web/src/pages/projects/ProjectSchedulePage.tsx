@@ -770,11 +770,18 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                 <tr key={ag.name} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
                   <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${ag.name}`} className="text-sky-700 hover:underline dark:text-sky-400">{ag.name}</Link></td>
                   <td className={tdCls}>
-                    {isRunningNow && <StatusBadge color="sky">{t('schedule.running')}</StatusBadge>}
-                    {!isRunningNow && hb.paused && <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>}
-                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus === 'failed' && <StatusBadge color="red">{t('schedule.failed')}</StatusBadge>}
-                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus !== 'failed' && (hb.lastWakeupStatus === 'done' || hb.nextWakeupAt) && <StatusBadge color="emerald">{t('schedule.idle')}</StatusBadge>}
-                    {!isRunningNow && !hb.paused && hb.lastWakeupStatus !== 'failed' && hb.lastWakeupStatus !== 'done' && !hb.nextWakeupAt && <StatusBadge color="neutral">{t('schedule.waiting')}</StatusBadge>}
+                    {(() => {
+                      if (isRunningNow) return <StatusBadge color="sky">{t('schedule.running')}</StatusBadge>
+                      if (hb.paused) return <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>
+                      if (hb.lastWakeupStatus === 'failed') return <StatusBadge color="red">{t('schedule.failed')}</StatusBadge>
+                      if (hb.lastWakeupStatus === 'done' || hb.nextWakeupAt) {
+                        if (hb.nextWakeupAt && !hb.lastWakeup && (hb.activeHours || hb.activeDays)) {
+                          return <StatusBadge color="amber">{t('schedule.outsideWindow')}</StatusBadge>
+                        }
+                        return <StatusBadge color="emerald">{t('schedule.idle')}</StatusBadge>
+                      }
+                      return <StatusBadge color="neutral">{t('schedule.waiting')}</StatusBadge>
+                    })()}
                   </td>
                   <td className={tdCls}>
                     {hb.nextWakeupAt && new Date(hb.nextWakeupAt) > new Date() ? (

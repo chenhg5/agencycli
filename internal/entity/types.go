@@ -762,10 +762,11 @@ type Cron struct {
 type OKRStatus string
 
 const (
-	OKRStatusOnTrack  OKRStatus = "on_track"
-	OKRStatusAtRisk   OKRStatus = "at_risk"
-	OKRStatusOffTrack OKRStatus = "off_track"
-	OKRStatusAchieved OKRStatus = "achieved"
+	OKRStatusOnTrack    OKRStatus = "on_track"
+	OKRStatusInProgress OKRStatus = "in_progress"
+	OKRStatusAtRisk     OKRStatus = "at_risk"
+	OKRStatusOffTrack   OKRStatus = "off_track"
+	OKRStatusAchieved   OKRStatus = "achieved"
 )
 
 // MetricType defines how a Key Result is measured.
@@ -820,8 +821,20 @@ type ReviewNote struct {
 
 // OKR is an Objective with its associated Key Results.
 // Stored in <root>/.agencycli/okrs.yaml.
+// OKRScope identifies the level at which an OKR is defined.
+type OKRScope string
+
+const (
+	OKRScopeAgency  OKRScope = "agency"
+	OKRScopeProject OKRScope = "project"
+	OKRScopeAgent   OKRScope = "agent"
+)
+
 type OKR struct {
 	ID          string       `yaml:"id"          json:"id"`
+	Scope       OKRScope     `yaml:"scope,omitempty"    json:"scope,omitempty"`
+	ScopeRef    string       `yaml:"scope_ref,omitempty" json:"scopeRef,omitempty"`
+	ParentID    string       `yaml:"parent_id,omitempty" json:"parentId,omitempty"`
 	Objective   string       `yaml:"objective"   json:"objective"`
 	Description string       `yaml:"description,omitempty" json:"description,omitempty"`
 	Owner       string       `yaml:"owner"       json:"owner"`

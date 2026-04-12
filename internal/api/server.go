@@ -149,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/docs/{id}", s.handleDocsDelete)
 	mux.HandleFunc("GET /api/v1/workbench/messages", s.handleWorkbenchMessages)
 	mux.HandleFunc("GET /api/v1/workbench/tasks", s.handleWorkbenchTasks)
+	mux.HandleFunc("GET /api/v1/workbench/overview", s.handleWorkbenchOverview)
 	mux.HandleFunc("GET /api/v1/scheduler/status", s.handleSchedulerStatus)
 	mux.HandleFunc("POST /api/v1/scheduler/start", s.handleSchedulerStart)
 	mux.HandleFunc("POST /api/v1/scheduler/stop", s.handleSchedulerStop)

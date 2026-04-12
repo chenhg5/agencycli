@@ -19,6 +19,7 @@
   },
   "projectNav": {
     "tasks": "任务",
+    "goals": "OKR",
     "milestones": "里程碑",
     "messages": "消息",
     "members": "成员",
@@ -251,7 +252,21 @@
     "replyTo": "回复",
     "replySent": "已发送",
     "filterProject": "项目",
-    "allProjects": "全部项目"
+    "allProjects": "全部项目",
+    "tabOverview": "概览",
+    "noProjects": "暂无项目",
+    "schedulerOn": "调度中",
+    "schedulerOff": "未调度",
+    "ovAgents": "Agent",
+    "ovHeartbeat": "已启用心跳",
+    "ovTasks": "任务",
+    "ovPending": "待处理",
+    "ovRunning": "执行中",
+    "ovMessages": "消息",
+    "ovUnread": "未读",
+    "ovViewSchedule": "查看调度详情",
+    "startAll": "启动全部调度",
+    "stopAll": "停止全部调度"
   },
   "docs": {
     "title": "知识库",
@@ -272,6 +287,8 @@
     "save": "保存",
     "cancel": "取消",
     "download": "下载",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏",
     "searchResults": "搜索结果",
     "collapseSidebar": "收起目录",
     "expandSidebar": "展开目录"
@@ -418,6 +435,7 @@
     "idle": "空闲",
     "failed": "失败",
     "waiting": "待激活",
+    "outsideWindow": "窗口外",
     "lastWakeup": "上次唤醒",
     "wakeupCountLabel": "唤醒次数",
     "today": "今天",
@@ -559,7 +577,20 @@
     "logTruncated": "日志过长，已截断显示。",
     "logEmpty": "（日志为空）",
     "viewRaw": "原始日志",
-    "viewConversation": "对话视图"
+    "viewConversation": "对话视图",
+    "status": {
+      "success": "成功",
+      "done_success": "成功",
+      "failed": "失败",
+      "done_failed": "失败",
+      "error": "错误",
+      "running": "运行中",
+      "in_progress": "运行中",
+      "awaiting": "等待中",
+      "awaiting_confirmation": "待确认",
+      "cancelled": "已取消",
+      "pending": "待处理"
+    }
   },
   "auth": {
     "loginTitle": "登录 AgencyCli",
@@ -814,9 +845,17 @@
     "metricBoolean": "是/否",
     "metricCurrency": "金额",
     "status_on_track": "正常",
+    "status_in_progress": "进行中",
     "status_at_risk": "有风险",
     "status_off_track": "偏离",
-    "status_achieved": "已达成"
+    "status_achieved": "已达成",
+    "scopeAgency": "全局",
+    "scopeProject": "项目",
+    "scopeAgent": "Agent",
+    "allScopes": "全部层级",
+    "allProjects": "全部项目",
+    "parentOKR": "上级 OKR",
+    "noParent": "无"
   },
   "milestone": {
     "title": "里程碑",

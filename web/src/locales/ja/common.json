@@ -19,6 +19,7 @@
   },
   "projectNav": {
     "tasks": "タスク",
+    "goals": "OKR",
     "milestones": "マイルストーン",
     "messages": "メッセージ",
     "members": "メンバー",
@@ -251,7 +252,21 @@
     "replyTo": "返信",
     "replySent": "送信しました",
     "filterProject": "プロジェクト",
-    "allProjects": "すべてのプロジェクト"
+    "allProjects": "すべてのプロジェクト",
+    "tabOverview": "概要",
+    "noProjects": "プロジェクトなし",
+    "schedulerOn": "実行中",
+    "schedulerOff": "停止",
+    "ovAgents": "エージェント",
+    "ovHeartbeat": "ハートビート有効",
+    "ovTasks": "タスク",
+    "ovPending": "保留中",
+    "ovRunning": "実行中",
+    "ovMessages": "メッセージ",
+    "ovUnread": "未読",
+    "ovViewSchedule": "スケジュール詳細",
+    "startAll": "全て開始",
+    "stopAll": "全て停止"
   },
   "docs": {
     "title": "ナレッジベース",
@@ -272,6 +287,8 @@
     "save": "保存",
     "cancel": "キャンセル",
     "download": "ダウンロード",
+    "fullscreen": "全画面",
+    "exitFullscreen": "全画面終了",
     "searchResults": "検索結果",
     "collapseSidebar": "サイドバーを閉じる",
     "expandSidebar": "サイドバーを開く"
@@ -418,6 +435,7 @@
     "idle": "待機中",
     "failed": "失敗",
     "waiting": "未起動",
+    "outsideWindow": "ウィンドウ外",
     "lastWakeup": "前回のウェイクアップ",
     "wakeupCountLabel": "ウェイクアップ回数",
     "today": "今日",
@@ -559,7 +577,20 @@
     "logTruncated": "ログが長いため、表示を省略しました。",
     "logEmpty": "（ログは空です）",
     "viewRaw": "生ログ",
-    "viewConversation": "会話ビュー"
+    "viewConversation": "会話ビュー",
+    "status": {
+      "success": "成功",
+      "done_success": "成功",
+      "failed": "失敗",
+      "done_failed": "失敗",
+      "error": "エラー",
+      "running": "実行中",
+      "in_progress": "実行中",
+      "awaiting": "待機中",
+      "awaiting_confirmation": "確認待ち",
+      "cancelled": "キャンセル",
+      "pending": "保留中"
+    }
   },
   "auth": {
     "loginTitle": "AgencyCli にログイン",
@@ -814,9 +845,17 @@
     "metricBoolean": "はい/いいえ",
     "metricCurrency": "通貨",
     "status_on_track": "順調",
+    "status_in_progress": "進行中",
     "status_at_risk": "リスクあり",
     "status_off_track": "逸脱",
-    "status_achieved": "達成"
+    "status_achieved": "達成",
+    "scopeAgency": "全体",
+    "scopeProject": "プロジェクト",
+    "scopeAgent": "エージェント",
+    "allScopes": "全レベル",
+    "allProjects": "全プロジェクト",
+    "parentOKR": "上位OKR",
+    "noParent": "なし"
   },
   "milestone": {
     "title": "マイルストーン",

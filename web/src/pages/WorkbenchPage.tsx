@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   CheckCircle2,
   KanbanSquare,
+  LayoutGrid,
   List,
   ListTodo,
   Mail,
   MessageSquare,
   Pencil,
+  Play,
+  Power,
   RefreshCw,
   Reply,
   Send,
+  Square,
   Trash2,
   X,
 } from 'lucide-react'
@@ -62,7 +66,7 @@ function useProjectsAgents() {
   return data
 }
 
-type Tab = 'messages' | 'tasks'
+type Tab = 'overview' | 'messages' | 'tasks'
 
 type MessageRow = MessageDetailModel
 
@@ -734,6 +738,184 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   )
 }
 
+/* ── Overview panel ───────────────────────────────────────────────────────── */
+
+type ProjectOverview = {
+  project: string
+  agentCount: number
+  heartbeatEnabled: number
+  schedulerRunning: boolean
+  pendingTasks: number
+  runningTasks: number
+  completedTasks: number
+  totalTasks: number
+  unreadMessages: number
+  totalMessages: number
+}
+
+function OverviewPanel() {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [reloadKey, setReloadKey] = useState(0)
+  const [busy, setBusy] = useState<string | null>(null)
+  const state = useApiJson<ProjectOverview[]>('/api/v1/workbench/overview', reloadKey)
+  const projects = state.status === 'ok' ? (state.data ?? []) : []
+
+  const reload = useCallback(() => setReloadKey(k => k + 1), [])
+
+  const allRunning = projects.length > 0 && projects.every(p => p.schedulerRunning)
+  const someRunning = projects.some(p => p.schedulerRunning)
+
+  async function toggleProject(project: string, running: boolean) {
+    setBusy(project)
+    try {
+      const url = running ? '/api/v1/scheduler/stop' : '/api/v1/scheduler/start'
+      await apiPost(url, { project })
+      reload()
+    } catch { /* toast handled by apiPost */ }
+    finally { setBusy(null) }
+  }
+
+  async function toggleAll(start: boolean) {
+    setBusy('__all')
+    try {
+      if (start) {
+        for (const p of projects) {
+          if (!p.schedulerRunning) await apiPost('/api/v1/scheduler/start', { project: p.project })
+        }
+      } else {
+        for (const p of projects) {
+          if (p.schedulerRunning) await apiPost('/api/v1/scheduler/stop', { project: p.project })
+        }
+      }
+      reload()
+    } catch { /* ignore */ }
+    finally { setBusy(null) }
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 px-8 py-4">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={reload} className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
+            <RefreshCw className="size-3" strokeWidth={2} />
+            {t('api.refresh')}
+          </button>
+          {projects.length > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              {!allRunning && (
+                <button type="button" disabled={busy === '__all'}
+                  onClick={() => void toggleAll(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                  <Play className="size-3.5" strokeWidth={2} />
+                  {t('workbench.startAll')}
+                </button>
+              )}
+              {someRunning && (
+                <button type="button" disabled={busy === '__all'}
+                  onClick={() => void toggleAll(false)}
+                  className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800">
+                  <Square className="size-3" strokeWidth={2} />
+                  {t('workbench.stopAll')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
+        {state.status === 'loading' && (
+          <div className="flex items-center gap-2 py-20 justify-center">
+            <div className="size-5 animate-spin rounded-full border-2 border-neutral-300 border-t-sky-600 dark:border-zinc-600 dark:border-t-sky-400" />
+            <span className="text-sm text-neutral-500">{t('api.loading')}</span>
+          </div>
+        )}
+        {state.status === 'ok' && projects.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('workbench.noProjects')}</p>
+          </div>
+        )}
+        {state.status === 'ok' && projects.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map(p => {
+              const isBusy = busy === p.project
+              return (
+                <div
+                  key={p.project}
+                  onClick={() => navigate(`/projects/${encodeURIComponent(p.project)}/schedule`)}
+                  className="group cursor-pointer rounded-xl border border-neutral-200/80 bg-white p-5 transition-all hover:border-neutral-300 hover:shadow-md dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-zinc-600"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">{p.project}</h3>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={e => { e.stopPropagation(); void toggleProject(p.project, p.schedulerRunning) }}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
+                        p.schedulerRunning
+                          ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40'
+                          : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700'
+                      )}
+                    >
+                      {isBusy ? (
+                        <div className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : p.schedulerRunning ? (
+                        <Power className="size-3" strokeWidth={2.5} />
+                      ) : (
+                        <Play className="size-3" strokeWidth={2.5} />
+                      )}
+                      {p.schedulerRunning ? t('workbench.schedulerOn') : t('workbench.schedulerOff')}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-neutral-50 px-3 py-2 dark:bg-zinc-800/40">
+                      <div className="text-[11px] font-medium text-neutral-400 dark:text-zinc-500">{t('workbench.ovAgents')}</div>
+                      <div className="mt-0.5 text-lg font-bold text-neutral-800 dark:text-zinc-200">
+                        {p.agentCount}
+                        {p.heartbeatEnabled > 0 && (
+                          <span className="ml-1.5 text-xs font-normal text-emerald-600 dark:text-emerald-400">
+                            {p.heartbeatEnabled} {t('workbench.ovHeartbeat')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 px-3 py-2 dark:bg-zinc-800/40">
+                      <div className="text-[11px] font-medium text-neutral-400 dark:text-zinc-500">{t('workbench.ovTasks')}</div>
+                      <div className="mt-0.5 flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-neutral-800 dark:text-zinc-200">{p.totalTasks}</span>
+                        <span className="text-xs text-neutral-500 dark:text-zinc-500">
+                          {p.pendingTasks > 0 && <span className="text-amber-600 dark:text-amber-400">{p.pendingTasks} {t('workbench.ovPending')}</span>}
+                          {p.pendingTasks > 0 && p.runningTasks > 0 && ' · '}
+                          {p.runningTasks > 0 && <span className="text-sky-600 dark:text-sky-400">{p.runningTasks} {t('workbench.ovRunning')}</span>}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 px-3 py-2 dark:bg-zinc-800/40">
+                      <div className="text-[11px] font-medium text-neutral-400 dark:text-zinc-500">{t('workbench.ovMessages')}</div>
+                      <div className="mt-0.5 flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-neutral-800 dark:text-zinc-200">{p.totalMessages}</span>
+                        {p.unreadMessages > 0 && (
+                          <span className="text-xs font-medium text-sky-600 dark:text-sky-400">{p.unreadMessages} {t('workbench.ovUnread')}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-end text-xs font-medium text-sky-600 opacity-0 transition-opacity group-hover:opacity-100 dark:text-sky-400">
+                    {t('workbench.ovViewSchedule')} →
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Tab component (Plane-style) ──────────────────────────────────────────── */
 
 function TabButton({
@@ -772,12 +954,14 @@ function TabButton({
 
 export default function WorkbenchPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<Tab>('messages')
+  const [tab, setTab] = useState<Tab>('overview')
   const projectsAgents = useProjectsAgents()
   const [badgeKey, setBadgeKey] = useState(0)
 
   const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?direction=inbox&read=unread', badgeKey)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
+  const taskCount = useApiJson<TaskRow[]>('/api/v1/workbench/tasks?status=pending', badgeKey)
+  const pendingTasks = taskCount.status === 'ok' ? taskCount.data.length : 0
   const refreshBadge = useCallback(() => setBadgeKey((k) => k + 1), [])
 
   return (
@@ -795,11 +979,15 @@ export default function WorkbenchPage() {
       {/* Tabs — Plane-style border-b-2 underline */}
       <div className="shrink-0 border-b border-neutral-200/80 px-8 dark:border-zinc-700/50">
         <div className="-mb-px flex gap-1">
+          <TabButton active={tab === 'overview'} onClick={() => setTab('overview')}>
+            <LayoutGrid className="size-4" strokeWidth={1.8} />
+            {t('workbench.tabOverview')}
+          </TabButton>
           <TabButton active={tab === 'messages'} onClick={() => setTab('messages')} badge={unreadMsgs}>
             <MessageSquare className="size-4" strokeWidth={1.8} />
             {t('workbench.tabMessages')}
           </TabButton>
-          <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')}>
+          <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')} badge={pendingTasks}>
             <ListTodo className="size-4" strokeWidth={1.8} />
             {t('workbench.tabTasks')}
           </TabButton>
@@ -807,6 +995,7 @@ export default function WorkbenchPage() {
       </div>
 
       {/* Panel */}
+      {tab === 'overview' && <OverviewPanel />}
       {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} onMutated={refreshBadge} />}
       {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} />}
     </div>
