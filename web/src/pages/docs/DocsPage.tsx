@@ -122,7 +122,7 @@ export default function DocsPage() {
         d.index.toLowerCase().includes(q),
       )
     }
-    return docs
+    return docs.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [allDocs, selectedIndex, searchQ])
 
   async function openDoc(doc: DocEntry) {
@@ -315,9 +315,17 @@ function countDocs(node: TreeNode): number {
 
 /* ─── Code block with copy button ──────────────────────────────────────────── */
 
+function extractText(node: React.ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(extractText).join('')
+  if (typeof node === 'object' && 'props' in node) return extractText((node as React.ReactElement).props.children)
+  return ''
+}
+
 function CodeBlock({ className, children, ...props }: React.HTMLAttributes<HTMLElement>) {
   const [copied, setCopied] = useState(false)
-  const text = String(children).replace(/\n$/, '')
+  const text = extractText(children).replace(/\n$/, '')
   const isInline = !className && !text.includes('\n')
 
   if (isInline) {

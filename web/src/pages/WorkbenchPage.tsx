@@ -806,7 +806,7 @@ function OverviewPanel() {
               {!allRunning && (
                 <button type="button" disabled={busy === '__all'}
                   onClick={() => void toggleAll(true)}
-                  className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                  className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:bg-zinc-900 dark:text-sky-400 dark:hover:bg-sky-900/20">
                   <Play className="size-3.5" strokeWidth={2} />
                   {t('workbench.startAll')}
                 </button>
@@ -854,7 +854,7 @@ function OverviewPanel() {
                       className={cn(
                         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50',
                         p.schedulerRunning
-                          ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40'
+                          ? 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40'
                           : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-zinc-800 dark:text-zinc-500 dark:hover:bg-zinc-700'
                       )}
                     >
@@ -875,7 +875,7 @@ function OverviewPanel() {
                       <div className="mt-0.5 text-lg font-bold text-neutral-800 dark:text-zinc-200">
                         {p.agentCount}
                         {p.heartbeatEnabled > 0 && (
-                          <span className="ml-1.5 text-xs font-normal text-emerald-600 dark:text-emerald-400">
+                          <span className="ml-1.5 text-xs font-normal text-sky-600 dark:text-sky-400">
                             {p.heartbeatEnabled} {t('workbench.ovHeartbeat')}
                           </span>
                         )}
