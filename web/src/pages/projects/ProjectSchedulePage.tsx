@@ -401,12 +401,12 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !busy && onClose()}>
-      <div className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
           <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('schedule.editHb')} — <span className="font-mono">{agentName}</span></h2>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
         </div>
-        <div className="space-y-4 px-5 py-4">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {/* Interval */}
           <Field label={t('schedule.interval')}>
             <div className="flex items-center gap-2">

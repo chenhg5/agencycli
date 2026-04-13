@@ -640,6 +640,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows := make([]taskRow, 0)
+	seenIDs := make(map[string]bool)
 	for _, ag := range agents {
 		if qAgent != "" && ag.Name != qAgent {
 			continue
@@ -648,9 +649,10 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 			tasks, err := s.ts.ListTasks(name, ag.Name)
 			if err == nil {
 				for _, t := range tasks {
-					if !matchFilter(t) {
+					if !matchFilter(t) || seenIDs[t.ID] {
 						continue
 					}
+					seenIDs[t.ID] = true
 					rows = append(rows, taskToRow(t, name, ag.Name, false))
 				}
 			}
@@ -659,9 +661,10 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 			archived, err := s.ts.ListArchivedTasks(name, ag.Name)
 			if err == nil {
 				for _, t := range archived {
-					if !matchFilter(t) {
+					if !matchFilter(t) || seenIDs[t.ID] {
 						continue
 					}
+					seenIDs[t.ID] = true
 					rows = append(rows, taskToRow(t, name, ag.Name, true))
 				}
 			}

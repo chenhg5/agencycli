@@ -179,10 +179,15 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 			active, _ := s.ts.ListTasks(proj, ag)
 			archived, _ := s.ts.ListArchivedTasks(proj, ag)
 			all := append(active, archived...)
+			seenTask := map[string]bool{}
 			for _, t := range all {
 				if t == nil || isWakeup(t) {
 					continue
 				}
+				if seenTask[t.ID] {
+					continue
+				}
+				seenTask[t.ID] = true
 				if cur.Role == RoleAdmin {
 					if ag != "human" && t.Assignee != "human" {
 						continue

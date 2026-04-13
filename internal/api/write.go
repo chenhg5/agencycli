@@ -374,6 +374,12 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.serverError(w, err)
 			return
 		}
+		if t.Status.IsTerminal() {
+			if err := s.ts.ArchiveTask(project, agent, t); err != nil {
+				s.serverError(w, err)
+				return
+			}
+		}
 	} else {
 		archived, err := s.ts.ListArchivedTasks(project, agent)
 		if err != nil {
