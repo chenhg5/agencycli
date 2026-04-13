@@ -717,11 +717,12 @@ function CCConnectSection() {
 
 // ── Workspace Secrets ──────────────────────────────────────────────────────
 
-type SecretRow = { id: string; key: string; scope: string; agents?: string[]; description?: string; hasValue: boolean; createdAt: string; updatedAt: string }
+type SecretRow = { id: string; key: string; value?: string; scope: string; agents?: string[]; description?: string; createdAt: string; updatedAt: string }
 
 function SecretsSection() {
   const { t } = useTranslation()
   const [secrets, setSecrets] = useState<SecretRow[]>([])
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set())
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [key, setKey] = useState('')
@@ -826,31 +827,45 @@ function SecretsSection() {
             <thead>
               <tr className="border-b border-neutral-200/60 text-left text-xs font-medium text-neutral-500 dark:border-zinc-700/50 dark:text-zinc-500">
                 <th className="pb-2 pr-4">{t('secrets.key')}</th>
+                <th className="pb-2 pr-4">{t('secrets.value')}</th>
                 <th className="pb-2 pr-4">{t('secrets.scope')}</th>
-                <th className="pb-2 pr-4">{t('secrets.agents')}</th>
                 <th className="pb-2 pr-4">{t('secrets.description')}</th>
                 <th className="pb-2 text-right">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {secrets.map(s => (
-                <tr key={s.id} className="border-b border-neutral-100/60 dark:border-zinc-800/40">
-                  <td className="py-2.5 pr-4 font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{s.key}</td>
-                  <td className="py-2.5 pr-4">
-                    <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
-                      s.scope === 'global' ? 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400' : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
-                    )}>
-                      {s.scope === 'global' ? t('secrets.scopeGlobal') : t('secrets.scopeAgents')}
-                    </span>
-                  </td>
-                  <td className="py-2.5 pr-4 text-xs text-neutral-500 dark:text-zinc-500">{s.agents?.join(', ') || '—'}</td>
-                  <td className="py-2.5 pr-4 text-xs text-neutral-500 dark:text-zinc-500">{s.description || '—'}</td>
-                  <td className="py-2.5 text-right">
-                    <button onClick={() => startEdit(s)} className="mr-2 text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400"><Pencil className="size-3.5" /></button>
-                    <button onClick={() => handleDelete(s.id)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
-                  </td>
-                </tr>
-              ))}
+              {secrets.map(s => {
+                const revealed = revealedIds.has(s.id)
+                return (
+                  <tr key={s.id} className="border-b border-neutral-100/60 dark:border-zinc-800/40">
+                    <td className="py-2.5 pr-4 font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{s.key}</td>
+                    <td className="py-2.5 pr-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-neutral-600 dark:text-zinc-400">{revealed ? (s.value || '—') : '••••••'}</span>
+                        <button onClick={() => setRevealedIds(prev => { const n = new Set(prev); revealed ? n.delete(s.id) : n.add(s.id); return n })}
+                          className="text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400">
+                          {revealed ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-medium',
+                        s.scope === 'global' ? 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400' : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                      )}>
+                        {s.scope === 'global' ? t('secrets.scopeGlobal') : t('secrets.scopeAgents')}
+                      </span>
+                      {s.scope === 'agents' && s.agents && s.agents.length > 0 && (
+                        <span className="ml-1.5 text-[10px] text-neutral-400 dark:text-zinc-600">{s.agents.join(', ')}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 pr-4 text-xs text-neutral-500 dark:text-zinc-500">{s.description || '—'}</td>
+                    <td className="py-2.5 text-right">
+                      <button onClick={() => startEdit(s)} className="mr-2 text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400"><Pencil className="size-3.5" /></button>
+                      <button onClick={() => handleDelete(s.id)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

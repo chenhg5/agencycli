@@ -1,4 +1,13 @@
 {
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "actions": "操作",
+    "delete": "删除",
+    "edit": "编辑",
+    "confirm": "确认",
+    "add": "添加"
+  },
   "aria": {
     "mainNavigation": "主导航"
   },
@@ -883,9 +892,9 @@
     "dueSoon": "{{days}} 天后到期"
   },
   "secrets": {
-    "title": "工作区密钥",
-    "hint": "密钥会作为环境变量注入到 Agent 运行进程中，支持全局或指定 Agent 应用。",
-    "add": "添加密钥",
+    "title": "环境变量",
+    "hint": "环境变量会注入到 Agent 运行进程中，支持全局应用或指定 Agent 应用。",
+    "add": "添加变量",
     "key": "变量名",
     "value": "值",
     "scope": "作用域",
@@ -895,11 +904,11 @@
     "description": "描述",
     "descPlaceholder": "可选，说明用途",
     "leaveEmpty": "留空则不修改",
-    "confirmDelete": "确定删除这个密钥吗？"
+    "confirmDelete": "确定删除这个变量吗？"
   },
   "agentEnv": {
     "title": "环境变量",
-    "hint": "Agent 专属环境变量，优先级最高，会覆盖工作区密钥和 Provider 设置。",
+    "hint": "Agent 专属环境变量，优先级最高，会覆盖工作区环境变量和 Provider 设置。",
     "add": "添加变量",
     "empty": "暂未设置环境变量"
   }

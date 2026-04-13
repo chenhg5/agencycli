@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
-  RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil,
+  RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2, X,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -90,9 +90,12 @@ const envInputCls = 'block w-full rounded-md border border-neutral-200/80 bg-neu
 
 function AgentEnvPanel({ project, agent }: { project: string; agent: string }) {
   const { t } = useTranslation()
-  type Entry = { key: string; hasValue: boolean }
+  type Entry = { key: string; value: string }
   const [entries, setEntries] = useState<Entry[]>([])
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [showAdd, setShowAdd] = useState(false)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editVal, setEditVal] = useState('')
   const [newKey, setNewKey] = useState('')
   const [newVal, setNewVal] = useState('')
 
@@ -105,21 +108,36 @@ function AgentEnvPanel({ project, agent }: { project: string; agent: string }) {
 
   useEffect(() => { load() }, [load])
 
+  const envApi = `/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env`
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!newKey.trim()) return
     try {
-      await apiPost(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env`, { key: newKey.trim(), value: newVal })
+      await apiPost(envApi, { key: newKey.trim(), value: newVal })
       setNewKey(''); setNewVal(''); setShowAdd(false); load()
+    } catch { /* ignore */ }
+  }
+
+  async function handleUpdate(key: string) {
+    try {
+      await apiPost(envApi, { key, value: editVal })
+      setEditingKey(null); setEditVal(''); load()
     } catch { /* ignore */ }
   }
 
   async function handleRemove(key: string) {
     try {
-      await apiDelete(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agent)}/env?key=${encodeURIComponent(key)}`)
+      await apiDelete(`${envApi}?key=${encodeURIComponent(key)}`)
       load()
     } catch { /* ignore */ }
   }
+
+  function toggleReveal(key: string) {
+    setRevealed(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+
+  const isSensitive = (k: string) => /key|token|secret|password|credential/i.test(k)
 
   return (
     <section className="rounded-xl border border-neutral-200/70 bg-white p-5 dark:border-zinc-700/50 dark:bg-zinc-900">
@@ -145,7 +163,7 @@ function AgentEnvPanel({ project, agent }: { project: string; agent: string }) {
           </div>
           <div className="flex-1">
             <label className="mb-1 block text-[11px] font-medium text-neutral-500 dark:text-zinc-400">VALUE</label>
-            <input type="password" value={newVal} onChange={e => setNewVal(e.target.value)} placeholder="****" required className={envInputCls} />
+            <input value={newVal} onChange={e => setNewVal(e.target.value)} placeholder="" required className={envInputCls} />
           </div>
           <button type="submit" className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700">{t('common.save')}</button>
           <button type="button" onClick={() => { setShowAdd(false); setNewKey(''); setNewVal('') }} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800">{t('common.cancel')}</button>
@@ -154,15 +172,39 @@ function AgentEnvPanel({ project, agent }: { project: string; agent: string }) {
 
       {entries.length > 0 ? (
         <div className="mt-3 space-y-1.5">
-          {entries.map(e => (
-            <div key={e.key} className="flex items-center justify-between rounded-lg bg-neutral-50/70 px-3 py-2 dark:bg-zinc-800/30">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{e.key}</span>
-                <span className="text-[10px] text-neutral-400 dark:text-zinc-600">= ••••••</span>
+          {entries.map(e => {
+            const sensitive = isSensitive(e.key)
+            const show = !sensitive || revealed.has(e.key)
+            const isEditing = editingKey === e.key
+            return (
+              <div key={e.key} className="flex items-center justify-between rounded-lg bg-neutral-50/70 px-3 py-2 dark:bg-zinc-800/30">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="shrink-0 font-mono text-xs font-semibold text-neutral-800 dark:text-zinc-200">{e.key}</span>
+                  <span className="text-[10px] text-neutral-300 dark:text-zinc-600">=</span>
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5">
+                      <input autoFocus value={editVal} onChange={ev => setEditVal(ev.target.value)} className="w-40 rounded border border-sky-300 bg-white px-1.5 py-0.5 font-mono text-xs text-neutral-800 outline-none dark:border-sky-700 dark:bg-zinc-800 dark:text-zinc-200" />
+                      <button onClick={() => handleUpdate(e.key)} className="text-sky-600 hover:text-sky-700 dark:text-sky-400"><Check className="size-3.5" /></button>
+                      <button onClick={() => setEditingKey(null)} className="text-neutral-400 hover:text-neutral-600 dark:text-zinc-500"><X className="size-3.5" /></button>
+                    </div>
+                  ) : (
+                    <span className="truncate font-mono text-xs text-neutral-600 dark:text-zinc-400">{show ? (e.value || '—') : '••••••'}</span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {sensitive && !isEditing && (
+                    <button onClick={() => toggleReveal(e.key)} className="text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400">
+                      {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </button>
+                  )}
+                  {!isEditing && (
+                    <button onClick={() => { setEditingKey(e.key); setEditVal(e.value) }} className="text-neutral-400 hover:text-sky-600 dark:text-zinc-500 dark:hover:text-sky-400"><Pencil className="size-3.5" /></button>
+                  )}
+                  <button onClick={() => handleRemove(e.key)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
+                </div>
               </div>
-              <button onClick={() => handleRemove(e.key)} className="text-neutral-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"><Trash2 className="size-3.5" /></button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : !showAdd ? (
         <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-600">{t('agentEnv.empty')}</p>

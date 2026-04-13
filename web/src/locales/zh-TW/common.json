@@ -1,4 +1,13 @@
 {
+  "common": {
+    "save": "儲存",
+    "cancel": "取消",
+    "actions": "操作",
+    "delete": "刪除",
+    "edit": "編輯",
+    "confirm": "確認",
+    "add": "新增"
+  },
   "aria": {
     "mainNavigation": "主導航"
   },
@@ -883,9 +892,9 @@
     "dueSoon": "{{days}} 天後到期"
   },
   "secrets": {
-    "title": "工作區密鑰",
-    "hint": "密鑰會作為環境變數注入到 Agent 執行程序中，支援全域或指定 Agent 套用。",
-    "add": "新增密鑰",
+    "title": "環境變數",
+    "hint": "環境變數會注入到 Agent 執行程式中，支援全域應用或指定 Agent 套用。",
+    "add": "新增變數",
     "key": "變數名",
     "value": "值",
     "scope": "作用域",
@@ -895,11 +904,11 @@
     "description": "描述",
     "descPlaceholder": "選填，說明用途",
     "leaveEmpty": "留空則不修改",
-    "confirmDelete": "確定刪除這個密鑰嗎？"
+    "confirmDelete": "確定刪除這個變數嗎？"
   },
   "agentEnv": {
     "title": "環境變數",
-    "hint": "Agent 專屬環境變數，優先順序最高，會覆蓋工作區密鑰和 Provider 設定。",
+    "hint": "Agent 專屬環境變數，優先順序最高，會覆蓋工作區環境變數和 Provider 設定。",
     "add": "新增變數",
     "empty": "尚未設定環境變數"
   }

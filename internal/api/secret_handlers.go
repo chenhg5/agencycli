@@ -21,10 +21,10 @@ func (s *Server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		ID          string              `json:"id"`
 		Key         string              `json:"key"`
+		Value       string              `json:"value"`
 		Scope       entity.SecretScope  `json:"scope"`
 		Agents      []string            `json:"agents,omitempty"`
 		Description string              `json:"description,omitempty"`
-		HasValue    bool                `json:"hasValue"`
 		CreatedAt   string              `json:"createdAt"`
 		UpdatedAt   string              `json:"updatedAt"`
 	}
@@ -33,10 +33,10 @@ func (s *Server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row{
 			ID:          sec.ID,
 			Key:         sec.Key,
+			Value:       sec.Value,
 			Scope:       sec.Scope,
 			Agents:      sec.Agents,
 			Description: sec.Description,
-			HasValue:    sec.Value != "",
 			CreatedAt:   sec.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 			UpdatedAt:   sec.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		})
@@ -153,12 +153,12 @@ func (s *Server) handleGetAgentEnv(w http.ResponseWriter, r *http.Request) {
 		env = make(map[string]string)
 	}
 	type envEntry struct {
-		Key      string `json:"key"`
-		HasValue bool   `json:"hasValue"`
+		Key   string `json:"key"`
+		Value string `json:"value"`
 	}
 	entries := make([]envEntry, 0, len(env))
 	for k, v := range env {
-		entries = append(entries, envEntry{Key: k, HasValue: v != ""})
+		entries = append(entries, envEntry{Key: k, Value: v})
 	}
 	_ = json.NewEncoder(w).Encode(entries)
 }
