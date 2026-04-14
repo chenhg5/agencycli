@@ -9,28 +9,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newSecretCmd() *cobra.Command {
+func newEnvVarCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "secret",
-		Short: "Manage workspace-level secrets (environment variables)",
-		Long: `Workspace secrets are injected into agent processes at runtime.
-Secrets can apply globally (all agents) or to specific agents only.
+		Use:   "envvar",
+		Short: "Manage workspace-level environment variables",
+		Long: `Workspace environment variables are injected into agent processes at runtime.
+Variables can apply globally (all agents) or to specific agents only.
 
 Resolution priority (lowest → highest):
-  1. Workspace global secrets
-  2. Workspace agent-scoped secrets
+  1. Workspace global variables
+  2. Workspace agent-scoped variables
   3. API provider env
   4. Per-agent env (agent set-env)`,
+		Aliases: []string{"ev"},
 	}
 	cmd.AddCommand(
-		newSecretAddCmd(),
-		newSecretListCmd(),
-		newSecretRemoveCmd(),
+		newEnvVarAddCmd(),
+		newEnvVarListCmd(),
+		newEnvVarRemoveCmd(),
 	)
 	return cmd
 }
 
-func newSecretAddCmd() *cobra.Command {
+func newEnvVarAddCmd() *cobra.Command {
 	var (
 		scope       string
 		agents      string
@@ -38,15 +39,15 @@ func newSecretAddCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "add KEY=VALUE",
-		Short: "Add a workspace secret",
-		Example: `  # Add a global secret (applied to all agents)
-  agencycli secret add GITHUB_TOKEN=ghp_xxxx
+		Short: "Add a workspace environment variable",
+		Example: `  # Add a global variable (applied to all agents)
+  agencycli envvar add GITHUB_TOKEN=ghp_xxxx
 
-  # Add a secret for specific agents only
-  agencycli secret add MY_API_KEY=sk-xxx --scope agents --agents "myproj/dev-claude,myproj/pm"
+  # Add a variable for specific agents only
+  agencycli envvar add MY_API_KEY=sk-xxx --scope agents --agents "myproj/dev-claude,myproj/pm"
 
   # Add with description
-  agencycli secret add NPM_TOKEN=npm_xxx --description "npm publish token"`,
+  agencycli envvar add NPM_TOKEN=npm_xxx --description "npm publish token"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -58,26 +59,26 @@ func newSecretAddCmd() *cobra.Command {
 				return fmt.Errorf("expected KEY=VALUE format")
 			}
 
-			sec := entity.Secret{
+			ev := entity.EnvVar{
 				Key:         strings.TrimSpace(key),
 				Value:       value,
-				Scope:       entity.SecretScope(scope),
+				Scope:       entity.EnvVarScope(scope),
 				Description: description,
 			}
 			if scope == "agents" && agents != "" {
 				for _, a := range strings.Split(agents, ",") {
 					a = strings.TrimSpace(a)
 					if a != "" {
-						sec.Agents = append(sec.Agents, a)
+						ev.Agents = append(ev.Agents, a)
 					}
 				}
 			}
-			ss := store.NewSecretStore(root)
-			created, err := ss.Add(sec)
+			es := store.NewEnvVarStore(root)
+			created, err := es.Add(ev)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Secret added: %s (id: %s, scope: %s)\n", sec.Key, created.ID, sec.Scope)
+			fmt.Printf("Variable added: %s (id: %s, scope: %s)\n", ev.Key, created.ID, ev.Scope)
 			return nil
 		},
 	}
@@ -87,76 +88,74 @@ func newSecretAddCmd() *cobra.Command {
 	return cmd
 }
 
-func newSecretListCmd() *cobra.Command {
+func newEnvVarListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: "List all workspace secrets (values masked)",
+		Use:     "list",
+		Short:   "List all workspace environment variables",
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
-			ss := store.NewSecretStore(root)
-			items, err := ss.List()
+			es := store.NewEnvVarStore(root)
+			items, err := es.List()
 			if err != nil {
 				return err
 			}
 			if len(items) == 0 {
-				fmt.Println("No secrets configured.")
+				fmt.Println("No environment variables configured.")
 				return nil
 			}
 			fmt.Printf("%-14s %-24s %-8s %-30s %s\n", "ID", "KEY", "SCOPE", "AGENTS", "DESCRIPTION")
-			for _, s := range items {
+			for _, v := range items {
 				agentStr := "-"
-				if len(s.Agents) > 0 {
-					agentStr = strings.Join(s.Agents, ",")
+				if len(v.Agents) > 0 {
+					agentStr = strings.Join(v.Agents, ",")
 				}
-				desc := s.Description
+				desc := v.Description
 				if len(desc) > 40 {
 					desc = desc[:37] + "..."
 				}
-				fmt.Printf("%-14s %-24s %-8s %-30s %s\n", s.ID, s.Key, s.Scope, agentStr, desc)
+				fmt.Printf("%-14s %-24s %-8s %-30s %s\n", v.ID, v.Key, v.Scope, agentStr, desc)
 			}
 			return nil
 		},
 	}
 }
 
-func newSecretRemoveCmd() *cobra.Command {
+func newEnvVarRemoveCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <id-or-key>",
-		Short: "Remove a workspace secret by ID or key name",
+		Use:     "remove <id-or-key>",
+		Short:   "Remove a workspace environment variable by ID or key name",
 		Aliases: []string{"rm"},
-		Args: cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
 				return err
 			}
-			ss := store.NewSecretStore(root)
+			es := store.NewEnvVarStore(root)
 			target := args[0]
 
-			// Try by ID first
-			if err := ss.Remove(target); err == nil {
-				fmt.Printf("Secret %s removed.\n", target)
+			if err := es.Remove(target); err == nil {
+				fmt.Printf("Variable %s removed.\n", target)
 				return nil
 			}
-			// Try by key name
-			items, err := ss.List()
+			items, err := es.List()
 			if err != nil {
 				return err
 			}
-			for _, s := range items {
-				if s.Key == target {
-					if err := ss.Remove(s.ID); err != nil {
+			for _, v := range items {
+				if v.Key == target {
+					if err := es.Remove(v.ID); err != nil {
 						return err
 					}
-					fmt.Printf("Secret %s (id: %s) removed.\n", s.Key, s.ID)
+					fmt.Printf("Variable %s (id: %s) removed.\n", v.Key, v.ID)
 					return nil
 				}
 			}
-			return fmt.Errorf("secret %q not found", target)
+			return fmt.Errorf("variable %q not found", target)
 		},
 	}
 }

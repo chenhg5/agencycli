@@ -904,7 +904,9 @@
     "description": "説明",
     "descPlaceholder": "任意、用途を説明",
     "leaveEmpty": "空欄の場合は変更なし",
-    "confirmDelete": "この変数を削除しますか？"
+    "confirmDelete": "この変数を削除しますか？",
+    "noAgents": "選択可能なエージェントがありません",
+    "selectedCount": "{{count}} 個のエージェントを選択中"
   },
   "agentEnv": {
     "title": "環境変数",

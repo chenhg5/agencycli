@@ -170,10 +170,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/providers/{id}", s.handleUpdateProvider)
 	mux.HandleFunc("DELETE /api/v1/providers/{id}", s.handleDeleteProvider)
 
-	mux.HandleFunc("GET /api/v1/secrets", s.handleListSecrets)
-	mux.HandleFunc("POST /api/v1/secrets", s.handleCreateSecret)
-	mux.HandleFunc("PUT /api/v1/secrets/{id}", s.handleUpdateSecret)
-	mux.HandleFunc("DELETE /api/v1/secrets/{id}", s.handleDeleteSecret)
+	mux.HandleFunc("GET /api/v1/envvars", s.handleListEnvVars)
+	mux.HandleFunc("POST /api/v1/envvars", s.handleCreateEnvVar)
+	mux.HandleFunc("PUT /api/v1/envvars/{id}", s.handleUpdateEnvVar)
+	mux.HandleFunc("DELETE /api/v1/envvars/{id}", s.handleDeleteEnvVar)
 
 	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
 	mux.HandleFunc("POST /api/v1/users", s.handleCreateUser)

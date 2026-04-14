@@ -796,10 +796,10 @@ func remapPromptFile(args []string, hostPath, containerPath string) []string {
 func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
 	merged := make(map[string]string)
 
-	// 1+2: workspace secrets (global first, then agent-scoped overrides)
-	ss := store.NewSecretStore(root)
-	if secretEnv, err := ss.ResolveEnvForAgent(meta.Project, meta.Name); err == nil {
-		for k, v := range secretEnv {
+	// 1+2: workspace env vars (global first, then agent-scoped overrides)
+	es := store.NewEnvVarStore(root)
+	if wsEnv, err := es.ResolveEnvForAgent(meta.Project, meta.Name); err == nil {
+		for k, v := range wsEnv {
 			merged[k] = v
 		}
 	}

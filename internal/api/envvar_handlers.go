@@ -9,11 +9,11 @@ import (
 	"github.com/chenhg5/agencycli/internal/store"
 )
 
-// ── Workspace Secrets CRUD ──────────────────────────────────────────────────
+// ── Workspace EnvVars CRUD ──────────────────────────────────────────────────
 
-func (s *Server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
-	ss := store.NewSecretStore(s.root)
-	items, err := ss.List()
+func (s *Server) handleListEnvVars(w http.ResponseWriter, r *http.Request) {
+	es := store.NewEnvVarStore(s.root)
+	items, err := es.List()
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -22,35 +22,35 @@ func (s *Server) handleListSecrets(w http.ResponseWriter, r *http.Request) {
 		ID          string              `json:"id"`
 		Key         string              `json:"key"`
 		Value       string              `json:"value"`
-		Scope       entity.SecretScope  `json:"scope"`
+		Scope       entity.EnvVarScope  `json:"scope"`
 		Agents      []string            `json:"agents,omitempty"`
 		Description string              `json:"description,omitempty"`
 		CreatedAt   string              `json:"createdAt"`
 		UpdatedAt   string              `json:"updatedAt"`
 	}
 	rows := make([]row, 0, len(items))
-	for _, sec := range items {
+	for _, ev := range items {
 		rows = append(rows, row{
-			ID:          sec.ID,
-			Key:         sec.Key,
-			Value:       sec.Value,
-			Scope:       sec.Scope,
-			Agents:      sec.Agents,
-			Description: sec.Description,
-			CreatedAt:   sec.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
-			UpdatedAt:   sec.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			ID:          ev.ID,
+			Key:         ev.Key,
+			Value:       ev.Value,
+			Scope:       ev.Scope,
+			Agents:      ev.Agents,
+			Description: ev.Description,
+			CreatedAt:   ev.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:   ev.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		})
 	}
 	_ = json.NewEncoder(w).Encode(rows)
 }
 
-func (s *Server) handleCreateSecret(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateEnvVar(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Key         string             `json:"key"`
-		Value       string             `json:"value"`
-		Scope       entity.SecretScope `json:"scope"`
-		Agents      []string           `json:"agents"`
-		Description string             `json:"description"`
+		Key         string              `json:"key"`
+		Value       string              `json:"value"`
+		Scope       entity.EnvVarScope  `json:"scope"`
+		Agents      []string            `json:"agents"`
+		Description string              `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -61,15 +61,15 @@ func (s *Server) handleCreateSecret(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "key is required", http.StatusBadRequest)
 		return
 	}
-	sec := entity.Secret{
+	ev := entity.EnvVar{
 		Key:         req.Key,
 		Value:       req.Value,
 		Scope:       req.Scope,
 		Agents:      req.Agents,
 		Description: req.Description,
 	}
-	ss := store.NewSecretStore(s.root)
-	created, err := ss.Add(sec)
+	es := store.NewEnvVarStore(s.root)
+	created, err := es.Add(ev)
 	if err != nil {
 		s.serverError(w, err)
 		return
@@ -78,25 +78,25 @@ func (s *Server) handleCreateSecret(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"id": created.ID})
 }
 
-func (s *Server) handleUpdateSecret(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateEnvVar(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		http.Error(w, "secret id required", http.StatusBadRequest)
+		http.Error(w, "envvar id required", http.StatusBadRequest)
 		return
 	}
 	var req struct {
-		Key         string             `json:"key"`
-		Value       *string            `json:"value"`
-		Scope       entity.SecretScope `json:"scope"`
-		Agents      []string           `json:"agents"`
-		Description string             `json:"description"`
+		Key         string              `json:"key"`
+		Value       *string             `json:"value"`
+		Scope       entity.EnvVarScope  `json:"scope"`
+		Agents      []string            `json:"agents"`
+		Description string              `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	ss := store.NewSecretStore(s.root)
-	existing, err := ss.Get(id)
+	es := store.NewEnvVarStore(s.root)
+	existing, err := es.Get(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -113,21 +113,21 @@ func (s *Server) handleUpdateSecret(w http.ResponseWriter, r *http.Request) {
 	existing.Agents = req.Agents
 	existing.Description = req.Description
 
-	if _, err := ss.Update(id, *existing); err != nil {
+	if _, err := es.Update(id, *existing); err != nil {
 		s.serverError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) handleDeleteSecret(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteEnvVar(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		http.Error(w, "secret id required", http.StatusBadRequest)
+		http.Error(w, "envvar id required", http.StatusBadRequest)
 		return
 	}
-	ss := store.NewSecretStore(s.root)
-	if err := ss.Remove(id); err != nil {
+	es := store.NewEnvVarStore(s.root)
+	if err := es.Remove(id); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -211,14 +211,13 @@ func (s *Server) handleDeleteAgentEnv(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "key query param is required", http.StatusBadRequest)
 		return
 	}
-	req := struct{ Key string }{Key: key}
 	meta, err := s.st.AgentMeta(project, agent)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	if meta.Env != nil {
-		delete(meta.Env, req.Key)
+		delete(meta.Env, key)
 	}
 	if err := s.st.SaveAgentMeta(project, agent, meta); err != nil {
 		s.serverError(w, err)
@@ -226,4 +225,3 @@ func (s *Server) handleDeleteAgentEnv(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-

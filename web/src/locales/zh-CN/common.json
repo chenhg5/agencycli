@@ -904,7 +904,9 @@
     "description": "描述",
     "descPlaceholder": "可选，说明用途",
     "leaveEmpty": "留空则不修改",
-    "confirmDelete": "确定删除这个变量吗？"
+    "confirmDelete": "确定删除这个变量吗？",
+    "noAgents": "暂无可选的 Agent",
+    "selectedCount": "已选 {{count}} 个 Agent"
   },
   "agentEnv": {
     "title": "环境变量",

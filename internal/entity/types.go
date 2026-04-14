@@ -983,24 +983,24 @@ type TemplateManifest struct {
 // Workspace Secrets
 // ─────────────────────────────────────────────
 
-// SecretScope defines whether a secret applies globally or to specific agents.
-type SecretScope string
+// EnvVarScope defines whether an environment variable applies globally or to specific agents.
+type EnvVarScope string
 
 const (
-	SecretScopeGlobal SecretScope = "global" // applied to all agents
-	SecretScopeAgents SecretScope = "agents" // applied to listed agents only
+	EnvVarScopeGlobal EnvVarScope = "global" // applied to all agents
+	EnvVarScopeAgents EnvVarScope = "agents" // applied to listed agents only
 )
 
-// Secret is a workspace-level environment variable entry stored in secrets.yaml.
-// Secrets are injected into agent processes at runtime and forwarded into Docker
+// EnvVar is a workspace-level environment variable entry stored in envvars.yaml.
+// Variables are injected into agent processes at runtime and forwarded into Docker
 // containers automatically. Resolution priority (lowest → highest):
 //
-//	workspace global secrets → agent-scoped secrets → API provider env → per-agent env
-type Secret struct {
+//	workspace global → agent-scoped → API provider env → per-agent env
+type EnvVar struct {
 	ID          string      `yaml:"id"          json:"id"`
 	Key         string      `yaml:"key"         json:"key"`
 	Value       string      `yaml:"value"       json:"-"`
-	Scope       SecretScope `yaml:"scope"       json:"scope"`
+	Scope       EnvVarScope `yaml:"scope"       json:"scope"`
 	Agents      []string    `yaml:"agents,omitempty" json:"agents,omitempty"`
 	Description string      `yaml:"description,omitempty" json:"description,omitempty"`
 	CreatedAt   time.Time   `yaml:"created_at"  json:"createdAt"`

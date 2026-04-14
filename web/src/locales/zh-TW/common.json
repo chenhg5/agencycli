@@ -904,7 +904,9 @@
     "description": "描述",
     "descPlaceholder": "選填，說明用途",
     "leaveEmpty": "留空則不修改",
-    "confirmDelete": "確定刪除這個變數嗎？"
+    "confirmDelete": "確定刪除這個變數嗎？",
+    "noAgents": "暫無可選的 Agent",
+    "selectedCount": "已選 {{count}} 個 Agent"
   },
   "agentEnv": {
     "title": "環境變數",

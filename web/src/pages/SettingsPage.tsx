@@ -728,36 +728,58 @@ function SecretsSection() {
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
   const [scope, setScope] = useState<'global' | 'agents'>('global')
-  const [agents, setAgents] = useState('')
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [desc, setDesc] = useState('')
+
+  type AgentOption = { id: string; project: string; name: string }
+  const [allAgents, setAllAgents] = useState<AgentOption[]>([])
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch('/api/v1/secrets')
+      const data = await apiFetch('/api/v1/envvars')
       setSecrets(data as SecretRow[])
     } catch { /* ignore */ }
   }, [])
 
+  const loadAgents = useCallback(async () => {
+    try {
+      const projects = await apiFetch('/api/v1/projects') as { name: string }[]
+      const opts: AgentOption[] = []
+      for (const p of projects) {
+        try {
+          const agents = await apiFetch(`/api/v1/projects/${encodeURIComponent(p.name)}/agents`) as { name: string }[]
+          for (const a of agents) opts.push({ id: `${p.name}/${a.name}`, project: p.name, name: a.name })
+        } catch { /* skip */ }
+      }
+      setAllAgents(opts)
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadAgents() }, [loadAgents])
 
   function resetForm() {
-    setShowForm(false); setEditId(null); setKey(''); setValue(''); setScope('global'); setAgents(''); setDesc('')
+    setShowForm(false); setEditId(null); setKey(''); setValue(''); setScope('global'); setSelectedAgents([]); setDesc('')
   }
 
   function startEdit(s: SecretRow) {
-    setEditId(s.id); setKey(s.key); setValue(''); setScope(s.scope as 'global' | 'agents'); setAgents(s.agents?.join(', ') ?? ''); setDesc(s.description ?? ''); setShowForm(true)
+    setEditId(s.id); setKey(s.key); setValue(''); setScope(s.scope as 'global' | 'agents'); setSelectedAgents(s.agents ?? []); setDesc(s.description ?? ''); setShowForm(true)
+  }
+
+  function toggleAgent(agentId: string) {
+    setSelectedAgents(prev => prev.includes(agentId) ? prev.filter(a => a !== agentId) : [...prev, agentId])
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    const body: Record<string, unknown> = { key, scope, description: desc, agents: scope === 'agents' ? agents.split(',').map(a => a.trim()).filter(Boolean) : [] }
+    const body: Record<string, unknown> = { key, scope, description: desc, agents: scope === 'agents' ? selectedAgents : [] }
     if (value) body.value = value
     try {
       if (editId) {
-        await apiPut(`/api/v1/secrets/${editId}`, body)
+        await apiPut(`/api/v1/envvars/${editId}`, body)
       } else {
         body.value = value
-        await apiPost('/api/v1/secrets', body)
+        await apiPost('/api/v1/envvars', body)
       }
       resetForm(); load()
     } catch { /* toast handled by apiFetch */ }
@@ -765,8 +787,12 @@ function SecretsSection() {
 
   async function handleDelete(id: string) {
     if (!confirm(t('secrets.confirmDelete'))) return
-    try { await apiDelete(`/api/v1/secrets/${id}`); load() } catch { /* ignore */ }
+    try { await apiDelete(`/api/v1/envvars/${id}`); load() } catch { /* ignore */ }
   }
+
+  const agentsByProject = allAgents.reduce<Record<string, AgentOption[]>>((acc, a) => {
+    (acc[a.project] ??= []).push(a); return acc
+  }, {})
 
   return (
     <section className="rounded-xl border border-neutral-200/70 bg-white p-5 dark:border-zinc-700/50 dark:bg-zinc-900">
@@ -811,7 +837,37 @@ function SecretsSection() {
           {scope === 'agents' && (
             <div>
               <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-zinc-400">{t('secrets.agents')}</label>
-              <input value={agents} onChange={e => setAgents(e.target.value)} placeholder="project/agent, project2/agent2" className={inputCls + ' !max-w-none'} />
+              {allAgents.length === 0 ? (
+                <p className="text-xs text-neutral-400 dark:text-zinc-500">{t('secrets.noAgents')}</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto rounded-md border border-neutral-200/80 bg-white p-2 dark:border-zinc-700/60 dark:bg-zinc-800/50">
+                  {Object.entries(agentsByProject).map(([proj, agents]) => (
+                    <div key={proj} className="mb-1.5 last:mb-0">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-zinc-500">{proj}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {agents.map(a => {
+                          const active = selectedAgents.includes(a.id)
+                          return (
+                            <button key={a.id} type="button" onClick={() => toggleAgent(a.id)}
+                              className={cn('rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+                                active
+                                  ? 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400'
+                                  : 'border-neutral-200 bg-white text-neutral-500 hover:border-sky-300 hover:text-sky-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-sky-600'
+                              )}>
+                              {a.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {selectedAgents.length > 0 && (
+                <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-zinc-500">
+                  {t('secrets.selectedCount', { count: selectedAgents.length })}
+                </p>
+              )}
             </div>
           )}
           <div className="flex gap-2">

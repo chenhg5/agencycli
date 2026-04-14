@@ -904,7 +904,9 @@
     "description": "Description",
     "descPlaceholder": "Optional, describe the purpose",
     "leaveEmpty": "leave empty to keep unchanged",
-    "confirmDelete": "Are you sure you want to delete this variable?"
+    "confirmDelete": "Are you sure you want to delete this variable?",
+    "noAgents": "No agents available",
+    "selectedCount": "{{count}} agent(s) selected"
   },
   "agentEnv": {
     "title": "Environment Variables",

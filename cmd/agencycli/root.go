@@ -87,7 +87,7 @@ func init() {
 		newDocsCmd(),
 		newOKRCmd(),
 		newMilestoneCmd(),
-		newSecretCmd(),
+		newEnvVarCmd(),
 	)
 }
 
