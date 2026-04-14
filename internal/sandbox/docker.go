@@ -62,7 +62,7 @@ var defaultCredentialMounts = map[entity.AgentModel][]string{
 		// ~/.claude.json holds user state / onboarding read at every startup.
 		// ~/.claude/ must be writable so Claude can create session-env dirs,
 		// write session state, and update settings during a run.
-		"~/.claude.json:/root/.claude.json:ro",
+		"~/.claude.json:/root/.claude.json",
 		"~/.claude:/root/.claude",
 		"~/.config/gh:/root/.config/gh:ro",
 		"~/.ssh:/root/.ssh:ro",
