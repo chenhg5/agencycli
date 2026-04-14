@@ -233,7 +233,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 			return r.ExecPrompt(project, agentName, prompt, "")
 		}
 		result.Status = entity.TaskStatusDoneFailed
-		result.ErrorMsg = runErr.Error()
+		result.ErrorMsg = buildErrorMsg(runErr, outBuf.Bytes())
 	} else {
 		result.Status = entity.TaskStatusDoneSuccess
 	}
@@ -442,7 +442,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 			return r.RunTask(project, agentName, task, "")
 		}
 		result.Status = entity.TaskStatusDoneFailed
-		result.ErrorMsg = runErr.Error()
+		result.ErrorMsg = buildErrorMsg(runErr, outBuf.Bytes())
 		r.recordAgentRun(telemetry.KindTask, project, agentName, task.ID, task.Title, string(model), sandboxLabel,
 			apiModel, apiBaseURL,
 			runStarted, runFinished, result.Status, &ec, result.SessionID, result.ErrorMsg,
@@ -492,6 +492,35 @@ func exitCodeOrZero(cmd *exec.Cmd) int {
 		return 0
 	}
 	return cmd.ProcessState.ExitCode()
+}
+
+// buildErrorMsg combines the Go error string with the last few lines of
+// process output so that the caller can see *why* the command failed,
+// not just the exit code.
+func buildErrorMsg(err error, output []byte) string {
+	base := err.Error()
+	tail := tailLines(output, 30, 2000)
+	if tail == "" {
+		return base
+	}
+	return base + "\n\n" + tail
+}
+
+func tailLines(data []byte, maxLines, maxBytes int) string {
+	s := string(data)
+	if len(s) > maxBytes*2 {
+		s = s[len(s)-maxBytes*2:]
+	}
+	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	start := 0
+	if len(lines) > maxLines {
+		start = len(lines) - maxLines
+	}
+	result := strings.Join(lines[start:], "\n")
+	if len(result) > maxBytes {
+		result = result[len(result)-maxBytes:]
+	}
+	return strings.TrimSpace(result)
 }
 
 func httpCommandSummary(url string) string {

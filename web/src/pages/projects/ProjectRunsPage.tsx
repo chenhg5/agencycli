@@ -466,7 +466,7 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
           {run.errorMsg && (
             <div className="col-span-full">
               <span className="text-xs font-medium text-red-500">{t('runs.errorLabel')}</span>
-              <p className="text-sm text-red-600 dark:text-red-400">{run.errorMsg}</p>
+              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded-md border border-red-200/60 bg-red-50/50 p-2.5 font-mono text-xs text-red-700 dark:border-red-800/40 dark:bg-red-950/20 dark:text-red-400">{run.errorMsg}</pre>
             </div>
           )}
         </div>
