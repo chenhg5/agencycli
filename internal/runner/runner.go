@@ -383,7 +383,11 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	// Using bash stdin redirect works correctly.
 	var cmd *exec.Cmd
 	if invoker.UseStdinPrompt() {
-		shellCmd := fmt.Sprintf("%s %s < %s", executable, strings.Join(args, " "), shellEscape(promptFile))
+		escaped := make([]string, len(args))
+		for i, a := range args {
+			escaped[i] = shellEscape(a)
+		}
+		shellCmd := fmt.Sprintf("%s %s < %s", shellEscape(executable), strings.Join(escaped, " "), shellEscape(promptFile))
 		cmd = exec.Command("bash", "-c", shellCmd)
 	} else {
 		cmd = exec.Command(executable, args...)
