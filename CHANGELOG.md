@@ -1,5 +1,54 @@
 # Changelog
 
+## [v0.4.1] - 2026-04-06
+
+### Added
+
+**Environment variable management**
+- Workspace-level environment variables (envvars): global or agent-scoped, injected at runtime
+- Resolution priority chain: workspace global → agent-scoped → API provider → per-agent env
+- CLI commands: `agencycli envvar add/list/remove` (alias: `ev`)
+- CLI commands: `agencycli agent set-env/unset-env/list-env` for per-agent variables
+- Web Settings page: envvar CRUD with agent picker (project-grouped multi-select)
+- Agent detail page: env panel with inline editing, sensitive value masking, and eye toggle
+
+**Event-driven triggers**
+- New scheduling mechanism: trigger agent wakeup on message received or task assigned
+- Trigger configuration via CLI (`agencycli agent set-trigger`) and web heartbeat editor
+- Deduplicated trigger execution with configurable cooldown
+
+**Workbench enhancements**
+- Project schedule overview cards: agent count, running agents, scheduler status, task/message counts
+- Start/stop individual project schedulers and "start all" button from workbench
+- Task tab badge showing pending task count
+- Running agents count displayed on project cards
+
+**Knowledge base improvements**
+- Document fullscreen mode: hide header/nav, centered content, ESC to exit
+- Code block copy fix (no more `[object Object]`)
+- Documents sorted by creation time
+- i18n-aware date formatting
+
+**Multi-level OKR**
+- OKR hierarchy: global, project, team, and agent scopes with parent linking
+- Scope tabs with project-level filtering
+- Agent dropdown selector for agent-scoped OKRs
+- KR target value display: `0/10000 (unit)` format
+
+### Fixed
+- Task duplication when status changed to completed/cancelled (missing archive call)
+- Heartbeat edit modal overflowing viewport
+- Scheduler showing "pending activation" instead of next-window time on inactive days
+- Run detail page now shows failure reason; status column fully i18n'd
+- Workbench overview colors unified (blue general, green for pending items only)
+
+### Changed
+- `secrets.yaml` → `envvars.yaml`; Secret type → EnvVar; API `/secrets` → `/envvars`
+- CLI `secret` command → `envvar` (alias `ev`)
+
+### Security
+- Fix command injection in wakeup condition pipe chain validation
+
 ## [v0.4.0] - 2026-04-06
 
 ### Added
