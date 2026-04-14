@@ -160,8 +160,7 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 	)
 	if fi, err := os.Stat(binHostDir); err == nil && fi.IsDir() {
 		args = append(args, "-v", binHostDir+":"+AgencycliBin)
-		// Prepend /agencycli/bin to PATH.
-		args = append(args, "-e", "PATH="+AgencycliBin+":$PATH")
+		args = append(args, "-e", "PATH="+AgencycliBin+":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 	}
 
 	// ── Credential mounts ────────────────────────────────────────────────────
