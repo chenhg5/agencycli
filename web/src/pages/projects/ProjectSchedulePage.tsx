@@ -129,7 +129,6 @@ function SchedulerControl({ projectId, onAction }: { projectId: string; onAction
   const { t } = useTranslation()
   const [status, setStatus] = useState<SchedStatusResp | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
   const fetchStatus = useCallback(async () => {
@@ -151,7 +150,7 @@ function SchedulerControl({ projectId, onAction }: { projectId: string; onAction
   const isRunning = Boolean(inst)
 
   async function toggle() {
-    setError(null); setBusy(true)
+    setBusy(true)
     try {
       if (isRunning) {
         const body: Record<string, string> = {}
@@ -163,7 +162,7 @@ function SchedulerControl({ projectId, onAction }: { projectId: string; onAction
       }
       await fetchStatus()
       onAction?.()
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    } catch { /* toast handled by apiFetch */ }
     finally { setBusy(false) }
   }
 
@@ -183,7 +182,6 @@ function SchedulerControl({ projectId, onAction }: { projectId: string; onAction
       )}>
         {isRunning ? t('schedule.schedulerStop') : t('schedule.schedulerStart')}
       </button>
-      {error && <p className="text-[11px] text-red-500">{error}</p>}
     </div>
   )
 }
@@ -723,17 +721,16 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   const fmt = useFormatDateTime()
   const [waking, setWaking] = useState<string | null>(null)
   const [resetting, setResetting] = useState<string | null>(null)
-  const [wakeErr, setWakeErr] = useState<string | null>(null)
   const [scopeUpdating, setScopeUpdating] = useState<string | null>(null)
   const [viewingLog, setViewingLog] = useState<string | null>(null)
 
   const activeAgents = agents.filter((ag) => ag.heartbeat.enabled)
 
   async function doWakeup(agentName: string) {
-    setWaking(agentName); setWakeErr(null)
+    setWaking(agentName)
     try {
       await apiPost('/api/v1/scheduler/wakeup', { project: projectId, agent: agentName })
-    } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
+    } catch { /* toast handled by apiFetch */ }
     finally { setWaking(null) }
   }
 
@@ -741,7 +738,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
     setResetting(agentName)
     try {
       await apiPost('/api/v1/session/reset', { project: projectId, agent: agentName })
-    } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
+    } catch { /* toast handled by apiFetch */ }
     finally { setResetting(null) }
   }
 
@@ -749,7 +746,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
     setScopeUpdating(agentName)
     try {
       await apiPatch(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/heartbeat`, { sessionScope: scope })
-    } catch (e) { setWakeErr(e instanceof Error ? e.message : String(e)) }
+    } catch { /* toast handled by apiFetch */ }
     finally { setScopeUpdating(null) }
   }
 
@@ -764,7 +761,6 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
 
   return (
     <>
-      {wakeErr && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{wakeErr}</p>}
       <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
         <table className="min-w-[1100px] w-full">
           <thead>

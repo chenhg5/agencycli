@@ -176,7 +176,7 @@ function PageTabBar() {
             }}
             onDragEnd={() => { dragIdx.current = null; setDropIdx(null) }}
             className={cn(
-              'group relative flex max-w-[180px] shrink-0 cursor-grab items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none active:cursor-grabbing',
+              'group relative flex max-w-[180px] shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none',
               isActive
                 ? 'border-neutral-900 text-neutral-900 dark:border-zinc-200 dark:text-zinc-200'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300',
