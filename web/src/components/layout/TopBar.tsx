@@ -130,9 +130,11 @@ function UserMenu() {
 }
 
 function PageTabBar() {
-  const { tabs, activePath, close } = usePageTabs()
+  const { tabs, activePath, close, reorder } = usePageTabs()
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const dragIdx = useRef<number | null>(null)
+  const [dropIdx, setDropIdx] = useState<number | null>(null)
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (scrollRef.current) scrollRef.current.scrollLeft += e.deltaY
@@ -146,16 +148,39 @@ function PageTabBar() {
       onWheel={handleWheel}
       className="flex min-w-0 flex-1 items-end gap-0 overflow-x-auto scrollbar-none"
     >
-      {tabs.map((tab) => {
+      {tabs.map((tab, i) => {
         const isActive = tab.path === activePath
+        const isDragOver = dropIdx === i && dragIdx.current !== null && dragIdx.current !== i
         return (
           <div
             key={tab.path}
+            draggable
+            onDragStart={(e) => {
+              dragIdx.current = i
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', String(i))
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setDropIdx(i)
+            }}
+            onDragLeave={() => { if (dropIdx === i) setDropIdx(null) }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragIdx.current !== null && dragIdx.current !== i) {
+                reorder(dragIdx.current, i)
+              }
+              dragIdx.current = null
+              setDropIdx(null)
+            }}
+            onDragEnd={() => { dragIdx.current = null; setDropIdx(null) }}
             className={cn(
-              'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none',
+              'group relative flex max-w-[180px] shrink-0 cursor-grab items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none active:cursor-grabbing',
               isActive
                 ? 'border-neutral-900 text-neutral-900 dark:border-zinc-200 dark:text-zinc-200'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-zinc-500 dark:hover:text-zinc-300',
+              isDragOver && 'border-sky-400 dark:border-sky-500',
             )}
             onClick={() => navigate(tab.path)}
             title={tab.title}

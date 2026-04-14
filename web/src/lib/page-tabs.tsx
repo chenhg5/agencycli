@@ -20,6 +20,7 @@ type PageTabsContextValue = {
   close: (path: string) => void
   closeOthers: (path: string) => void
   closeAll: () => void
+  reorder: (fromIndex: number, toIndex: number) => void
 }
 
 const Ctx = createContext<PageTabsContextValue>({
@@ -28,6 +29,7 @@ const Ctx = createContext<PageTabsContextValue>({
   close: () => {},
   closeOthers: () => {},
   closeAll: () => {},
+  reorder: () => {},
 })
 
 const STORAGE_KEY = 'page-tabs'
@@ -107,9 +109,19 @@ export function PageTabsProvider({ children, pageTitle }: { children: ReactNode;
     navigate('/')
   }, [navigate])
 
+  const reorder = useCallback((fromIndex: number, toIndex: number) => {
+    setTabs((prev) => {
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= prev.length || toIndex >= prev.length) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }, [])
+
   const value = useMemo<PageTabsContextValue>(
-    () => ({ tabs, activePath: pathname, close, closeOthers, closeAll }),
-    [tabs, pathname, close, closeOthers, closeAll],
+    () => ({ tabs, activePath: pathname, close, closeOthers, closeAll, reorder }),
+    [tabs, pathname, close, closeOthers, closeAll, reorder],
   )
 
   return (
