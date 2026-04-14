@@ -377,25 +377,20 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Run the agent.
-	// Note: when UseStdinPrompt is true, we wrap in `bash -c "cmd < file"` because
-	// docker's `-i` flag does not work correctly with stdin from a regular file
-	// via Go's cmd.Stdin = file (docker tries to seek on stdin, which fails for regular files).
-	// Using bash stdin redirect works correctly.
-	var cmd *exec.Cmd
-	if invoker.UseStdinPrompt() {
-		escaped := make([]string, len(args))
-		for i, a := range args {
-			escaped[i] = shellEscape(a)
-		}
-		shellCmd := fmt.Sprintf("%s %s < %s", shellEscape(executable), strings.Join(escaped, " "), shellEscape(promptFile))
-		cmd = exec.Command("bash", "-c", shellCmd)
-	} else {
-		cmd = exec.Command(executable, args...)
-	}
+	cmd := exec.Command(executable, args...)
 	if execDir != "" {
 		cmd.Dir = execDir
 	}
 	cmd.Env = effectiveEnv
+
+	if invoker.UseStdinPrompt() {
+		pf, err := os.Open(promptFile)
+		if err != nil {
+			return nil, fmt.Errorf("open prompt file for stdin: %w", err)
+		}
+		defer pf.Close()
+		cmd.Stdin = pf
+	}
 
 	var outBuf bytes.Buffer
 	multiOut := io.MultiWriter(&outBuf, logFile)
