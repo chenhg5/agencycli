@@ -824,6 +824,15 @@ func remapPromptFile(args []string, hostPath, containerPath string) []string {
 func resolveProviderEnv(root string, meta *entity.AgentMeta) map[string]string {
 	merged := make(map[string]string)
 
+	// 0: agent identity env vars (lowest priority, injected by agencycli)
+	merged["AGENCYCLI"] = "1"
+	merged["AGENCYCLI_PROJECT"] = meta.Project
+	merged["AGENCYCLI_AGENT"] = meta.Name
+	merged["AGENCYCLI_TEAM"] = meta.Team
+	merged["AGENCYCLI_ROLE"] = meta.Role
+	merged["AGENCYCLI_MODEL"] = string(meta.Model)
+	merged["AGENCYCLI_ROOT"] = root
+
 	// 1+2: workspace env vars (global first, then agent-scoped overrides)
 	es := store.NewEnvVarStore(root)
 	if wsEnv, err := es.ResolveEnvForAgent(meta.Project, meta.Name); err == nil {
