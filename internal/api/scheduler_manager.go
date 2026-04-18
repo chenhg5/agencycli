@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -308,4 +309,61 @@ func (s *Server) clearSchedulerRuntimeFields(project, agent string) {
 		}
 		_ = s.ts.SaveHeartbeat(project, ag, hb)
 	}
+}
+
+func (s *Server) handleSchedulerAbort(w http.ResponseWriter, r *http.Request) {
+	var body schedActionBody
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	project := strings.TrimSpace(body.Project)
+	agent := strings.TrimSpace(body.Agent)
+	if project == "" || agent == "" {
+		s.jsonError(w, http.StatusBadRequest, "project and agent are required")
+		return
+	}
+
+	hb, err := s.ts.GetHeartbeat(project, agent)
+	if err != nil || hb == nil {
+		s.jsonError(w, http.StatusNotFound, "heartbeat config not found")
+		return
+	}
+
+	if hb.PID <= 0 || hb.LastWakeupStatus != "running" {
+		s.jsonError(w, http.StatusConflict, "agent is not currently running")
+		return
+	}
+
+	pid := hb.PID
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("cannot find process %d: %v", pid, err))
+		return
+	}
+
+	// Signal 0 checks liveness.
+	if err := proc.Signal(syscall.Signal(0)); err != nil {
+		hb.PID = 0
+		hb.LastWakeupStatus = "aborted"
+		_ = s.ts.SaveHeartbeat(project, agent, hb)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "msg": "process already dead, status updated"})
+		return
+	}
+
+	// Kill the process group to ensure child processes (docker, claude) are also terminated.
+	killProcessGroup(pid)
+
+	// Give it a moment then force kill if needed.
+	time.Sleep(500 * time.Millisecond)
+	if err := proc.Signal(syscall.Signal(0)); err == nil {
+		_ = proc.Kill()
+	}
+
+	hb.PID = 0
+	hb.LastWakeupStatus = "aborted"
+	_ = s.ts.SaveHeartbeat(project, agent, hb)
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "pid": pid})
 }

@@ -194,6 +194,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [filters, setFilters] = useState<Filters>({ ...defaultFilters })
+  const [msgSort, setMsgSort] = useState<'newest' | 'oldest'>('newest')
   const [reloadKey, setReloadKey] = useState(0)
   const [selected, setSelected] = useState<MessageRow | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
@@ -205,7 +206,12 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
 
   const queryString = useMemo(() => buildMsgQuery(filters), [filters])
   const state = useApiJson<MessageRow[]>(`/api/v1/workbench/messages${queryString}`, reloadKey)
-  const messages = state.status === 'ok' ? (state.data ?? []) : []
+  const rawMessages = state.status === 'ok' ? (state.data ?? []) : []
+  const messages = useMemo(() => {
+    const sorted = [...rawMessages]
+    if (msgSort === 'oldest') sorted.reverse()
+    return sorted
+  }, [rawMessages, msgSort])
 
   const totalWbMsgPages = Math.ceil(messages.length / wbMsgsPerPage)
   const pagedWbMessages = useMemo(() => {
@@ -293,6 +299,10 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
             <option value="no">{t('messages.filterArchived')}: {t('messages.archivedActive')}</option>
             <option value="yes">{t('messages.archivedOnly')}</option>
             <option value="all">{t('messages.archivedAll')}</option>
+          </select>
+          <select value={msgSort} onChange={(e) => { setMsgSort(e.target.value as 'newest' | 'oldest'); setWbMsgPage(1) }} className={selectCls}>
+            <option value="newest">{t('workbench.sortNewest')}</option>
+            <option value="oldest">{t('workbench.sortOldest')}</option>
           </select>
           {hasFilters && (
             <button type="button" onClick={resetFilters} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-400">
@@ -445,6 +455,8 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const [view, setView] = useState<TaskView>('list')
   const [statusFilter, setStatusFilter] = useState('pending')
   const [projectFilter, setProjectFilter] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState<string>('')
+  const [taskSort, setTaskSort] = useState<'newest' | 'oldest' | 'priority'>('newest')
   const [reloadKey, setReloadKey] = useState(0)
   const [detailRow, setDetailRow] = useState<TaskRow | null>(null)
   const [editRow, setEditRow] = useState<TaskRow | null>(null)
@@ -460,7 +472,16 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const wbTasksPerPage = 20
 
   const state = useApiJson<TaskRow[]>(`/api/v1/workbench/tasks${qs}`, reloadKey)
-  const tasks = state.status === 'ok' ? (state.data ?? []) : []
+  const rawTasks = state.status === 'ok' ? (state.data ?? []) : []
+
+  const tasks = useMemo(() => {
+    let filtered = rawTasks
+    if (priorityFilter !== '') filtered = filtered.filter((t) => t.priority === Number(priorityFilter))
+    const sorted = [...filtered]
+    if (taskSort === 'oldest') sorted.reverse()
+    else if (taskSort === 'priority') sorted.sort((a, b) => a.priority - b.priority)
+    return sorted
+  }, [rawTasks, priorityFilter, taskSort])
 
   const totalWbTaskPages = Math.ceil(tasks.length / wbTasksPerPage)
   const pagedWbTasks = useMemo(() => {
@@ -468,7 +489,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
     return tasks.slice(start, start + wbTasksPerPage)
   }, [tasks, wbTaskPage])
 
-  useEffect(() => { setWbTaskPage(1) }, [statusFilter, projectFilter])
+  useEffect(() => { setWbTaskPage(1) }, [statusFilter, projectFilter, priorityFilter, taskSort])
 
   const projects = useMemo(() => {
     const s = new Set(tasks.map((t) => t.project))
@@ -563,6 +584,15 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
               {STATUS_KEYS.map((s) => <option key={s} value={s}>{t(`tasks.status.${s}`)}</option>)}
             </select>
           )}
+          <select value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); setChecked(new Set()) }} className={selectCls}>
+            <option value="">{t('workbench.priorityAll')}</option>
+            {[0, 1, 2, 3].map((p) => <option key={p} value={p}>P{p}</option>)}
+          </select>
+          <select value={taskSort} onChange={(e) => { setTaskSort(e.target.value as 'newest' | 'oldest' | 'priority'); setChecked(new Set()) }} className={selectCls}>
+            <option value="newest">{t('workbench.sortNewest')}</option>
+            <option value="oldest">{t('workbench.sortOldest')}</option>
+            <option value="priority">{t('workbench.sortPriority')}</option>
+          </select>
           {projects.length > 1 && (
             <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setChecked(new Set()) }} className={cn(selectCls, 'font-mono')}>
               <option value="">{t('workbench.filterProject')}: {t('workbench.allProjects')}</option>

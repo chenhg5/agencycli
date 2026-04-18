@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, FileText, RefreshCw, X } from 'lucide-react'
+import { BarChart3, FileText, RefreshCw, StopCircle, X } from 'lucide-react'
 import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
+import { apiPost } from '../../lib/api'
 
 type Summary = {
   runs: number
@@ -92,6 +93,7 @@ const statusCls: Record<string, string> = {
   done_failed: 'text-red-600 dark:text-red-400',
   error: 'text-red-600 dark:text-red-400',
   running: 'text-sky-700 dark:text-sky-400',
+  aborted: 'text-orange-600 dark:text-orange-400',
   awaiting: 'text-amber-700 dark:text-amber-400',
   awaiting_confirmation: 'text-amber-700 dark:text-amber-400',
 }
@@ -150,6 +152,17 @@ export default function ProjectRunsPage() {
 
   const [reloadKey, setReloadKey] = useState(0)
   const refresh = useCallback(() => setReloadKey((k) => k + 1), [])
+  const [abortingAgent, setAbortingAgent] = useState<string | null>(null)
+
+  async function doAbort(project: string, agent: string) {
+    if (!window.confirm(t('schedule.confirmAbort'))) return
+    setAbortingAgent(`${project}/${agent}`)
+    try {
+      await apiPost('/api/v1/scheduler/abort', { project, agent })
+      refresh()
+    } catch { /* toast */ }
+    finally { setAbortingAgent(null) }
+  }
   const sumState = useApiJson<TelemetrySummary>(summaryQuery, reloadKey)
   const runsState = useApiJson<TelemetryRuns>(runsQuery, reloadKey)
 
@@ -364,6 +377,15 @@ export default function ProjectRunsPage() {
                       </td>
                       <td className={cn('px-4 py-3 text-center text-[13px] font-medium', statusCls[r.status] ?? 'text-neutral-600 dark:text-zinc-400')}>
                         <span>{t(`runs.status.${r.status}`, { defaultValue: r.status })}</span>
+                        {r.status === 'running' && (
+                          <button type="button"
+                            disabled={abortingAgent === `${r.project}/${r.agent}`}
+                            onClick={(e) => { e.stopPropagation(); void doAbort(r.project, r.agent) }}
+                            className="ml-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-900/20">
+                            <StopCircle className="size-3" strokeWidth={2} />
+                            {t('schedule.abort')}
+                          </button>
+                        )}
                         {isFailed(r.status) && r.errorMsg && (
                           <p className="mt-0.5 max-w-[240px] truncate text-[11px] font-normal text-red-500/80 dark:text-red-400/70" title={r.errorMsg}>{r.errorMsg}</p>
                         )}

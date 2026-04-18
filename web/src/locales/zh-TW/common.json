@@ -276,7 +276,11 @@
     "ovUnread": "未讀",
     "ovViewSchedule": "檢視調度詳情",
     "startAll": "啟動全部調度",
-    "stopAll": "停止全部調度"
+    "stopAll": "停止全部調度",
+    "sortNewest": "最新優先",
+    "sortOldest": "最久優先",
+    "sortPriority": "優先級排序",
+    "priorityAll": "優先級: 全部"
   },
   "docs": {
     "title": "知識庫",
@@ -504,6 +508,10 @@
     "allSchedulers": "所有排程器執行個體",
     "wakeupNow": "立即喚醒",
     "wakingUp": "喚醒中…",
+    "abort": "中斷",
+    "aborting": "中斷中…",
+    "aborted": "已中斷",
+    "confirmAbort": "確定要中斷正在執行的 Agent 嗎？這會立即終止其程序。",
     "copyResumeCmd": "複製恢復會話命令"
   },
   "session": {
@@ -603,6 +611,7 @@
       "awaiting": "等待中",
       "awaiting_confirmation": "待確認",
       "cancelled": "已取消",
+      "aborted": "已中斷",
       "pending": "待處理"
     }
   },
@@ -913,5 +922,17 @@
     "hint": "Agent 專屬環境變數，優先順序最高，會覆蓋工作區環境變數和 Provider 設定。",
     "add": "新增變數",
     "empty": "尚未設定環境變數"
+  },
+  "sandbox": {
+    "title": "沙箱執行環境",
+    "provider": "執行模式",
+    "providerNone": "本機直接執行（無沙箱）",
+    "image": "Docker 映像",
+    "imagePlaceholder": "留空使用預設映像",
+    "network": "網路模式",
+    "networkDefault": "預設",
+    "networkOffline": "離線",
+    "memory": "記憶體限制 (MB)",
+    "memoryPlaceholder": "0 = 不限制"
   }
 }

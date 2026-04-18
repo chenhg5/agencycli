@@ -276,7 +276,11 @@
     "ovUnread": "未読",
     "ovViewSchedule": "スケジュール詳細",
     "startAll": "全て開始",
-    "stopAll": "全て停止"
+    "stopAll": "全て停止",
+    "sortNewest": "新しい順",
+    "sortOldest": "古い順",
+    "sortPriority": "優先度順",
+    "priorityAll": "優先度: すべて"
   },
   "docs": {
     "title": "ナレッジベース",
@@ -504,6 +508,10 @@
     "allSchedulers": "すべてのスケジューラー",
     "wakeupNow": "今すぐ起動",
     "wakingUp": "起動中…",
+    "abort": "中断",
+    "aborting": "中断中…",
+    "aborted": "中断済み",
+    "confirmAbort": "実行中のエージェントを中断しますか？プロセスが即座に終了されます。",
     "copyResumeCmd": "セッション再開コマンドをコピー"
   },
   "session": {
@@ -603,6 +611,7 @@
       "awaiting": "待機中",
       "awaiting_confirmation": "確認待ち",
       "cancelled": "キャンセル",
+      "aborted": "中断済み",
       "pending": "保留中"
     }
   },
@@ -913,5 +922,17 @@
     "hint": "エージェント固有の環境変数は最優先で、ワークスペース環境変数やプロバイダ設定を上書きします。",
     "add": "変数追加",
     "empty": "環境変数は設定されていません"
+  },
+  "sandbox": {
+    "title": "サンドボックス実行環境",
+    "provider": "実行モード",
+    "providerNone": "ホスト直接実行（サンドボックスなし）",
+    "image": "Docker イメージ",
+    "imagePlaceholder": "空欄でデフォルトイメージ",
+    "network": "ネットワークモード",
+    "networkDefault": "デフォルト",
+    "networkOffline": "オフライン",
+    "memory": "メモリ制限 (MB)",
+    "memoryPlaceholder": "0 = 無制限"
   }
 }

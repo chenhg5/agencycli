@@ -276,7 +276,11 @@
     "ovUnread": "未读",
     "ovViewSchedule": "查看调度详情",
     "startAll": "启动全部调度",
-    "stopAll": "停止全部调度"
+    "stopAll": "停止全部调度",
+    "sortNewest": "最新优先",
+    "sortOldest": "最久优先",
+    "sortPriority": "优先级排序",
+    "priorityAll": "优先级: 全部"
   },
   "docs": {
     "title": "知识库",
@@ -504,6 +508,10 @@
     "allSchedulers": "所有调度器实例",
     "wakeupNow": "立即唤醒",
     "wakingUp": "唤醒中…",
+    "abort": "中断",
+    "aborting": "中断中…",
+    "aborted": "已中断",
+    "confirmAbort": "确定要中断当前正在运行的 Agent 吗？这会立即终止其进程。",
     "copyResumeCmd": "复制恢复会话命令"
   },
   "session": {
@@ -603,6 +611,7 @@
       "awaiting": "等待中",
       "awaiting_confirmation": "待确认",
       "cancelled": "已取消",
+      "aborted": "已中断",
       "pending": "待处理"
     }
   },
@@ -913,5 +922,17 @@
     "hint": "Agent 专属环境变量，优先级最高，会覆盖工作区环境变量和 Provider 设置。",
     "add": "添加变量",
     "empty": "暂未设置环境变量"
+  },
+  "sandbox": {
+    "title": "沙箱执行环境",
+    "provider": "运行模式",
+    "providerNone": "本机直接运行（无沙箱）",
+    "image": "Docker 镜像",
+    "imagePlaceholder": "留空使用默认镜像",
+    "network": "网络模式",
+    "networkDefault": "默认",
+    "networkOffline": "离线",
+    "memory": "内存限制 (MB)",
+    "memoryPlaceholder": "0 = 不限制"
   }
 }

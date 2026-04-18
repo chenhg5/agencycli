@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { BookOpen, ChevronDown, ChevronRight, Puzzle, Save } from 'lucide-react'
@@ -10,9 +11,16 @@ import { apiPut } from '../lib/api'
 type SkillRow = { name: string; description?: string }
 type SkillDetail = { name: string; description?: string; prompt: string }
 
-function SkillItem({ skill }: { skill: SkillRow }) {
+function SkillItem({ skill, defaultOpen }: { skill: SkillRow; defaultOpen?: boolean }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!defaultOpen)
+  const elRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (defaultOpen && elRef.current) {
+      elRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [defaultOpen])
   const detailState = useApiJson<SkillDetail>(open ? `/api/v1/skills/${encodeURIComponent(skill.name)}` : null, 0)
 
   const [value, setValue] = useState<string | null>(null)
@@ -39,7 +47,7 @@ function SkillItem({ skill }: { skill: SkillRow }) {
   }, [skill.name, content])
 
   return (
-    <div className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-700/40">
+    <div ref={elRef} className="border-b border-neutral-100 last:border-b-0 dark:border-zinc-700/40">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -124,6 +132,8 @@ function SkillItem({ skill }: { skill: SkillRow }) {
 
 export default function SkillsPage() {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  const openSkill = searchParams.get('open') ?? ''
   const skillsState = useApiJson<SkillRow[]>('/api/v1/skills', 0)
   const skills = skillsState.status === 'ok' ? (skillsState.data ?? []) : []
 
@@ -159,7 +169,7 @@ export default function SkillsPage() {
       {skills.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
           {skills.map((sk) => (
-            <SkillItem key={sk.name} skill={sk} />
+            <SkillItem key={sk.name} skill={sk} defaultOpen={sk.name === openSkill} />
           ))}
         </div>
       )}

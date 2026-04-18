@@ -280,7 +280,7 @@ export function IMConnectionPanel({ project, agentName, model, workDir }: {
     } finally { setAddBusy(false) }
   }
 
-  async function handleDisconnect(platformType: string) {
+  async function handleDisconnect(_platformType: string) {
     if (!confirm(t('ccconnect.confirmDisconnect'))) return
     try {
       await apiDelete(`/api/v1/ccconnect/projects/${encodeURIComponent(defaultProjectName)}`)

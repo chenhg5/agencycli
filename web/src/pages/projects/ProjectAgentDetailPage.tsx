@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2, X,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff, Container,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -43,6 +43,15 @@ type HTTPAgentConfig = {
   stream?: boolean
 }
 
+type SandboxConfig = {
+  provider: string
+  docker?: {
+    image?: string
+    network_mode?: string
+    memory_mb?: number
+  }
+}
+
 type AgentContext = {
   contextFile: string
   context: string
@@ -56,6 +65,7 @@ type AgentContext = {
   env?: Record<string, string>
   provider?: string
   workDir?: string
+  sandbox?: SandboxConfig
 }
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
@@ -545,6 +555,12 @@ export default function ProjectAgentDetailPage() {
                     initialProvider={ctx.provider}
                     onChanged={() => setCtxReload((k) => k + 1)}
                   />
+                  <SandboxEditor
+                    project={projectId}
+                    agentName={agentName}
+                    initial={ctx.sandbox}
+                    onChanged={() => setCtxReload((k) => k + 1)}
+                  />
                 </div>
               </section>
 
@@ -554,10 +570,11 @@ export default function ProjectAgentDetailPage() {
                   <SectionHeader icon={Puzzle} title={t('skill.agentSkills')} />
                   <div className="mt-3 flex flex-wrap gap-2">
                     {ctx.skills.map((sk) => (
-                      <span key={sk} className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                      <Link key={sk} to={`/skills?open=${encodeURIComponent(sk)}`}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40">
                         <Puzzle className="size-3.5" strokeWidth={2} />
                         {sk}
-                      </span>
+                      </Link>
                     ))}
                   </div>
                 </section>
@@ -635,6 +652,84 @@ function InfoCard({ icon: Icon, label, value, mono }: { icon?: LucideIcon; label
       <div className="min-w-0">
         <p className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{label}</p>
         <p className={cn('mt-0.5 text-sm font-medium text-neutral-800 dark:text-zinc-200', mono && 'font-mono text-xs')} title={value}>{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function SandboxEditor({ project, agentName, initial, onChanged }: {
+  project: string; agentName: string; initial?: SandboxConfig; onChanged: () => void
+}) {
+  const { t } = useTranslation()
+  const [provider, setProvider] = useState(initial?.provider ?? '')
+  const [image, setImage] = useState(initial?.docker?.image ?? '')
+  const [network, setNetwork] = useState(initial?.docker?.network_mode ?? '')
+  const [memoryMb, setMemoryMb] = useState(initial?.docker?.memory_mb ?? 0)
+  const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+
+  const inputCls = 'w-full rounded-md border border-neutral-200/80 bg-white px-3 py-1.5 text-sm text-neutral-800 outline-none transition-colors focus:border-sky-400 focus:ring-1 focus:ring-sky-400/30 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-200 dark:focus:border-sky-500'
+  const labelCls = 'block text-xs font-medium text-neutral-500 dark:text-zinc-400 mb-1'
+
+  async function save() {
+    setSaving(true)
+    try {
+      await apiPut(`/api/v1/projects/${encodeURIComponent(project)}/agents/${encodeURIComponent(agentName)}/sandbox`, {
+        provider: provider || 'none',
+        image,
+        network,
+        memoryMb,
+      })
+      setDirty(false)
+      onChanged()
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Container className="size-4 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
+          <span className="text-sm font-medium text-neutral-700 dark:text-zinc-300">{t('sandbox.title')}</span>
+        </div>
+        {dirty && (
+          <button type="button" onClick={() => void save()} disabled={saving}
+            className="flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400">
+            <Save className="size-3" strokeWidth={2} />
+            {saving ? t('common.save') + '...' : t('common.save')}
+          </button>
+        )}
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className={labelCls}>{t('sandbox.provider')}</label>
+          <select value={provider} onChange={(e) => { setProvider(e.target.value); setDirty(true) }} className={inputCls}>
+            <option value="">{t('sandbox.providerNone')}</option>
+            <option value="docker">Docker</option>
+          </select>
+        </div>
+        {provider === 'docker' && (
+          <>
+            <div>
+              <label className={labelCls}>{t('sandbox.image')}</label>
+              <input type="text" value={image} onChange={(e) => { setImage(e.target.value); setDirty(true) }} placeholder={t('sandbox.imagePlaceholder')} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>{t('sandbox.network')}</label>
+                <select value={network} onChange={(e) => { setNetwork(e.target.value); setDirty(true) }} className={inputCls}>
+                  <option value="">bridge ({t('sandbox.networkDefault')})</option>
+                  <option value="host">host</option>
+                  <option value="none">none ({t('sandbox.networkOffline')})</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{t('sandbox.memory')}</label>
+                <input type="number" value={memoryMb || ''} onChange={(e) => { setMemoryMb(Number(e.target.value)); setDirty(true) }} placeholder={t('sandbox.memoryPlaceholder')} className={inputCls} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

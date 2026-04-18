@@ -720,6 +720,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [waking, setWaking] = useState<string | null>(null)
+  const [aborting, setAborting] = useState<string | null>(null)
   const [resetting, setResetting] = useState<string | null>(null)
   const [scopeUpdating, setScopeUpdating] = useState<string | null>(null)
   const [viewingLog, setViewingLog] = useState<string | null>(null)
@@ -732,6 +733,15 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
       await apiPost('/api/v1/scheduler/wakeup', { project: projectId, agent: agentName })
     } catch { /* toast handled by apiFetch */ }
     finally { setWaking(null) }
+  }
+
+  async function doAbort(agentName: string) {
+    if (!window.confirm(t('schedule.confirmAbort'))) return
+    setAborting(agentName)
+    try {
+      await apiPost('/api/v1/scheduler/abort', { project: projectId, agent: agentName })
+    } catch { /* toast handled by apiFetch */ }
+    finally { setAborting(null) }
   }
 
   async function doSessionReset(agentName: string) {
@@ -791,6 +801,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                       if (isRunningNow) return <StatusBadge color="sky">{t('schedule.running')}</StatusBadge>
                       if (hb.paused) return <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>
                       if (hb.lastWakeupStatus === 'failed') return <StatusBadge color="red">{t('schedule.failed')}</StatusBadge>
+                      if (hb.lastWakeupStatus === 'aborted') return <StatusBadge color="orange">{t('schedule.aborted')}</StatusBadge>
                       if (hb.lastWakeupStatus === 'done' || hb.nextWakeupAt) {
                         if (hb.nextWakeupAt && !hb.lastWakeup && (hb.activeHours || hb.activeDays)) {
                           return <StatusBadge color="amber">{t('schedule.outsideWindow')}</StatusBadge>
@@ -875,10 +886,16 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                         </button>
                       )}
                       {isRunningNow && (
-                        <button type="button" onClick={() => setViewingLog(ag.name)}
-                          className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-emerald-700 opacity-0 transition-all hover:bg-emerald-50 group-hover:opacity-100 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                          {t('schedule.viewLog')}
-                        </button>
+                        <>
+                          <button type="button" disabled={aborting === ag.name} onClick={() => void doAbort(ag.name)}
+                            className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-red-600 opacity-0 transition-all hover:bg-red-50 disabled:opacity-40 group-hover:opacity-100 dark:text-red-400 dark:hover:bg-red-900/20">
+                            {aborting === ag.name ? t('schedule.aborting') : t('schedule.abort')}
+                          </button>
+                          <button type="button" onClick={() => setViewingLog(ag.name)}
+                            className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-emerald-700 opacity-0 transition-all hover:bg-emerald-50 group-hover:opacity-100 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                            {t('schedule.viewLog')}
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -985,7 +1002,7 @@ function CopySessionCmd({ model, sessionId, agentDir }: { model?: string; sessio
 
 /* ─── shared UI ─── */
 
-function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutral' | 'sky' | 'red' | 'violet'; children: React.ReactNode }) {
+function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutral' | 'sky' | 'red' | 'violet' | 'orange'; children: React.ReactNode }) {
   const cls: Record<string, string> = {
     emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
     amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -993,6 +1010,7 @@ function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutra
     sky: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
     red: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     violet: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
   }
   return <span className={cn('inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold', cls[color])}>{children}</span>
 }

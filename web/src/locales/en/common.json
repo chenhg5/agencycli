@@ -276,7 +276,11 @@
     "ovUnread": "unread",
     "ovViewSchedule": "View schedule",
     "startAll": "Start All",
-    "stopAll": "Stop All"
+    "stopAll": "Stop All",
+    "sortNewest": "Newest first",
+    "sortOldest": "Oldest first",
+    "sortPriority": "By priority",
+    "priorityAll": "Priority: All"
   },
   "docs": {
     "title": "Knowledge Base",
@@ -504,6 +508,10 @@
     "allSchedulers": "All scheduler instances",
     "wakeupNow": "Wakeup",
     "wakingUp": "Waking…",
+    "abort": "Abort",
+    "aborting": "Aborting…",
+    "aborted": "Aborted",
+    "confirmAbort": "Are you sure you want to abort the running agent? This will immediately terminate its process.",
     "copyResumeCmd": "Copy resume command"
   },
   "session": {
@@ -603,6 +611,7 @@
       "awaiting": "Awaiting",
       "awaiting_confirmation": "Awaiting Confirm",
       "cancelled": "Cancelled",
+      "aborted": "Aborted",
       "pending": "Pending"
     }
   },
@@ -913,5 +922,17 @@
     "hint": "Agent-specific env vars have the highest priority, overriding workspace-level variables and provider settings.",
     "add": "Add Variable",
     "empty": "No environment variables set"
+  },
+  "sandbox": {
+    "title": "Sandbox Environment",
+    "provider": "Run Mode",
+    "providerNone": "Direct (no sandbox)",
+    "image": "Docker Image",
+    "imagePlaceholder": "Leave empty for default image",
+    "network": "Network Mode",
+    "networkDefault": "default",
+    "networkOffline": "offline",
+    "memory": "Memory Limit (MB)",
+    "memoryPlaceholder": "0 = unlimited"
   }
 }

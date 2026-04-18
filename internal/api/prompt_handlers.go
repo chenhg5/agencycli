@@ -228,6 +228,9 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 	if meta.Provider != "" {
 		resp["provider"] = meta.Provider
 	}
+	if meta.Sandbox != nil {
+		resp["sandbox"] = meta.Sandbox
+	}
 
 	goalSummary := s.buildGoalSummary(project)
 	if goalSummary != "" {
@@ -352,6 +355,59 @@ func (s *Server) handlePostProjectSync(w http.ResponseWriter, r *http.Request) {
 		"ok":     true,
 		"output": string(out),
 	})
+}
+
+func (s *Server) handlePutAgentSandbox(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("name")
+	agent := r.PathValue("agent")
+
+	meta, err := s.st.AgentMeta(project, agent)
+	if err != nil {
+		if isNotFoundErr(err) {
+			s.jsonError(w, http.StatusNotFound, "agent not found")
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+
+	var body struct {
+		Provider string `json:"provider"`
+		Image    string `json:"image"`
+		Network  string `json:"network"`
+		MemoryMB int    `json:"memoryMb"`
+	}
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if body.Provider == "" || body.Provider == "none" {
+		meta.Sandbox = nil
+	} else {
+		meta.Sandbox = &entity.SandboxConfig{
+			Provider: entity.SandboxProvider(body.Provider),
+		}
+		if body.Provider == "docker" {
+			dc := &entity.DockerSandboxConfig{}
+			if body.Image != "" {
+				dc.Image = body.Image
+			}
+			if body.Network != "" {
+				dc.NetworkMode = body.Network
+			}
+			if body.MemoryMB > 0 {
+				dc.MemoryMB = body.MemoryMB
+			}
+			meta.Sandbox.Docker = dc
+		}
+	}
+
+	if err := s.st.SaveAgentMeta(project, agent, meta); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
 
 func (s *Server) syncAgent(project, agent string) {
