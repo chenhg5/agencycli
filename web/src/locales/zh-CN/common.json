@@ -470,6 +470,7 @@
     "cronOff": "关",
     "pauseCron": "暂停",
     "resumeCron": "恢复",
+    "editCron": "编辑定时任务",
     "confirmDeleteCron": "确定删除此定时任务？",
     "deleteCron": "删除",
     "addCron": "新建定时任务",
@@ -934,5 +935,17 @@
     "networkOffline": "离线",
     "memory": "内存限制 (MB)",
     "memoryPlaceholder": "0 = 不限制"
+  },
+  "cron": {
+    "modePreset": "常用",
+    "modeCustom": "自定义",
+    "presetEveryHour": "每小时",
+    "presetEvery2Hours": "每2小时",
+    "presetEvery6Hours": "每6小时",
+    "presetDaily9am": "每天 9:00",
+    "presetDaily9amWeekdays": "工作日 9:00",
+    "presetTwiceDaily": "每天 9:00 和 18:00",
+    "presetWeeklyMonday": "每周一 9:00",
+    "presetMonthly1st": "每月1日 9:00"
   }
 }

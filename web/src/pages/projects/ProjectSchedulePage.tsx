@@ -8,7 +8,7 @@ import {
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
 import { cn } from '../../lib/cn'
-import { apiFetch, apiDelete, apiPatch, apiPost } from '../../lib/api'
+import { apiFetch, apiDelete, apiPatch, apiPost, apiPut } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 
@@ -542,6 +542,7 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [adding, setAdding] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ agent: string; cron: CronRow } | null>(null)
 
   const allCrons = useMemo(() => {
     const rows: { agent: string; cron: CronRow }[] = []
@@ -613,6 +614,9 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
                   <td className={cn(tdCls, 'tabular-nums')}>{c.runCount ?? 0}</td>
                   <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button type="button" onClick={() => setEditing({ agent, cron: c })} className={cn(smallBtn, 'text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/30')} title={t('schedule.editCron')}>
+                        <Pencil className="size-3.5" strokeWidth={1.8} />
+                      </button>
                       <button type="button" onClick={() => void toggleCron(agent, c.id, !c.enabled)} className={cn(smallBtn, 'text-neutral-500 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800')} title={c.enabled ? t('schedule.pauseCron') : t('schedule.resumeCron')}>
                         {c.enabled ? <Pause className="size-3.5" strokeWidth={1.8} /> : <Play className="size-3.5" strokeWidth={1.8} />}
                       </button>
@@ -628,7 +632,104 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
         </div>
       )}
       <p className="mt-3 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.restartHint')}</p>
+
+      {editing && (
+        <EditCronModal projectId={projectId} agent={editing.agent} cron={editing.cron} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onChanged() }} />
+      )}
     </>
+  )
+}
+
+/* ── Cron schedule presets & builder ── */
+
+const CRON_PRESETS = [
+  { label: 'cron.presetEveryHour', value: '0 * * * *' },
+  { label: 'cron.presetEvery2Hours', value: '0 */2 * * *' },
+  { label: 'cron.presetEvery6Hours', value: '0 */6 * * *' },
+  { label: 'cron.presetDaily9am', value: '0 9 * * *' },
+  { label: 'cron.presetDaily9amWeekdays', value: '0 9 * * 1-5' },
+  { label: 'cron.presetTwiceDaily', value: '0 9,18 * * *' },
+  { label: 'cron.presetWeeklyMonday', value: '0 9 * * 1' },
+  { label: 'cron.presetMonthly1st', value: '0 9 1 * *' },
+] as const
+
+function CronScheduleInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation()
+  const [mode, setMode] = useState<'preset' | 'custom'>(() => {
+    return CRON_PRESETS.some((p) => p.value === value) ? 'preset' : 'custom'
+  })
+
+  const chipCls = 'cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium transition-colors'
+  const chipActive = 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300'
+  const chipInactive = 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500'
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => setMode('preset')} className={cn('text-xs font-medium', mode === 'preset' ? 'text-sky-700 dark:text-sky-400' : 'text-neutral-400 dark:text-zinc-500')}>{t('cron.modePreset')}</button>
+        <span className="text-neutral-300 dark:text-zinc-600">|</span>
+        <button type="button" onClick={() => setMode('custom')} className={cn('text-xs font-medium', mode === 'custom' ? 'text-sky-700 dark:text-sky-400' : 'text-neutral-400 dark:text-zinc-500')}>{t('cron.modeCustom')}</button>
+      </div>
+      {mode === 'preset' ? (
+        <div className="flex flex-wrap gap-1.5">
+          {CRON_PRESETS.map((p) => (
+            <button key={p.value} type="button" onClick={() => onChange(p.value)} className={cn(chipCls, value === p.value ? chipActive : chipInactive)}>
+              {t(p.label)}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <input value={value} onChange={(e) => onChange(e.target.value)} className={cn(fieldCls, 'font-mono')} placeholder="0 9 * * 1-5" />
+      )}
+      {value && <p className="text-[11px] font-mono text-neutral-400 dark:text-zinc-500">{value}</p>}
+    </div>
+  )
+}
+
+function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId: string; agent: string; cron: CronRow; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation()
+  const [title, setTitle] = useState(cron.title)
+  const [schedule, setSchedule] = useState(cron.schedule)
+  const [prompt, setPrompt] = useState(cron.prompt)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function save() {
+    setErr(null); setBusy(true)
+    try {
+      await apiPut(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons/${encodeURIComponent(cron.id)}`, {
+        title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim(),
+      })
+      onSaved()
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !busy && onClose()}>
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-5 py-3 dark:border-zinc-700">
+          <h2 className="text-base font-semibold text-neutral-900 dark:text-zinc-100">{t('schedule.editCron')} — <span className="font-mono">{agent}</span></h2>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 dark:text-zinc-500 dark:hover:bg-zinc-800"><X className="size-4" /></button>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <Field label={t('forms.title')}>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldCls} />
+          </Field>
+          <Field label={t('schedule.cronSchedule')}>
+            <CronScheduleInput value={schedule} onChange={setSchedule} />
+          </Field>
+          <Field label={t('forms.prompt')}>
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className={fieldCls} />
+          </Field>
+        </div>
+        {err && <p className="px-5 pb-2 text-sm text-red-600 dark:text-red-400">{err}</p>}
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-zinc-700">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-500 hover:text-neutral-700 dark:text-zinc-500">{t('forms.cancel')}</button>
+          <button type="button" disabled={busy || !title.trim() || !schedule.trim() || !prompt.trim()} onClick={() => void save()} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-40">{busy ? t('forms.saving') : t('common.save')}</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -652,7 +753,7 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
 
   return (
     <div className="mb-4 rounded-lg border border-dashed border-sky-300 bg-sky-50/30 p-4 animate-fade-in dark:border-sky-800 dark:bg-sky-900/10">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">Agent</span>
           <select value={agent} onChange={(e) => setAgent(e.target.value)} className={selectCls + ' w-full'}>
@@ -663,10 +764,10 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
           <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('forms.title')}</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} className={fieldCls} placeholder="Daily standup" />
         </div>
-        <div>
-          <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('schedule.cronSchedule')}</span>
-          <input value={schedule} onChange={(e) => setSchedule(e.target.value)} className={cn(fieldCls, 'font-mono')} placeholder="0 9 * * 1-5" />
-        </div>
+      </div>
+      <div className="mt-3">
+        <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('schedule.cronSchedule')}</span>
+        <CronScheduleInput value={schedule} onChange={setSchedule} />
       </div>
       <div className="mt-3">
         <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('forms.prompt')}</span>

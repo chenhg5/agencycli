@@ -468,6 +468,7 @@
     "noCrons": "No cron jobs configured yet.",
     "cronOn": "On",
     "cronOff": "Off",
+    "editCron": "Edit cron job",
     "pauseCron": "Pause",
     "resumeCron": "Resume",
     "confirmDeleteCron": "Delete this cron job?",
@@ -934,5 +935,17 @@
     "networkOffline": "offline",
     "memory": "Memory Limit (MB)",
     "memoryPlaceholder": "0 = unlimited"
+  },
+  "cron": {
+    "modePreset": "Presets",
+    "modeCustom": "Custom",
+    "presetEveryHour": "Every hour",
+    "presetEvery2Hours": "Every 2 hours",
+    "presetEvery6Hours": "Every 6 hours",
+    "presetDaily9am": "Daily 9:00",
+    "presetDaily9amWeekdays": "Weekdays 9:00",
+    "presetTwiceDaily": "Daily 9:00 & 18:00",
+    "presetWeeklyMonday": "Monday 9:00",
+    "presetMonthly1st": "1st of month 9:00"
   }
 }

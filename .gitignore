@@ -41,3 +41,5 @@ Thumbs.db
 !**/agents/*/.agencycli/agent.yaml
 
 .npmrc
+
+agencycli

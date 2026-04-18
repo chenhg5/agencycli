@@ -527,11 +527,10 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			agentLog("%s sleeping %s — next at %s",
 				colorDim+"○", waitDur.Round(time.Second), nextAt)
 		}
-		select {
-			case <-ctx.Done():
-				return
-			case <-time.After(waitDur):
-			}
+		sleepWithCronCheck(ctx, waitDur, root, project, agentName, ts, s, agentLog)
+		if ctx.Err() != nil {
+			return
+		}
 		}
 
 		// Re-check context after sleep.
@@ -546,14 +545,13 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 				nextOpenUTC := time.Now().Add(nextWake).UTC()
 				hb.NextWakeupAt = &nextOpenUTC
 				_ = ts.SaveHeartbeat(project, agentName, hb)
-				agentLog("%s outside active window — sleeping %s until window opens",
-					colorDim+"○", nextWake.Round(time.Minute))
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(nextWake):
-				}
-				continue
+			agentLog("%s outside active window — sleeping %s until window opens",
+				colorDim+"○", nextWake.Round(time.Minute))
+			sleepWithCronCheck(ctx, nextWake, root, project, agentName, ts, s, agentLog)
+			if ctx.Err() != nil {
+				return
+			}
+			continue
 			}
 		}
 
@@ -569,14 +567,13 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 		if hb.WakeupPreset != "" {
 			met, reason := checkWakeupPreset(hb.WakeupPreset, ts, project, agentName)
 			if !met {
-				agentLog("%s preset condition not met (%s: %s) — skipping cycle, next check in %s",
-					colorYellow+"⏸", hb.WakeupPreset, reason, interval.Round(time.Second))
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(interval):
-				}
-				continue
+			agentLog("%s preset condition not met (%s: %s) — skipping cycle, next check in %s",
+				colorYellow+"⏸", hb.WakeupPreset, reason, interval.Round(time.Second))
+			sleepWithCronCheck(ctx, interval, root, project, agentName, ts, s, agentLog)
+			if ctx.Err() != nil {
+				return
+			}
+			continue
 			}
 		}
 
@@ -596,18 +593,17 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 				hb.LastConditionStatus = "not_met"
 				_ = ts.SaveHeartbeat(project, agentName, hb)
 				if output != "" {
-					agentLog("%s condition not met (%s) — skipping cycle, next check in %s",
-						colorYellow+"⏸", truncate(output, 80), interval.Round(time.Second))
-				} else {
-					agentLog("%s condition not met — skipping cycle, next check in %s",
-						colorYellow+"⏸", interval.Round(time.Second))
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(interval):
-				}
-				continue
+				agentLog("%s condition not met (%s) — skipping cycle, next check in %s",
+					colorYellow+"⏸", truncate(output, 80), interval.Round(time.Second))
+			} else {
+				agentLog("%s condition not met — skipping cycle, next check in %s",
+					colorYellow+"⏸", interval.Round(time.Second))
+			}
+			sleepWithCronCheck(ctx, interval, root, project, agentName, ts, s, agentLog)
+			if ctx.Err() != nil {
+				return
+			}
+			continue
 			}
 		}
 
@@ -936,6 +932,51 @@ func agencyLang(s store.Store) string {
 		return "en"
 	}
 	return a.Lang
+}
+
+// sleepWithCronCheck sleeps for the given duration but wakes every minute to
+// check and fire due crons.  If a cron fires, it runs the pending tasks
+// immediately so that cron schedules are honoured even when the heartbeat
+// interval is long or the wakeup-preset condition is not met.
+func sleepWithCronCheck(ctx context.Context, dur time.Duration,
+	root, project, agentName string,
+	ts taskstore.Store, s store.Store,
+	logFn func(string, ...any)) {
+
+	if dur <= 0 {
+		return
+	}
+	deadline := time.Now().Add(dur)
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n := fireDueCrons(ts, project, agentName)
+			if n > 0 {
+				logFn("%s cron fired %d task(s) during sleep — executing", colorYellow+"◆", n)
+				hb, _ := ts.GetHeartbeat(project, agentName)
+				if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
+					logFn("%s cron task execution error: %v", colorRed+"✗", err)
+				}
+			}
+			if time.Now().After(deadline) {
+				return
+			}
+		case <-time.After(time.Until(deadline)):
+			n := fireDueCrons(ts, project, agentName)
+			if n > 0 {
+				logFn("%s cron fired %d task(s) during sleep — executing", colorYellow+"◆", n)
+				hb, _ := ts.GetHeartbeat(project, agentName)
+				if err := runAllPendingTasks(ctx, root, project, agentName, ts, s, hb); err != nil {
+					logFn("%s cron task execution error: %v", colorRed+"✗", err)
+				}
+			}
+			return
+		}
+	}
 }
 
 // ── cron helpers ─────────────────────────────────────────────────────────────

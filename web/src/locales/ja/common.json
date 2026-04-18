@@ -468,6 +468,7 @@
     "noCrons": "Cronジョブはまだありません。",
     "cronOn": "オン",
     "cronOff": "オフ",
+    "editCron": "定時タスクを編集",
     "pauseCron": "一時停止",
     "resumeCron": "再開",
     "confirmDeleteCron": "このCronジョブを削除しますか？",
@@ -934,5 +935,17 @@
     "networkOffline": "オフライン",
     "memory": "メモリ制限 (MB)",
     "memoryPlaceholder": "0 = 無制限"
+  },
+  "cron": {
+    "modePreset": "プリセット",
+    "modeCustom": "カスタム",
+    "presetEveryHour": "毎時",
+    "presetEvery2Hours": "2時間ごと",
+    "presetEvery6Hours": "6時間ごと",
+    "presetDaily9am": "毎日 9:00",
+    "presetDaily9amWeekdays": "平日 9:00",
+    "presetTwiceDaily": "毎日 9:00 と 18:00",
+    "presetWeeklyMonday": "毎週月曜 9:00",
+    "presetMonthly1st": "毎月1日 9:00"
   }
 }

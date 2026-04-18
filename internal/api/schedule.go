@@ -520,6 +520,56 @@ func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(cronToJSON(c))
 }
 
+func (s *Server) handlePutCron(w http.ResponseWriter, r *http.Request) {
+	name, agent, ok := s.parseProjectAgent(w, r)
+	if !ok {
+		return
+	}
+	cronID := r.PathValue("cronId")
+	var body postCronBody
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	crons, err := s.ts.ListCrons(name, agent)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	var target *entity.Cron
+	for _, c := range crons {
+		if c.ID == cronID {
+			target = c
+			break
+		}
+	}
+	if target == nil {
+		s.jsonError(w, http.StatusNotFound, "cron not found")
+		return
+	}
+	if t := strings.TrimSpace(body.Title); t != "" {
+		target.Title = t
+	}
+	if p := strings.TrimSpace(body.Prompt); p != "" {
+		target.Prompt = p
+	}
+	if sc := strings.TrimSpace(body.Schedule); sc != "" {
+		if err := validateCronSchedule(sc); err != nil {
+			s.jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		target.Schedule = sc
+	}
+	if body.Enabled != nil {
+		target.Enabled = *body.Enabled
+	}
+	if err := s.ts.SaveCrons(name, agent, crons); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(cronToJSON(target))
+}
+
 func randomAlpha(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, n)
