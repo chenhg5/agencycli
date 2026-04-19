@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.5.0] - 2026-04-20
+
+### Added
+
+**Provider management**
+- `agencycli provider` CLI commands for managing API providers (add/list/remove/set-default)
+- Setup guidance system: interactive first-run wizard for new workspaces
+
+**Cron editing & execution**
+- Web UI: inline cron editing (expression, prompt, enabled toggle)
+- Fire pending crons during heartbeat sleep phase (no longer wait for next full wakeup cycle)
+
+**Agent identity injection**
+- Inject agent identity environment variables (`AGENCYCLI_AGENT`, `AGENCYCLI_PROJECT`, etc.) into every agent process
+
+**Agent abort & sandbox config**
+- Abort running agents from web UI and CLI (`agencycli run abort`)
+- Sandbox configuration panel in agent detail page (image, mounts, env)
+- Workbench sort/filter improvements and skill deep-links on agent page
+
+**Draggable page tabs**
+- Top bar tabs are now draggable for custom ordering
+
+### Fixed
+- Mount `.claude.json` as read-write in Docker sandbox (was read-only, breaking session persistence)
+- Remove inline error text flash on schedule page; default cursor style on tabs
+- Use explicit PATH in Docker container instead of unexpanded `$PATH` variable
+- Use `exec.Command` + stdin pipe instead of `bash -c` for Docker runs (fixes quoting issues)
+- Shell-escape Docker args when using stdin prompt redirect
+- Include process output tail in run error messages for better diagnostics
+
 ## [v0.4.1] - 2026-04-06
 
 ### Added
