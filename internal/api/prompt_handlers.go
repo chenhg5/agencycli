@@ -237,6 +237,8 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		resp["goals"] = goalSummary
 	}
 
+	resp["setupChecks"] = buildSetupChecks(meta)
+
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
@@ -423,4 +425,143 @@ func (s *Server) syncAgent(project, agent string) {
 	if err != nil {
 		slog.Warn("sync after wakeup save failed", "project", project, "agent", agent, "err", err, "output", string(out))
 	}
+}
+
+type setupCheck struct {
+	Key    string `json:"key"`
+	Label  string `json:"label"`
+	Status string `json:"status"` // ok, warning, error
+	Detail string `json:"detail,omitempty"`
+}
+
+func buildSetupChecks(meta *entity.AgentMeta) []setupCheck {
+	model := entity.NormaliseModel(meta.Model)
+	if model == entity.ModelHuman || model == entity.ModelHTTPAgent {
+		return nil
+	}
+
+	var checks []setupCheck
+	isDocker := meta.Sandbox != nil && meta.Sandbox.Provider == entity.SandboxDocker
+
+	// 1. CLI tool check
+	cliName, installCmd := cliInfoForModel(model)
+	if cliName != "" {
+		if isDocker {
+			checks = append(checks, setupCheck{
+				Key: "cli", Label: cliName + " CLI", Status: "ok",
+				Detail: "Docker 沙箱内已预装",
+			})
+		} else if _, err := exec.LookPath(cliName); err == nil {
+			checks = append(checks, setupCheck{
+				Key: "cli", Label: cliName + " CLI", Status: "ok",
+			})
+		} else {
+			checks = append(checks, setupCheck{
+				Key: "cli", Label: cliName + " CLI", Status: "error",
+				Detail: "未安装。请运行: " + installCmd,
+			})
+		}
+	}
+
+	// 2. Docker check (if using docker sandbox)
+	if isDocker {
+		if _, err := exec.LookPath("docker"); err == nil {
+			dcmd := exec.Command("docker", "info")
+			dcmd.Stdout = nil
+			dcmd.Stderr = nil
+			if dcmd.Run() == nil {
+				checks = append(checks, setupCheck{Key: "docker", Label: "Docker", Status: "ok"})
+			} else {
+				checks = append(checks, setupCheck{
+					Key: "docker", Label: "Docker", Status: "error",
+					Detail: "Docker 已安装但守护进程未运行。请运行: sudo systemctl start docker",
+				})
+			}
+		} else {
+			checks = append(checks, setupCheck{
+				Key: "docker", Label: "Docker", Status: "error",
+				Detail: "未安装。请访问: https://docs.docker.com/get-docker/",
+			})
+		}
+	}
+
+	// 3. Auth / credential check
+	authCheck := checkAuthForModel(model, isDocker)
+	if authCheck != nil {
+		checks = append(checks, *authCheck)
+	}
+
+	// 4. API provider check
+	if meta.Provider != "" {
+		checks = append(checks, setupCheck{
+			Key: "provider", Label: "API 供应商", Status: "ok",
+			Detail: meta.Provider,
+		})
+	} else {
+		switch model {
+		case entity.ModelClaudeCode:
+			if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" {
+				checks = append(checks, setupCheck{Key: "provider", Label: "API 供应商", Status: "ok", Detail: "通过环境变量配置"})
+			} else {
+				checks = append(checks, setupCheck{
+					Key: "provider", Label: "API 供应商", Status: "warning",
+					Detail: "未配置 API 供应商或 ANTHROPIC_API_KEY。请在设置页添加供应商或设置环境变量",
+				})
+			}
+		case entity.ModelCodex, entity.ModelQoder:
+			if os.Getenv("OPENAI_API_KEY") != "" {
+				checks = append(checks, setupCheck{Key: "provider", Label: "API 供应商", Status: "ok", Detail: "通过环境变量配置"})
+			} else {
+				checks = append(checks, setupCheck{
+					Key: "provider", Label: "API 供应商", Status: "warning",
+					Detail: "未配置 OPENAI_API_KEY。请在设置页添加供应商或设置环境变量",
+				})
+			}
+		}
+	}
+
+	return checks
+}
+
+func cliInfoForModel(model entity.AgentModel) (name, install string) {
+	switch model {
+	case entity.ModelClaudeCode:
+		return "claude", "npm install -g @anthropic-ai/claude-code"
+	case entity.ModelCodex:
+		return "codex", "npm install -g @openai/codex"
+	case entity.ModelCursor:
+		return "agent", "curl -fsSL https://www.cursor.com/install-agent.sh | sh"
+	case entity.ModelGemini:
+		return "gemini", "npm install -g @anthropic-ai/gemini-cli"
+	case entity.ModelQoder:
+		return "qoder", "npm install -g @anthropic-ai/qoder"
+	case entity.ModelOpenCode:
+		return "opencode", "go install github.com/opencode-ai/opencode@latest"
+	}
+	return "", ""
+}
+
+func checkAuthForModel(model entity.AgentModel, isDocker bool) *setupCheck {
+	home, _ := os.UserHomeDir()
+	switch model {
+	case entity.ModelCursor:
+		authFile := filepath.Join(home, ".config", "cursor", "auth.json")
+		if _, err := os.Stat(authFile); err == nil {
+			return &setupCheck{Key: "auth", Label: "Cursor 认证", Status: "ok"}
+		}
+		return &setupCheck{
+			Key: "auth", Label: "Cursor 认证", Status: "error",
+			Detail: "未登录。请运行: agent login",
+		}
+	case entity.ModelClaudeCode:
+		claudeJSON := filepath.Join(home, ".claude.json")
+		if _, err := os.Stat(claudeJSON); err == nil {
+			return &setupCheck{Key: "auth", Label: "Claude 认证", Status: "ok"}
+		}
+		return &setupCheck{
+			Key: "auth", Label: "Claude 认证", Status: "warning",
+			Detail: "~/.claude.json 不存在（如果使用 API Key 可忽略）",
+		}
+	}
+	return nil
 }

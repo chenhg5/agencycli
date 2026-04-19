@@ -485,12 +485,25 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
               <p className="truncate font-mono text-xs text-neutral-600 dark:text-zinc-400">{run.command}</p>
             </div>
           )}
-          {run.errorMsg && (
-            <div className="col-span-full">
-              <span className="text-xs font-medium text-red-500">{t('runs.errorLabel')}</span>
-              <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-words rounded-md border border-red-200/60 bg-red-50/50 p-2.5 font-mono text-xs text-red-700 dark:border-red-800/40 dark:bg-red-950/20 dark:text-red-400">{run.errorMsg}</pre>
-            </div>
-          )}
+          {run.errorMsg && (() => {
+            const hintIdx = run.errorMsg.indexOf('[hint]')
+            const rawError = hintIdx >= 0 ? run.errorMsg.slice(0, hintIdx).trimEnd() : run.errorMsg
+            const hintText = hintIdx >= 0 ? run.errorMsg.slice(hintIdx + 6).trim() : ''
+            return (
+              <div className="col-span-full space-y-2">
+                <div>
+                  <span className="text-xs font-medium text-red-500">{t('runs.errorLabel')}</span>
+                  <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md border border-red-200/60 bg-red-50/50 p-2.5 font-mono text-xs text-red-700 dark:border-red-800/40 dark:bg-red-950/20 dark:text-red-400">{rawError}</pre>
+                </div>
+                {hintText && (
+                  <div className="rounded-md border border-blue-200/60 bg-blue-50/50 p-3 dark:border-blue-800/40 dark:bg-blue-950/20">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">💡 {t('runs.setupHint')}</span>
+                    <pre className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-blue-700 dark:text-blue-300">{hintText}</pre>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Log content */}

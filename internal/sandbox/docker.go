@@ -50,7 +50,7 @@ var defaultImages = map[entity.AgentModel]string{
 	entity.ModelCodex:      imagePrefix + "/sandbox-codex:latest",
 	entity.ModelGemini:     imagePrefix + "/sandbox-gemini:latest",
 	entity.ModelOpenCode:   imagePrefix + "/sandbox-opencode:latest",
-	entity.ModelCursor:     imagePrefix + "/sandbox-cursor:latest",
+	entity.ModelCursor:     imagePrefix + "/sandbox-claudecode:latest",
 	entity.ModelQoder:      imagePrefix + "/sandbox-codex:latest", // Qoder uses same base as Codex
 }
 
@@ -85,7 +85,9 @@ var defaultCredentialMounts = map[entity.AgentModel][]string{
 		"~/.ssh:/root/.ssh:ro",
 	},
 	entity.ModelCursor: {
-		"~/.cursor:/root/.cursor:ro",
+		"~/.cursor:/root/.cursor",
+		"~/.config/cursor:/root/.config/cursor:ro",
+		"~/.local/share/cursor-agent:/root/.local/share/cursor-agent:ro",
 		"~/.config/gh:/root/.config/gh:ro",
 		"~/.ssh:/root/.ssh:ro",
 	},
@@ -171,6 +173,30 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 		hostPath := strings.SplitN(expanded, ":", 2)[0]
 		if _, err := os.Stat(hostPath); err == nil {
 			args = append(args, "-v", expanded)
+		}
+	}
+
+	// ── Cursor Agent binary ──────────────────────────────────────────────────
+	// Cursor Agent is a self-contained Node.js bundle (cursor-agent + node +
+	// index.js all in the same directory). The entry script resolves its own
+	// directory to locate sibling files, so we must mount the entire version
+	// directory at a fixed container path and rewrite innerArgs to use the
+	// full path so SCRIPT_DIR resolves correctly.
+	if entity.NormaliseModel(model) == entity.ModelCursor {
+		if agentBin, err := exec.LookPath("agent"); err == nil {
+			if realBin, err := filepath.EvalSymlinks(agentBin); err == nil {
+				realDir := filepath.Dir(realBin)
+				const containerCursorDir = "/opt/cursor-agent"
+				args = append(args, "-v", realDir+":"+containerCursorDir+":ro")
+				entryName := filepath.Base(realBin)
+				fullPath := containerCursorDir + "/" + entryName
+				for i, a := range innerArgs {
+					if a == "agent" {
+						innerArgs[i] = fullPath
+						break
+					}
+				}
+			}
 		}
 	}
 

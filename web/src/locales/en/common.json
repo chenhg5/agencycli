@@ -191,6 +191,7 @@
     "agentType": "Agent Type",
     "apiProvider": "API Provider",
     "configuration": "Configuration",
+    "setupChecklist": "Setup Checklist",
     "addEnvVar": "Add variable",
     "hiring": "Hiring…",
     "hire": "Hire"
@@ -594,6 +595,7 @@
     "sessionLabel": "Session ID",
     "command": "Command",
     "errorLabel": "Error",
+    "setupHint": "Setup Guide",
     "logTitle": "Run log",
     "noLog": "No log path available",
     "logNotFound": "Log file not found or cleaned up",

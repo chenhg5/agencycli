@@ -191,6 +191,7 @@
     "agentType": "Agent タイプ",
     "apiProvider": "API プロバイダー設定",
     "configuration": "設定",
+    "setupChecklist": "環境チェック",
     "addEnvVar": "変数を追加",
     "hiring": "採用中…",
     "hire": "採用"
@@ -594,6 +595,7 @@
     "sessionLabel": "セッション ID",
     "command": "コマンド",
     "errorLabel": "エラー",
+    "setupHint": "解決ガイド",
     "logTitle": "実行ログ",
     "noLog": "ログパスがありません",
     "logNotFound": "ログファイルが存在しないか削除されました",

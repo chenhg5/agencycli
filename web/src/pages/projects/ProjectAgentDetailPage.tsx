@@ -5,7 +5,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2, X,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff, Container,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff, Container, AlertTriangle, ShieldCheck, CircleX,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -52,6 +52,13 @@ type SandboxConfig = {
   }
 }
 
+type SetupCheck = {
+  key: string
+  label: string
+  status: 'ok' | 'warning' | 'error'
+  detail?: string
+}
+
 type AgentContext = {
   contextFile: string
   context: string
@@ -66,6 +73,7 @@ type AgentContext = {
   provider?: string
   workDir?: string
   sandbox?: SandboxConfig
+  setupChecks?: SetupCheck[]
 }
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
@@ -533,6 +541,35 @@ export default function ProjectAgentDetailPage() {
                 <InfoCard icon={FileCode} label={t('prompt.contextFile')} value={ctx.contextFile} mono />
                 {ctx.syncedAt && <InfoCard icon={Clock} label={t('prompt.lastSync')} value={fmt(ctx.syncedAt)} />}
               </div>
+
+              {/* Setup Checklist */}
+              {ctx.setupChecks && ctx.setupChecks.length > 0 && (
+                <section>
+                  <SectionHeader icon={ShieldCheck} title={t('members.setupChecklist')} />
+                  <div className="mt-3 rounded-lg border border-neutral-200/80 bg-white p-4 dark:border-zinc-700/60 dark:bg-zinc-900/40">
+                    <div className="space-y-2">
+                      {ctx.setupChecks.map((c) => (
+                        <div key={c.key} className="flex items-start gap-2.5 text-sm">
+                          {c.status === 'ok' && <Check className="mt-0.5 size-4 shrink-0 text-green-500" />}
+                          {c.status === 'warning' && <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />}
+                          {c.status === 'error' && <CircleX className="mt-0.5 size-4 shrink-0 text-red-500" />}
+                          <div className="min-w-0">
+                            <span className={cn(
+                              'font-medium',
+                              c.status === 'ok' && 'text-neutral-700 dark:text-zinc-300',
+                              c.status === 'warning' && 'text-amber-700 dark:text-amber-400',
+                              c.status === 'error' && 'text-red-700 dark:text-red-400',
+                            )}>{c.label}</span>
+                            {c.detail && (
+                              <p className="mt-0.5 text-xs text-neutral-500 dark:text-zinc-500">{c.detail}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {/* Configuration: model + env */}
               <section>

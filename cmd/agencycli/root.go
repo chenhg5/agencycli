@@ -88,6 +88,7 @@ func init() {
 		newOKRCmd(),
 		newMilestoneCmd(),
 		newEnvVarCmd(),
+		newProviderCmd(),
 	)
 }
 

@@ -191,6 +191,7 @@
     "agentType": "Agent 類型",
     "apiProvider": "API Provider 設定",
     "configuration": "設定",
+    "setupChecklist": "環境檢查",
     "addEnvVar": "新增變數",
     "hiring": "僱用中…",
     "hire": "僱用"
@@ -594,6 +595,7 @@
     "sessionLabel": "會話 ID",
     "command": "命令",
     "errorLabel": "錯誤",
+    "setupHint": "解決建議",
     "logTitle": "執行日誌",
     "noLog": "無日誌路徑",
     "logNotFound": "日誌檔案不存在或已清理",

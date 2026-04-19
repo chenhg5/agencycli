@@ -495,14 +495,104 @@ func exitCodeOrZero(cmd *exec.Cmd) int {
 
 // buildErrorMsg combines the Go error string with the last few lines of
 // process output so that the caller can see *why* the command failed,
-// not just the exit code.
+// not just the exit code.  It also appends setup hints for common errors.
 func buildErrorMsg(err error, output []byte) string {
 	base := err.Error()
 	tail := tailLines(output, 30, 2000)
+	var msg string
 	if tail == "" {
-		return base
+		msg = base
+	} else {
+		msg = base + "\n\n" + tail
 	}
-	return base + "\n\n" + tail
+	if hint := detectSetupHint(msg); hint != "" {
+		msg += "\n\n" + hint
+	}
+	return msg
+}
+
+// detectSetupHint checks the combined error output for well-known failure
+// patterns and returns an actionable setup hint (prefixed with [hint]) that
+// guides the user through resolving the issue.
+func detectSetupHint(errText string) string {
+	lower := strings.ToLower(errText)
+
+	switch {
+	// Docker image not found / pull denied
+	case strings.Contains(lower, "unable to find image") && strings.Contains(lower, "denied"):
+		return `[hint] Docker 镜像拉取失败。请确认：
+1. Docker 已安装并运行：docker info
+2. 如果是私有镜像，先登录：docker login ghcr.io
+3. 或在成员详情页 → 沙箱配置中指定自定义镜像`
+
+	// Docker not installed or daemon not running
+	case strings.Contains(lower, "docker") && (strings.Contains(lower, "not found") || strings.Contains(lower, "cannot connect") || strings.Contains(lower, "daemon")):
+		return `[hint] Docker 未安装或未启动。请：
+1. 安装 Docker：https://docs.docker.com/get-docker/
+2. 启动 Docker：sudo systemctl start docker
+3. 或在成员详情页将沙箱切换为"无"（直接在宿主机运行）`
+
+	// Claude Code CLI not found
+	case strings.Contains(lower, "claude") && strings.Contains(lower, "not found"):
+		return `[hint] Claude Code CLI 未安装。请：
+1. 安装：npm install -g @anthropic-ai/claude-code
+2. 验证：claude --version
+3. 如果使用 Docker 沙箱，镜像内已预装，请检查沙箱配置`
+
+	// Codex CLI not found
+	case strings.Contains(lower, "codex") && strings.Contains(lower, "not found"):
+		return `[hint] Codex CLI 未安装。请：
+1. 安装：npm install -g @openai/codex
+2. 验证：codex --version`
+
+	// Cursor Agent not found
+	case strings.Contains(lower, "agent") && strings.Contains(lower, "not found") && strings.Contains(lower, "executable"):
+		return `[hint] Cursor Agent CLI 未安装。请：
+1. 安装：curl -fsSL https://www.cursor.com/install-agent.sh | sh
+2. 验证：agent --version
+3. 如果已安装，确认 agent 在 PATH 中`
+
+	// Cursor / agent authentication
+	case strings.Contains(lower, "authentication required") && (strings.Contains(lower, "agent login") || strings.Contains(lower, "cursor_api_key")):
+		return `[hint] Cursor Agent 未认证。请：
+1. 在宿主机上运行：agent login
+2. 或设置环境变量：CURSOR_API_KEY=your-key
+3. 如果使用 Docker，确认 ~/.config/cursor/ 已正确挂载`
+
+	// Claude Code authentication / invalid signature
+	case strings.Contains(lower, "invalid signature") || (strings.Contains(lower, "anthropic") && strings.Contains(lower, "401")):
+		return `[hint] Anthropic API 认证失败。请：
+1. 检查 API Key 是否正确：设置页 → API 供应商
+2. 如果使用第三方代理，确认 base URL 和 key 匹配
+3. 通过 CLI 检查：agencycli provider list`
+
+	// OpenAI / Codex authentication
+	case strings.Contains(lower, "openai") && (strings.Contains(lower, "401") || strings.Contains(lower, "unauthorized")):
+		return `[hint] OpenAI API 认证失败。请：
+1. 检查 OPENAI_API_KEY 是否正确
+2. 设置页 → API 供应商中配置 OpenAI provider
+3. 或通过 CLI：agencycli envvar add OPENAI_API_KEY=sk-xxx`
+
+	// dangerously-skip-permissions as root
+	case strings.Contains(lower, "dangerously-skip-permissions") && strings.Contains(lower, "root"):
+		return `[hint] Claude Code 不允许在 root 下使用 --dangerously-skip-permissions。请：
+1. 在成员详情页将沙箱切换为 Docker（Docker 内已设置 IS_SANDBOX=1）
+2. 或使用非 root 用户运行`
+
+	// Read-only filesystem
+	case strings.Contains(lower, "read-only file system") || strings.Contains(lower, "erofs"):
+		return `[hint] 文件系统只读错误。请：
+1. 检查 Docker 挂载是否使用了 :ro（只读）
+2. 确认需要写入的路径没有被设为只读挂载
+3. 在沙箱配置中调整挂载选项`
+
+	// Sandbox / bwrap errors (Codex inner sandbox)
+	case strings.Contains(lower, "bwrap") || strings.Contains(lower, "no permissions to create a new namespace"):
+		return `[hint] Codex 内部沙箱冲突。请：
+1. 在成员详情页将沙箱切换为 Docker（Docker 内会自动禁用内部沙箱）
+2. 或设置环境变量：CODEX_UNSAFE_ALLOW_NO_SANDBOX=1`
+	}
+	return ""
 }
 
 func tailLines(data []byte, maxLines, maxBytes int) string {
