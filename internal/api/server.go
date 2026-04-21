@@ -217,6 +217,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/ccconnect/reload", s.handleCCProxyReload)
 	mux.HandleFunc("POST /api/v1/ccconnect/restart", s.handleCCProxyRestart)
 
+	// ── Files ──
+	mux.HandleFunc("GET /api/v1/files", s.handleListFiles)
+	mux.HandleFunc("POST /api/v1/files/upload", s.handleUploadFile)
+	mux.HandleFunc("POST /api/v1/files/mkdir", s.handleMkdir)
+	mux.HandleFunc("POST /api/v1/files/move", s.handleMoveFile)
+	mux.HandleFunc("GET /api/v1/files/content/{path...}", s.handleFileContent)
+	mux.HandleFunc("DELETE /api/v1/files/{path...}", s.handleDeleteFile)
+
 	mux.HandleFunc("GET /api/v1/check-update", s.handleCheckUpdate)
 	mux.HandleFunc("GET /api/v1/daemon/status", s.handleDaemonStatus)
 
@@ -230,7 +238,7 @@ func (s *Server) Handler() http.Handler {
 
 func withJSONHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasSuffix(r.URL.Path, "/download") {
+		if !strings.HasSuffix(r.URL.Path, "/download") && !strings.Contains(r.URL.Path, "/files/content/") {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		}
 		next.ServeHTTP(w, r)
@@ -239,13 +247,17 @@ func withJSONHeaders(next http.Handler) http.Handler {
 
 func (s *Server) withTokenAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") {
+		var token string
+		if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			token = strings.TrimPrefix(auth, "Bearer ")
+		} else if t := r.URL.Query().Get("_token"); t != "" {
+			token = t
+		}
+		if token == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
 			return
 		}
-		token := strings.TrimPrefix(auth, "Bearer ")
 
 		// Legacy: static API key
 		if s.apiKey != "" && token == s.apiKey {

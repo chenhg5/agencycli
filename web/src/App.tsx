@@ -19,6 +19,7 @@ import ProjectTasksPage from './pages/projects/ProjectTasksPage'
 import TeamDetailPage from './pages/teams/TeamDetailPage'
 import TeamsPage from './pages/teams/TeamsPage'
 import DocsPage from './pages/docs/DocsPage'
+import FilesPage from './pages/FilesPage'
 import PeoplePage from './pages/PeoplePage'
 import PersonDetailPage from './pages/PersonDetailPage'
 import OKRPage from './pages/OKRPage'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="workbench" element={<WorkbenchPage />} />
         {isAdmin && <Route path="skills" element={<SkillsPage />} />}
         {isAdmin && <Route path="docs/*" element={<DocsPage />} />}
+        <Route path="files" element={<FilesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

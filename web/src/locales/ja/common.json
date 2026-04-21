@@ -24,6 +24,7 @@
     "workbench": "ワークベンチ",
     "skills": "スキル",
     "docs": "ナレッジベース",
+    "files": "ファイル",
     "settings": "設定"
   },
   "projectNav": {
@@ -282,6 +283,25 @@
     "sortOldest": "古い順",
     "sortPriority": "優先度順",
     "priorityAll": "優先度: すべて"
+  },
+  "files": {
+    "title": "ファイル",
+    "upload": "アップロード",
+    "newFolder": "新規フォルダ",
+    "folderName": "フォルダ名",
+    "folder": "フォルダ",
+    "name": "名前",
+    "type": "種類",
+    "size": "サイズ",
+    "modified": "更新日時",
+    "empty": "このフォルダは空です",
+    "dropHere": "ファイルをここにドロップしてアップロード",
+    "noPreview": "このファイル形式のプレビューには対応していません",
+    "download": "ダウンロード",
+    "cancel": "キャンセル",
+    "create": "作成",
+    "deleteConfirm": "「{{name}}」を削除しますか？",
+    "deleteFolderConfirm": "フォルダ「{{name}}」とその内容をすべて削除しますか？"
   },
   "docs": {
     "title": "ナレッジベース",

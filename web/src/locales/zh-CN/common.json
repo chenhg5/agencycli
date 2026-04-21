@@ -24,6 +24,7 @@
     "workbench": "工作台",
     "skills": "技能",
     "docs": "知识库",
+    "files": "文件",
     "settings": "设置"
   },
   "projectNav": {
@@ -282,6 +283,25 @@
     "sortOldest": "最久优先",
     "sortPriority": "优先级排序",
     "priorityAll": "优先级: 全部"
+  },
+  "files": {
+    "title": "文件",
+    "upload": "上传",
+    "newFolder": "新建文件夹",
+    "folderName": "文件夹名称",
+    "folder": "文件夹",
+    "name": "名称",
+    "type": "类型",
+    "size": "大小",
+    "modified": "修改时间",
+    "empty": "此文件夹为空",
+    "dropHere": "拖放文件到此处上传",
+    "noPreview": "暂不支持预览此文件类型",
+    "download": "下载",
+    "cancel": "取消",
+    "create": "创建",
+    "deleteConfirm": "确定删除「{{name}}」？",
+    "deleteFolderConfirm": "确定删除文件夹「{{name}}」及其所有内容？"
   },
   "docs": {
     "title": "知识库",

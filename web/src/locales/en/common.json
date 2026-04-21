@@ -24,6 +24,7 @@
     "workbench": "Workbench",
     "skills": "Skills",
     "docs": "Knowledge Base",
+    "files": "Files",
     "settings": "Settings"
   },
   "projectNav": {
@@ -282,6 +283,25 @@
     "sortOldest": "Oldest first",
     "sortPriority": "By priority",
     "priorityAll": "Priority: All"
+  },
+  "files": {
+    "title": "Files",
+    "upload": "Upload",
+    "newFolder": "New Folder",
+    "folderName": "Folder name",
+    "folder": "Folder",
+    "name": "Name",
+    "type": "Type",
+    "size": "Size",
+    "modified": "Modified",
+    "empty": "This folder is empty",
+    "dropHere": "Drop files here to upload",
+    "noPreview": "No preview available",
+    "download": "Download",
+    "cancel": "Cancel",
+    "create": "Create",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleteFolderConfirm": "Delete folder \"{{name}}\" and all its contents?"
   },
   "docs": {
     "title": "Knowledge Base",

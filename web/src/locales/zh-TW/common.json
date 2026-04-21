@@ -24,6 +24,7 @@
     "workbench": "工作臺",
     "skills": "技能",
     "docs": "知識庫",
+    "files": "檔案",
     "settings": "設定"
   },
   "projectNav": {
@@ -282,6 +283,25 @@
     "sortOldest": "最久優先",
     "sortPriority": "優先級排序",
     "priorityAll": "優先級: 全部"
+  },
+  "files": {
+    "title": "檔案",
+    "upload": "上傳",
+    "newFolder": "新增資料夾",
+    "folderName": "資料夾名稱",
+    "folder": "資料夾",
+    "name": "名稱",
+    "type": "類型",
+    "size": "大小",
+    "modified": "修改時間",
+    "empty": "此資料夾為空",
+    "dropHere": "拖放檔案到此處上傳",
+    "noPreview": "暫不支援預覽此檔案類型",
+    "download": "下載",
+    "cancel": "取消",
+    "create": "建立",
+    "deleteConfirm": "確定刪除「{{name}}」？",
+    "deleteFolderConfirm": "確定刪除資料夾「{{name}}」及其所有內容？"
   },
   "docs": {
     "title": "知識庫",

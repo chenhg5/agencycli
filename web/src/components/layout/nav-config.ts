@@ -4,6 +4,7 @@ import {
   Briefcase,
   CalendarClock,
   FolderKanban,
+  FolderOpen,
   LayoutDashboard,
   ListTodo,
   Milestone,
@@ -26,6 +27,7 @@ export type NavKey =
   | 'goals'
   | 'skills'
   | 'docs'
+  | 'files'
   | 'settings'
 
 /** 项目内执行面：`projectNav.*` */
@@ -62,6 +64,7 @@ export const workspaceNav: NavItem[] = [
   { to: '/teams', navKey: 'teams', icon: Users, activePrefix: '/teams', adminOnly: true },
   { to: '/skills', navKey: 'skills', icon: Puzzle, activePrefix: '/skills', adminOnly: true },
   { to: '/docs', navKey: 'docs', icon: BookOpen, activePrefix: '/docs' },
+  { to: '/files', navKey: 'files', icon: FolderOpen, activePrefix: '/files' },
   { to: '/settings', navKey: 'settings', icon: Settings, activePrefix: '/settings' },
 ]
 
@@ -87,6 +90,7 @@ export function navKeyFromPath(pathname: string): NavKey {
     workbench: 'workbench',
     skills: 'skills',
     docs: 'docs',
+    files: 'files',
     settings: 'settings',
   }
   return map[seg ?? ''] ?? 'overview'
