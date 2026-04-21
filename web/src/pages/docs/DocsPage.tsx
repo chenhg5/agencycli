@@ -375,22 +375,22 @@ function CodeBlock({ className, children, ...props }: React.HTMLAttributes<HTMLE
 /* ─── Custom markdown components for Notion-like rendering ─────────────────── */
 
 const mdComponents: Components = {
-  h1: ({ children }) => (
-    <h1 className="mt-10 mb-4 text-[2em] font-bold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 first:mt-0">
-      {children}
-    </h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="mt-8 mb-3 text-[1.5em] font-semibold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 border-b border-neutral-200 pb-2 dark:border-zinc-700/60">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="mt-6 mb-2 text-[1.25em] font-semibold leading-snug text-neutral-900 dark:text-zinc-50">{children}</h3>
-  ),
-  h4: ({ children }) => (
-    <h4 className="mt-5 mb-2 text-[1.1em] font-semibold text-neutral-800 dark:text-zinc-100">{children}</h4>
-  ),
+  h1: ({ children }) => {
+    const id = slugify(extractText(children))
+    return <h1 id={id} className="mt-10 mb-4 text-[2em] font-bold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 first:mt-0">{children}</h1>
+  },
+  h2: ({ children }) => {
+    const id = slugify(extractText(children))
+    return <h2 id={id} className="mt-8 mb-3 text-[1.5em] font-semibold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 border-b border-neutral-200 pb-2 dark:border-zinc-700/60">{children}</h2>
+  },
+  h3: ({ children }) => {
+    const id = slugify(extractText(children))
+    return <h3 id={id} className="mt-6 mb-2 text-[1.25em] font-semibold leading-snug text-neutral-900 dark:text-zinc-50">{children}</h3>
+  },
+  h4: ({ children }) => {
+    const id = slugify(extractText(children))
+    return <h4 id={id} className="mt-5 mb-2 text-[1.1em] font-semibold text-neutral-800 dark:text-zinc-100">{children}</h4>
+  },
   p: ({ children }) => (
     <p className="my-3 text-base leading-7 text-neutral-700 dark:text-zinc-300">{children}</p>
   ),
@@ -458,6 +458,83 @@ const mdComponents: Components = {
   em: ({ children }) => <em className="italic text-neutral-600 dark:text-zinc-400">{children}</em>,
 }
 
+/* ─── Table of contents ────────────────────────────────────────────────────── */
+
+type TocItem = { level: number; text: string; id: string }
+
+function parseHeadings(md: string): TocItem[] {
+  const stripped = stripFrontmatter(md)
+  const items: TocItem[] = []
+  let inCode = false
+  for (const line of stripped.split('\n')) {
+    if (line.trimStart().startsWith('```')) { inCode = !inCode; continue }
+    if (inCode) continue
+    const m = line.match(/^(#{2,3})\s+(.+)$/)
+    if (!m) continue
+    const level = m[1].length
+    const text = m[2].replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`#]/g, '').trim()
+    if (!text) continue
+    items.push({ level, text, id: slugify(text) })
+  }
+  return items
+}
+
+function DocToc({ items, scrollRef }: {
+  items: TocItem[]
+  scrollRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [activeId, setActiveId] = useState('')
+
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container || items.length === 0) return
+    function onScroll() {
+      const cRect = container!.getBoundingClientRect()
+      let current = items[0]?.id ?? ''
+      for (const item of items) {
+        const el = document.getElementById(item.id)
+        if (!el) continue
+        if (el.getBoundingClientRect().top - cRect.top <= 80) current = item.id
+      }
+      setActiveId(current)
+    }
+    container.addEventListener('scroll', onScroll, { passive: true })
+    requestAnimationFrame(onScroll)
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [items, scrollRef])
+
+  const minLevel = Math.min(...items.map(h => h.level))
+
+  function scrollTo(id: string) {
+    const el = document.getElementById(id)
+    const container = scrollRef.current
+    if (!el || !container) return
+    const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 80
+    container.scrollTo({ top, behavior: 'smooth' })
+  }
+
+  return (
+    <nav className="text-[13px] leading-relaxed">
+      <ul className="space-y-0.5 border-l border-neutral-200 dark:border-zinc-700/60">
+        {items.map((h, i) => (
+          <li key={`${h.id}-${i}`} style={{ paddingLeft: (h.level - minLevel) * 12 }}>
+            <button
+              onClick={() => scrollTo(h.id)}
+              className={`block w-full text-left py-1 pl-3 -ml-px border-l-2 transition-colors truncate ${
+                activeId === h.id
+                  ? 'border-sky-500 text-sky-600 dark:text-sky-400 font-medium'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-300'
+              }`}
+            >
+              {h.text}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
 /* ─── Document viewer ──────────────────────────────────────────────────────── */
 
 function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onToggleSidebar }: {
@@ -472,6 +549,8 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
   const [editDesc, setEditDesc] = useState(doc.description ?? '')
   const [editIndex, setEditIndex] = useState(doc.index)
   const [editTags, setEditTags] = useState((doc.tags ?? []).join(', '))
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const tocItems = useMemo(() => parseHeadings(content), [content])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -524,16 +603,25 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             <Minimize2 className="size-3.5" /> {t('docs.exitFullscreen')}
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          <article className="mx-auto max-w-4xl px-10 py-10">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={mdComponents}
-            >
-              {stripFrontmatter(content)}
-            </ReactMarkdown>
-          </article>
+        <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+          <div className="flex justify-center">
+            <article className="w-full max-w-4xl px-10 py-10">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={mdComponents}
+              >
+                {stripFrontmatter(content)}
+              </ReactMarkdown>
+            </article>
+            {tocItems.length > 1 && (
+              <aside className="hidden xl:block w-56 shrink-0 py-10 pr-6">
+                <div className="sticky top-10">
+                  <DocToc items={tocItems} scrollRef={scrollRef} />
+                </div>
+              </aside>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -614,16 +702,25 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
       )}
 
       {/* Document body */}
-      <div className="flex-1 overflow-y-auto">
-        <article className="mx-auto max-w-5xl px-8 py-8">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={mdComponents}
-          >
-            {stripFrontmatter(content)}
-          </ReactMarkdown>
-        </article>
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+        <div className="flex justify-center">
+          <article className="w-full max-w-5xl px-8 py-8">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={mdComponents}
+            >
+              {stripFrontmatter(content)}
+            </ReactMarkdown>
+          </article>
+          {tocItems.length > 1 && (
+            <aside className="hidden xl:block w-56 shrink-0 py-8 pr-6">
+              <div className="sticky top-8">
+                <DocToc items={tocItems} scrollRef={scrollRef} />
+              </div>
+            </aside>
+          )}
+        </div>
       </div>
     </div>
   )
