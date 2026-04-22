@@ -7,7 +7,7 @@ import rehypeHighlight from 'rehype-highlight'
 import type { Components } from 'react-markdown'
 import {
   BookOpen, ChevronRight, ChevronDown, FileText, FolderOpen, Folder,
-  Maximize2, Minimize2, Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
+  ListTree, Maximize2, Minimize2, Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
   Calendar, User, Tag, FolderTree, Download, PanelLeftClose, PanelLeft,
 } from 'lucide-react'
 import { apiFetch, apiPost, apiUrl } from '../../lib/api'
@@ -458,6 +458,22 @@ const mdComponents: Components = {
   em: ({ children }) => <em className="italic text-neutral-600 dark:text-zinc-400">{children}</em>,
 }
 
+function CopyPathBtn({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      onClick={e => {
+        e.stopPropagation()
+        navigator.clipboard.writeText(path).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
+      }}
+      title={path}
+      className="rounded p-0.5 text-neutral-300 hover:text-neutral-500 dark:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
+    >
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+    </button>
+  )
+}
+
 /* ─── Table of contents ────────────────────────────────────────────────────── */
 
 type TocItem = { level: number; text: string; id: string }
@@ -532,6 +548,45 @@ function DocToc({ items, scrollRef }: {
         ))}
       </ul>
     </nav>
+  )
+}
+
+function FloatingToc({ items, scrollRef }: {
+  items: TocItem[]
+  scrollRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    function onClick(e: MouseEvent) {
+      if ((e.target as HTMLElement).closest('[data-floating-toc]')) return
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [open])
+
+  if (items.length <= 1) return null
+
+  return (
+    <div className="xl:hidden" data-floating-toc>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className={`fixed bottom-6 right-6 z-40 rounded-full p-3 shadow-lg transition-colors ${
+          open
+            ? 'bg-sky-600 text-white'
+            : 'bg-white/80 text-neutral-500 hover:bg-white hover:text-neutral-700 dark:bg-zinc-800/80 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
+        } backdrop-blur-sm border border-neutral-200/60 dark:border-zinc-700/60`}
+      >
+        <ListTree className="size-5" />
+      </button>
+      {open && (
+        <div className="fixed bottom-20 right-6 z-40 w-60 max-h-[60vh] overflow-y-auto rounded-xl border border-neutral-200/60 bg-white/85 p-4 shadow-xl backdrop-blur-md dark:border-zinc-700/60 dark:bg-zinc-900/85">
+          <DocToc items={items} scrollRef={scrollRef} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -623,6 +678,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             )}
           </div>
         </div>
+        <FloatingToc items={tocItems} scrollRef={scrollRef} />
       </div>
     )
   }
@@ -667,7 +723,10 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
 
       {/* Meta info bar */}
       <div className="flex items-center gap-5 border-b border-neutral-100 dark:border-zinc-800 px-5 py-2 text-xs text-neutral-400 dark:text-zinc-500">
-        <span className="flex items-center gap-1"><FolderTree className="size-3.5" /> {doc.index}</span>
+        <span className="flex items-center gap-1">
+          <FolderTree className="size-3.5" /> {doc.index}
+          <CopyPathBtn path={doc.filePath} />
+        </span>
         <span className="flex items-center gap-1"><User className="size-3.5" /> {doc.createdBy}</span>
         <span className="flex items-center gap-1"><Calendar className="size-3.5" /> {fmtDate(doc.createdAt)}</span>
         {doc.tags && doc.tags.length > 0 && (
@@ -722,6 +781,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
           )}
         </div>
       </div>
+      <FloatingToc items={tocItems} scrollRef={scrollRef} />
     </div>
   )
 }
