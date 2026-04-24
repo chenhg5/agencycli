@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.5.1] - 2026-04-20
+
+### Added
+
+**Knowledge base document viewer improvements**
+- Table of contents (TOC) navigation with scroll-spy and smooth scrolling
+- Floating transparent TOC overlay on small screens (avoids content obstruction)
+- Copy document relative path button
+
+**File manager module**
+- New file browser page for managing agency promotional materials (images, videos, etc.)
+- Grid/list view toggle with media thumbnails and preview
+- Drag-and-drop file upload, folder creation, and file deletion
+- Image zoom viewer and video/audio preview with native controls
+- Drag-and-drop file/folder move (including breadcrumb drop targets)
+- Copy file path button in grid, list, and preview modal
+
+**Cron job session management**
+- Session scope setting for cron jobs: "new each run" or "persistent" (matching heartbeat behavior)
+- Persistent session shows session ID with copy-command button for direct CLI resume
+- Edit and create forms include session scope selector
+
+**Documentation**
+- Competitive analysis document (HiClaw + Molecule AI comparison)
+- CubeSandbox vs Docker evaluation document
+
 ## [v0.5.0] - 2026-04-20
 
 ### Added
