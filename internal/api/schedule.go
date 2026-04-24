@@ -156,12 +156,19 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 
 func cronToJSON(c *entity.Cron) map[string]any {
 	out := map[string]any{
-		"id":       c.ID,
-		"title":    c.Title,
-		"schedule": c.Schedule,
-		"enabled":  c.Enabled,
-		"prompt":   c.Prompt,
-		"runCount": c.RunCount,
+		"id":           c.ID,
+		"title":        c.Title,
+		"schedule":     c.Schedule,
+		"enabled":      c.Enabled,
+		"prompt":       c.Prompt,
+		"runCount":     c.RunCount,
+		"sessionScope": c.SessionScope,
+	}
+	if c.SessionID != "" {
+		out["sessionId"] = c.SessionID
+	}
+	if c.SessionStartedAt != nil {
+		out["sessionStartedAt"] = c.SessionStartedAt.UTC().Format(time.RFC3339Nano)
 	}
 	if c.LastRun != nil {
 		out["lastRun"] = c.LastRun.UTC().Format(time.RFC3339Nano)
@@ -464,10 +471,11 @@ func (s *Server) handleDeleteCron(w http.ResponseWriter, r *http.Request) {
 }
 
 type postCronBody struct {
-	Title    string `json:"title"`
-	Schedule string `json:"schedule"`
-	Prompt   string `json:"prompt"`
-	Enabled  *bool  `json:"enabled"`
+	Title        string  `json:"title"`
+	Schedule     string  `json:"schedule"`
+	Prompt       string  `json:"prompt"`
+	Enabled      *bool   `json:"enabled"`
+	SessionScope *string `json:"sessionScope"`
 }
 
 func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
@@ -504,12 +512,17 @@ func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
 		enabled = *body.Enabled
 	}
 	id := fmt.Sprintf("c-%s-%s", time.Now().UTC().Format("20060102"), randomAlpha(6))
+	scope := ""
+	if body.SessionScope != nil {
+		scope = *body.SessionScope
+	}
 	c := &entity.Cron{
-		ID:       id,
-		Title:    title,
-		Schedule: schedule,
-		Enabled:  enabled,
-		Prompt:   prompt,
+		ID:           id,
+		Title:        title,
+		Schedule:     schedule,
+		Enabled:      enabled,
+		Prompt:       prompt,
+		SessionScope: scope,
 	}
 	crons = append(crons, c)
 	if err := s.ts.SaveCrons(name, agent, crons); err != nil {
@@ -562,6 +575,13 @@ func (s *Server) handlePutCron(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Enabled != nil {
 		target.Enabled = *body.Enabled
+	}
+	if body.SessionScope != nil {
+		target.SessionScope = *body.SessionScope
+		if *body.SessionScope != "persistent" {
+			target.SessionID = ""
+			target.SessionStartedAt = nil
+		}
 	}
 	if err := s.ts.SaveCrons(name, agent, crons); err != nil {
 		s.serverError(w, err)

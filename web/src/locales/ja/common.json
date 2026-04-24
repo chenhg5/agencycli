@@ -489,6 +489,8 @@
     "noCrons": "Cronジョブはまだありません。",
     "cronOn": "オン",
     "cronOff": "オフ",
+    "cronSessionNew": "毎回新規",
+    "cronSessionHint": "毎回新規：実行ごとに新しいセッションを開始。永続：実行間で同じセッションを再利用、コマンドをコピーして直接続行。",
     "editCron": "定時タスクを編集",
     "pauseCron": "一時停止",
     "resumeCron": "再開",

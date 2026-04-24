@@ -32,6 +32,7 @@ type HeartbeatRow = {
 type CronRow = {
   id: string; title: string; schedule: string; enabled: boolean; prompt: string
   lastRun?: string; lastRunStatus?: string; runCount?: number
+  sessionScope?: string; sessionId?: string; sessionStartedAt?: string
 }
 
 type SessionUsage = {
@@ -545,8 +546,8 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
   const [editing, setEditing] = useState<{ agent: string; cron: CronRow } | null>(null)
 
   const allCrons = useMemo(() => {
-    const rows: { agent: string; cron: CronRow }[] = []
-    for (const ag of agents) for (const c of ag.crons) rows.push({ agent: ag.name, cron: c })
+    const rows: { agent: string; cron: CronRow; model?: string; agentDir?: string }[] = []
+    for (const ag of agents) for (const c of ag.crons) rows.push({ agent: ag.name, cron: c, model: ag.model, agentDir: ag.agentDir })
     return rows
   }, [agents])
 
@@ -589,26 +590,41 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
 
       {allCrons.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
-          <table className="min-w-[750px] w-full">
+          <table className="min-w-[900px] w-full">
             <thead>
               <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
                 <th className={thCls}>Agent</th>
                 <th className={thCls}>{t('forms.title')}</th>
                 <th className={thCls}>{t('schedule.cronSchedule')}</th>
                 <th className={thCls}>{t('schedule.statusLabel')}</th>
+                <th className={thCls}>{t('session.scopeLabel')}</th>
+                <th className={thCls}>{t('session.sessionLabel')}</th>
                 <th className={thCls}>{t('schedule.lastRun')}</th>
                 <th className={thCls}>{t('schedule.runCountLabel')}</th>
                 <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-              {allCrons.map(({ agent, cron: c }) => (
+              {allCrons.map(({ agent, cron: c, model, agentDir }) => (
                 <tr key={`${agent}-${c.id}`} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
                   <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${agent}`} className="text-sky-700 hover:underline dark:text-sky-400">{agent}</Link></td>
                   <td className={tdCls}>{c.title}</td>
                   <td className={cn(tdCls, 'font-mono')}>{c.schedule}</td>
                   <td className={tdCls}>
                     {c.enabled ? <StatusBadge color="emerald">{t('schedule.cronOn')}</StatusBadge> : <StatusBadge color="neutral">{t('schedule.cronOff')}</StatusBadge>}
+                  </td>
+                  <td className={tdCls}>
+                    {c.sessionScope === 'persistent'
+                      ? <StatusBadge color="violet">{t('session.scopePersistent')}</StatusBadge>
+                      : <StatusBadge color="neutral">{t('schedule.cronSessionNew')}</StatusBadge>}
+                  </td>
+                  <td className={tdCls}>
+                    {c.sessionScope === 'persistent' && c.sessionId ? (
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={c.sessionId}>{c.sessionId.slice(0, 12)}…</span>
+                        <CopySessionCmd model={model} sessionId={c.sessionId} agentDir={agentDir} />
+                      </div>
+                    ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
                   </td>
                   <td className={tdCls}>{c.lastRun ? fmt(c.lastRun) : '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>{c.runCount ?? 0}</td>
@@ -691,6 +707,7 @@ function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId
   const [title, setTitle] = useState(cron.title)
   const [schedule, setSchedule] = useState(cron.schedule)
   const [prompt, setPrompt] = useState(cron.prompt)
+  const [sessionScope, setSessionScope] = useState(cron.sessionScope || 'new')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -699,6 +716,7 @@ function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId
     try {
       await apiPut(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons/${encodeURIComponent(cron.id)}`, {
         title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim(),
+        sessionScope,
       })
       onSaved()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
@@ -722,6 +740,22 @@ function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId
           <Field label={t('forms.prompt')}>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className={fieldCls} />
           </Field>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-800/30">
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-zinc-400">{t('session.sessionLabel')}</p>
+            <Field label={t('session.scopeLabel')}>
+              <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={fieldCls}>
+                <option value="new">{t('schedule.cronSessionNew')}</option>
+                <option value="persistent">{t('session.scopePersistent')}</option>
+              </select>
+              <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
+            </Field>
+            {cron.sessionScope === 'persistent' && cron.sessionId && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500 dark:text-zinc-500">
+                <span>{t('session.sessionIdLabel')}:</span>
+                <span className="font-mono text-emerald-700 dark:text-emerald-400">{cron.sessionId.slice(0, 16)}…</span>
+              </div>
+            )}
+          </div>
         </div>
         {err && <p className="px-5 pb-2 text-sm text-red-600 dark:text-red-400">{err}</p>}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-zinc-700">
@@ -739,13 +773,17 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
   const [title, setTitle] = useState('')
   const [schedule, setSchedule] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [sessionScope, setSessionScope] = useState('new')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   async function create() {
     setErr(null); setBusy(true)
     try {
-      await apiPost(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons`, { title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim() })
+      await apiPost(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons`, {
+        title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim(),
+        sessionScope,
+      })
       onCreated()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
@@ -772,6 +810,14 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
       <div className="mt-3">
         <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('forms.prompt')}</span>
         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} className={fieldCls} />
+      </div>
+      <div className="mt-3">
+        <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('session.scopeLabel')}</span>
+        <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={selectCls + ' w-full'}>
+          <option value="new">{t('schedule.cronSessionNew')}</option>
+          <option value="persistent">{t('session.scopePersistent')}</option>
+        </select>
+        <p className="mt-1 text-[11px] text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
       </div>
       {err && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{err}</p>}
       <div className="mt-3 flex gap-2">

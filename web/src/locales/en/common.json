@@ -489,6 +489,8 @@
     "noCrons": "No cron jobs configured yet.",
     "cronOn": "On",
     "cronOff": "Off",
+    "cronSessionNew": "New each run",
+    "cronSessionHint": "New each run: starts a fresh session per execution. Persistent: reuse the same session across runs, copy the command to continue directly.",
     "editCron": "Edit cron job",
     "pauseCron": "Pause",
     "resumeCron": "Resume",

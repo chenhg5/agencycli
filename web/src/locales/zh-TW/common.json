@@ -489,6 +489,8 @@
     "noCrons": "暫無定時任務。",
     "cronOn": "開",
     "cronOff": "關",
+    "cronSessionNew": "每次新建",
+    "cronSessionHint": "每次新建：每次執行啟動新會話。持久：跨執行復用同一會話，可複製命令直接繼續。",
     "editCron": "編輯定時任務",
     "pauseCron": "暫停",
     "resumeCron": "恢復",

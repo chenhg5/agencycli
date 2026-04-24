@@ -774,6 +774,16 @@ type Cron struct {
 	Enabled  bool   `yaml:"enabled"`
 	Prompt   string `yaml:"prompt"`
 
+	// SessionScope controls whether each cron run starts a fresh session
+	// or continues in the same persistent session.
+	//   "new"        — each execution starts a new session (default)
+	//   "persistent" — reuse the same session across executions
+	SessionScope string `yaml:"session_scope,omitempty"`
+
+	// SessionID is the current session ID when SessionScope is "persistent".
+	SessionID        string     `yaml:"session_id,omitempty"`
+	SessionStartedAt *time.Time `yaml:"session_started_at,omitempty"`
+
 	LastRun       *time.Time `yaml:"last_run,omitempty"`
 	LastRunStatus string     `yaml:"last_run_status,omitempty"`
 	RunCount      int        `yaml:"run_count,omitempty"`
