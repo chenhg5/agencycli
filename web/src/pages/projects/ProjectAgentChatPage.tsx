@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Maximize2, Minimize2, RefreshCw, Send, Sparkles, Square } from 'lucide-react'
+import { Edit3, Maximize2, Minimize2, RefreshCw, Send, Sparkles, Square } from 'lucide-react'
 import { ConversationLog } from '../../components/ui/ConversationLog'
 import { apiFetch, apiUrl } from '../../lib/api'
 import { getStoredToken } from '../../lib/auth'
@@ -52,6 +52,8 @@ export default function ProjectAgentChatPage() {
   const [focusMode, setFocusMode] = useState(false)
   const [agentContext, setAgentContext] = useState<AgentContext | null>(null)
   const [providers, setProviders] = useState<ProviderOption[]>([])
+  const [sessionEditorOpen, setSessionEditorOpen] = useState(false)
+  const [sessionDraft, setSessionDraft] = useState(initialSessionId)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -70,6 +72,7 @@ export default function ProjectAgentChatPage() {
     try {
       const data = await apiFetch<HistoryResp>(path)
       setSessionId(data.sessionId ?? sid)
+      setSessionDraft(data.sessionId ?? sid)
       setContent(data.content ?? '')
       setHistoryTruncated(Boolean(data.truncated))
     } catch (e) {
@@ -203,11 +206,20 @@ export default function ProjectAgentChatPage() {
   function startFresh() {
     abortRef.current?.abort()
     setSessionId('')
+    setSessionDraft('')
     setContent('')
     setError(null)
     setFreshNext(true)
     resetTextareaHeight(inputRef.current)
     inputRef.current?.focus()
+  }
+
+  function switchSession() {
+    const next = sessionDraft.trim()
+    setSessionEditorOpen(false)
+    setFreshNext(false)
+    setSessionId(next)
+    void loadHistory(next)
   }
 
   if (!projectId || !agentName) return null
@@ -255,6 +267,15 @@ export default function ProjectAgentChatPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => { setSessionDraft(sessionId); setSessionEditorOpen(true) }}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              <Edit3 className="size-3.5" strokeWidth={1.8} />
+              {t('agentChat.switchSession')}
+            </button>
+            <button
+              type="button"
               onClick={() => void loadHistory(sessionId)}
               disabled={historyLoading || loading}
               className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -283,6 +304,43 @@ export default function ProjectAgentChatPage() {
         </div>
         {historyTruncated && (
           <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{t('agentChat.historyTruncated')}</p>
+        )}
+        {sessionEditorOpen && (
+          <div className="mt-3 rounded-xl border border-sky-200/70 bg-sky-50/40 p-3 dark:border-sky-800/50 dark:bg-sky-950/20">
+            <label className="block text-xs font-medium text-sky-800 dark:text-sky-300">
+              {t('agentChat.sessionIdLabel')}
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                autoFocus
+                value={sessionDraft}
+                onChange={(e) => setSessionDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') switchSession()
+                  if (e.key === 'Escape') setSessionEditorOpen(false)
+                }}
+                placeholder={t('agentChat.sessionIdPlaceholder')}
+                className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-3 py-2 font-mono text-sm text-neutral-800 outline-none focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={switchSession}
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700"
+                >
+                  {t('agentChat.switchSessionConfirm')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionEditorOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  {t('forms.cancel')}
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-sky-700/80 dark:text-sky-300/80">{t('agentChat.sessionSwitchHint')}</p>
+          </div>
         )}
         {error && (
           <p className="mt-2 text-xs text-red-500 dark:text-red-400">{error}</p>

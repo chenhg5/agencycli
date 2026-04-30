@@ -589,6 +589,11 @@
     "exitFocus": "Exit focus",
     "modelLabel": "Model",
     "modelUnknown": "Not configured",
+    "switchSession": "Switch Session",
+    "sessionIdLabel": "Session ID",
+    "sessionIdPlaceholder": "Paste an external or existing Session ID",
+    "switchSessionConfirm": "Switch",
+    "sessionSwitchHint": "Paste a Session ID created in another terminal or tool; the next message will resume that session.",
     "stopped": "Stopped",
     "error": "Chat execution failed"
   },

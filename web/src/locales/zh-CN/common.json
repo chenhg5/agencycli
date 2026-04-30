@@ -589,6 +589,11 @@
     "exitFocus": "退出专注",
     "modelLabel": "模型",
     "modelUnknown": "未配置",
+    "switchSession": "切换 Session",
+    "sessionIdLabel": "Session ID",
+    "sessionIdPlaceholder": "输入外部或已有 Session ID",
+    "switchSessionConfirm": "切换",
+    "sessionSwitchHint": "可以粘贴在其他终端或工具里产生的 Session ID；发送下一条消息时会用该 Session 继续。",
     "stopped": "已停止",
     "error": "对话执行失败"
   },
