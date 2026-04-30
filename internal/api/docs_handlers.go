@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,7 +145,45 @@ func (s *Server) handleDocsAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(entry)
+	_ = json.NewEncoder(w).Encode(docsEntryResponse(r, entry))
+}
+
+func docsWebPath(docID string) string {
+	return "/docs/" + url.PathEscape(docID)
+}
+
+func docsEntryResponse(r *http.Request, entry *store.DocEntry) map[string]any {
+	webPath := docsWebPath(entry.ID)
+	out := map[string]any{
+		"id":          entry.ID,
+		"title":       entry.Title,
+		"filePath":    entry.FilePath,
+		"index":       entry.Index,
+		"createdBy":   entry.CreatedBy,
+		"tags":        entry.Tags,
+		"description": entry.Description,
+		"createdAt":   entry.CreatedAt,
+		"updatedAt":   entry.UpdatedAt,
+		"webPath":     webPath,
+		"webUrl":      requestBaseURL(r) + webPath,
+	}
+	return out
+}
+
+func requestBaseURL(r *http.Request) string {
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	return scheme + "://" + host
 }
 
 type docsUpdateBody struct {

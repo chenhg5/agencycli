@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,6 +88,10 @@ Virtual directories in --index are created automatically.`,
 			}
 			fmt.Printf("✓ Document added: %s [%s]\n", entry.ID, index)
 			fmt.Printf("  Title: %s\n  Path:  %s\n", title, absPath)
+			fmt.Printf("  Web:   %s\n", docsWebPath(entry.ID))
+			if webURL := docsWebURL(entry.ID); webURL != "" {
+				fmt.Printf("  URL:   %s\n", webURL)
+			}
 			return nil
 		},
 	}
@@ -99,6 +104,18 @@ Virtual directories in --index are created automatically.`,
 	return cmd
 }
 
+func docsWebPath(docID string) string {
+	return "/docs/" + url.PathEscape(docID)
+}
+
+func docsWebURL(docID string) string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("AGENCYCLI_WEB_BASE_URL")), "/")
+	if base == "" {
+		return ""
+	}
+	return base + docsWebPath(docID)
+}
+
 func newDocsListCmd() *cobra.Command {
 	var (
 		index     string
@@ -107,8 +124,8 @@ func newDocsListCmd() *cobra.Command {
 		asJSON    bool
 	)
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all indexed documents",
+		Use:     "list",
+		Short:   "List all indexed documents",
 		Aliases: []string{"ls"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -375,4 +392,3 @@ func printTree(n *store.TreeNode, prefix string) {
 		fmt.Printf("%s📄 %s  (%s)\n", prefix, d.Title, d.ID)
 	}
 }
-
