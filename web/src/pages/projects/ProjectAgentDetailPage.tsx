@@ -5,7 +5,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   RefreshCw, Save, ChevronRight, Bot, BookOpen, Puzzle, Check, Plus, Trash2, X,
-  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff, Container, AlertTriangle, ShieldCheck, CircleX,
+  Settings2, Users, UserCog, FileCode, Clock, Activity, User, Mail, ListTodo, Reply, Send, KeyRound, Pencil, Eye, EyeOff, Container, AlertTriangle, ShieldCheck, CircleX, MessageSquareText,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -319,6 +319,13 @@ function SessionPanel({ project, agentName }: { project: string; agentName: stri
         <span className="text-neutral-500 dark:text-zinc-500">{t('session.scopeLabel')}: <span className="font-medium text-neutral-700 dark:text-zinc-300">{info.sessionScope === 'task' ? t('session.scopeTask') : t('session.scopeCycle')}</span></span>
 
         <div className="flex items-center gap-2">
+          <Link
+            to={`/projects/${encodeURIComponent(project)}/members/${encodeURIComponent(agentName)}/chat${hasSession ? `?sessionId=${encodeURIComponent(info.sessionId!)}` : ''}`}
+            className="flex items-center gap-1 rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400"
+          >
+            <MessageSquareText className="size-3.5" strokeWidth={2} />
+            {t('agentChat.openChat')}
+          </Link>
           {hasSession && (
             <button type="button" onClick={() => void doReset()} disabled={resetting}
               className="cursor-pointer rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">

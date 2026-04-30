@@ -64,6 +64,13 @@
   "notifications": {
     "aria": "通知"
   },
+  "pageTabs": {
+    "addQuickLink": "收藏到快速連結",
+    "rename": "臨時改名",
+    "renamePrompt": "輸入新的標籤名",
+    "resetName": "恢復原名",
+    "closeOthers": "關閉其他標籤頁"
+  },
   "theme": {
     "light": "淺色",
     "dark": "深色",
@@ -254,6 +261,10 @@
     "subtitle": "你的待辦事項：來自各專案 Agent 的訊息與需要處理的任務，集中在此統一操作。",
     "tabMessages": "訊息",
     "tabTasks": "任務",
+    "tabQuickLinks": "快速連結",
+    "quickLinksEmpty": "暫無快速連結",
+    "quickLinksHint": "右鍵頂部標籤頁，選擇「收藏到快速連結」，下次可從這裡快速跳轉。",
+    "quickLinkRemove": "移除快速連結",
     "emptyMessages": "暫無訊息",
     "emptyMessagesHint": "當 Agent 給你（human）發訊息時，會出現在這裡。",
     "emptyTasks": "暫無任務",
@@ -563,6 +574,23 @@
     "promptOptional": "（可選）",
     "promptPlaceholder": "輸入給 Agent 的指令 / Prompt…",
     "promptHint": "如果填寫了 Prompt，會先建立任務再立即執行。留空則執行下一個待處理任務。"
+  },
+  "agentChat": {
+    "title": "Agent 對話",
+    "openChat": "對話",
+    "reloadHistory": "重載歷史",
+    "newSession": "新會話",
+    "historyTruncated": "歷史日誌過長，已截斷顯示。",
+    "empty": "還沒有可顯示的會話內容。",
+    "emptyHint": "輸入訊息後會透過目前 Agent 的 CLI 和 Session 繼續對話。",
+    "placeholder": "輸入要對 Agent 說的話…",
+    "sendHint": "Enter 送出，Shift+Enter 換行。目前實作會重用 agent 執行日誌顯示。",
+    "focusMode": "專注模式",
+    "exitFocus": "退出專注",
+    "modelLabel": "模型",
+    "modelUnknown": "未配置",
+    "stopped": "已停止",
+    "error": "對話執行失敗"
   },
   "context": {
     "runs": "執行次數"

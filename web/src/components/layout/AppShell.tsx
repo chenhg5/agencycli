@@ -28,6 +28,18 @@ function useBreadcrumbs(): BreadcrumbSegment[] {
   const pseg = projectNavKeyFromPath(pathname)
 
   // Check for agent detail page: /projects/:id/members/:agentName
+  const agentChatMatch = /^\/projects\/[^/]+\/members\/([^/]+)\/chat$/.exec(pathname)
+  if (pid && agentChatMatch) {
+    const agentName = decodeURIComponent(agentChatMatch[1])
+    return [
+      { label: t('nav.projects'), to: '/projects' },
+      { label: pid, to: `/projects/${encodeURIComponent(pid)}/tasks` },
+      { label: t('projectNav.members'), to: `/projects/${encodeURIComponent(pid)}/members` },
+      { label: agentName, to: `/projects/${encodeURIComponent(pid)}/members/${encodeURIComponent(agentName)}` },
+      { label: t('agentChat.title') },
+    ]
+  }
+
   const agentMatch = /^\/projects\/[^/]+\/members\/([^/]+)$/.exec(pathname)
   if (pid && agentMatch) {
     const agentName = decodeURIComponent(agentMatch[1])

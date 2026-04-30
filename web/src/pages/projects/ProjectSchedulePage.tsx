@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   CalendarClock, ClipboardCopy, Heart, Pause, Pencil, Play, Plus, Power,
-  Trash2, X, Zap,
+  MessageSquareText, Trash2, X, Zap,
 } from 'lucide-react'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
@@ -1038,6 +1038,13 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                             {hb.sessionStartedAt && <span className="text-[11px] text-neutral-400 dark:text-zinc-500">{fmt(hb.sessionStartedAt)}</span>}
                           </div>
                           <CopySessionCmd model={ag.model} sessionId={hb.sessionId!} agentDir={ag.agentDir} />
+                          <Link
+                            to={`/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(ag.name)}/chat?sessionId=${encodeURIComponent(hb.sessionId!)}`}
+                            title={t('agentChat.openChat')}
+                            className="shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-sky-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-sky-400"
+                          >
+                            <MessageSquareText className="size-3.5" strokeWidth={2} />
+                          </Link>
                         </div>
                         {ag.sessionUsage && ag.sessionUsage.runCount > 0 && (
                           <ContextUsageBar usage={ag.sessionUsage} />

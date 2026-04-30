@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   KanbanSquare,
   LayoutGrid,
+  Link as LinkIcon,
   List,
   ListTodo,
   Mail,
@@ -16,6 +17,7 @@ import {
   Reply,
   Send,
   Square,
+  Star,
   Trash2,
   X,
 } from 'lucide-react'
@@ -32,6 +34,7 @@ import { CreateTaskDialog } from '../components/project/CreateTaskDialog'
 import { RunAgentDialog } from '../components/project/RunAgentDialog'
 import { Pagination } from '../components/ui/Pagination'
 import { TaskKanban } from '../components/task/TaskKanban'
+import { getQuickLinks, removeQuickLink, type QuickLink } from '../lib/quick-links'
 import {
   EditTaskModal,
   TaskDetailModal,
@@ -66,7 +69,7 @@ function useProjectsAgents() {
   return data
 }
 
-type Tab = 'overview' | 'messages' | 'tasks'
+type Tab = 'overview' | 'quickLinks' | 'messages' | 'tasks'
 
 type MessageRow = MessageDetailModel
 
@@ -947,6 +950,76 @@ function OverviewPanel() {
   )
 }
 
+/* ── Quick links panel ─────────────────────────────────────────────────────── */
+
+function QuickLinksPanel({ onChanged }: { onChanged: () => void }) {
+  const { t } = useTranslation()
+  const [links, setLinks] = useState<QuickLink[]>(() => getQuickLinks())
+
+  const reload = useCallback(() => {
+    setLinks(getQuickLinks())
+    onChanged()
+  }, [onChanged])
+
+  useEffect(() => {
+    window.addEventListener('quick-links-changed', reload)
+    window.addEventListener('storage', reload)
+    return () => {
+      window.removeEventListener('quick-links-changed', reload)
+      window.removeEventListener('storage', reload)
+    }
+  }, [reload])
+
+  function remove(path: string) {
+    removeQuickLink(path)
+    reload()
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {links.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-zinc-800/50">
+              <Star className="size-7 text-neutral-400 dark:text-zinc-500" strokeWidth={1.5} />
+            </div>
+            <p className="text-lg font-medium text-neutral-600 dark:text-zinc-400">{t('workbench.quickLinksEmpty')}</p>
+            <p className="mt-1.5 text-sm text-neutral-400 dark:text-zinc-500">{t('workbench.quickLinksHint')}</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {links.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className="group rounded-xl border border-neutral-200/80 bg-white p-4 transition-all hover:border-sky-200 hover:bg-sky-50/30 hover:shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900/40 dark:hover:border-sky-900/50 dark:hover:bg-sky-900/10"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100/70 dark:bg-sky-900/30">
+                    <LinkIcon className="size-4 text-sky-600 dark:text-sky-400" strokeWidth={1.8} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-neutral-900 dark:text-zinc-100">{link.title}</p>
+                    <p className="mt-1 truncate font-mono text-xs text-neutral-400 dark:text-zinc-500">{link.path}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); remove(link.path) }}
+                    className="rounded-md p-1 text-neutral-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-zinc-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                    title={t('workbench.quickLinkRemove')}
+                  >
+                    <Trash2 className="size-3.5" strokeWidth={1.8} />
+                  </button>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Tab component (Plane-style) ──────────────────────────────────────────── */
 
 function TabButton({
@@ -988,12 +1061,23 @@ export default function WorkbenchPage() {
   const [tab, setTab] = useState<Tab>('overview')
   const projectsAgents = useProjectsAgents()
   const [badgeKey, setBadgeKey] = useState(0)
+  const [, setQuickLinksVersion] = useState(0)
 
   const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?direction=inbox&read=unread', badgeKey)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
   const taskCount = useApiJson<TaskRow[]>('/api/v1/workbench/tasks?status=pending', badgeKey)
   const pendingTasks = taskCount.status === 'ok' ? taskCount.data.length : 0
   const refreshBadge = useCallback(() => setBadgeKey((k) => k + 1), [])
+  const refreshQuickLinks = useCallback(() => setQuickLinksVersion((v) => v + 1), [])
+
+  useEffect(() => {
+    window.addEventListener('quick-links-changed', refreshQuickLinks)
+    window.addEventListener('storage', refreshQuickLinks)
+    return () => {
+      window.removeEventListener('quick-links-changed', refreshQuickLinks)
+      window.removeEventListener('storage', refreshQuickLinks)
+    }
+  }, [refreshQuickLinks])
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -1014,6 +1098,10 @@ export default function WorkbenchPage() {
             <LayoutGrid className="size-4" strokeWidth={1.8} />
             {t('workbench.tabOverview')}
           </TabButton>
+          <TabButton active={tab === 'quickLinks'} onClick={() => setTab('quickLinks')}>
+            <Star className="size-4" strokeWidth={1.8} />
+            {t('workbench.tabQuickLinks')}
+          </TabButton>
           <TabButton active={tab === 'messages'} onClick={() => setTab('messages')} badge={unreadMsgs}>
             <MessageSquare className="size-4" strokeWidth={1.8} />
             {t('workbench.tabMessages')}
@@ -1027,6 +1115,7 @@ export default function WorkbenchPage() {
 
       {/* Panel */}
       {tab === 'overview' && <OverviewPanel />}
+      {tab === 'quickLinks' && <QuickLinksPanel onChanged={refreshQuickLinks} />}
       {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} onMutated={refreshBadge} />}
       {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} />}
     </div>

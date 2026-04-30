@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Globe, LogOut, Monitor, Moon, PanelLeft, Search, Settings, Sun, X } from 'lucide-react'
+import { Globe, LogOut, Monitor, Moon, PanelLeft, Pencil, RotateCcw, Search, Settings, SidebarClose, Star, Sun, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { i18n } from '../../i18n'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../theme/ThemeProvider'
 import { usePageTabs } from '../../lib/page-tabs'
+import { addQuickLink } from '../../lib/quick-links'
 import { cn } from '../../lib/cn'
 
 const iconBtn =
@@ -130,15 +131,36 @@ function UserMenu() {
 }
 
 function PageTabBar() {
-  const { tabs, activePath, close, reorder } = usePageTabs()
+  const { tabs, activePath, close, closeOthers, reorder, rename, resetTitle } = usePageTabs()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
   const dragIdx = useRef<number | null>(null)
   const [dropIdx, setDropIdx] = useState<number | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string; title: string; renamed?: boolean } | null>(null)
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (scrollRef.current) scrollRef.current.scrollLeft += e.deltaY
   }, [])
+
+  useEffect(() => {
+    if (!menu) return
+    const closeMenu = () => setMenu(null)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu() }
+    document.addEventListener('mousedown', closeMenu)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', closeMenu)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menu])
+
+  function handleRename(path: string, currentTitle: string) {
+    const next = window.prompt(t('pageTabs.renamePrompt'), currentTitle)
+    if (next == null) return
+    rename(path, next)
+    setMenu(null)
+  }
 
   if (tabs.length === 0) return null
 
@@ -175,6 +197,11 @@ function PageTabBar() {
               setDropIdx(null)
             }}
             onDragEnd={() => { dragIdx.current = null; setDropIdx(null) }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setMenu({ x: e.clientX, y: e.clientY, path: tab.path, title: tab.title, renamed: tab.renamed })
+            }}
             className={cn(
               'group relative flex max-w-[180px] shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] font-medium transition-colors select-none',
               isActive
@@ -201,6 +228,49 @@ function PageTabBar() {
           </div>
         )
       })}
+      {menu && (
+        <div
+          className="fixed z-[90] w-48 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-800"
+          style={{ left: menu.x, top: menu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => { addQuickLink({ path: menu.path, title: menu.title }); setMenu(null) }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <Star className="size-3.5" strokeWidth={1.8} />
+            {t('pageTabs.addQuickLink')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRename(menu.path, menu.title)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <Pencil className="size-3.5" strokeWidth={1.8} />
+            {t('pageTabs.rename')}
+          </button>
+          {menu.renamed && (
+            <button
+              type="button"
+              onClick={() => { resetTitle(menu.path); setMenu(null) }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              <RotateCcw className="size-3.5" strokeWidth={1.8} />
+              {t('pageTabs.resetName')}
+            </button>
+          )}
+          <div className="my-1 border-t border-neutral-100 dark:border-zinc-700" />
+          <button
+            type="button"
+            onClick={() => { closeOthers(menu.path); setMenu(null) }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <SidebarClose className="size-3.5" strokeWidth={1.8} />
+            {t('pageTabs.closeOthers')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

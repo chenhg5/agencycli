@@ -64,6 +64,13 @@
   "notifications": {
     "aria": "Notifications"
   },
+  "pageTabs": {
+    "addQuickLink": "Add to quick links",
+    "rename": "Rename temporarily",
+    "renamePrompt": "Enter a new tab name",
+    "resetName": "Reset name",
+    "closeOthers": "Close other tabs"
+  },
   "theme": {
     "light": "Light",
     "dark": "Dark",
@@ -254,6 +261,10 @@
     "subtitle": "Your action items: messages from agents across projects and tasks that need your attention, all in one place.",
     "tabMessages": "Messages",
     "tabTasks": "Tasks",
+    "tabQuickLinks": "Quick links",
+    "quickLinksEmpty": "No quick links yet",
+    "quickLinksHint": "Right-click a top tab and choose \"Add to quick links\" to jump back here later.",
+    "quickLinkRemove": "Remove quick link",
     "emptyMessages": "No messages",
     "emptyMessagesHint": "Messages from agents to you (human) will appear here.",
     "emptyTasks": "No tasks",
@@ -563,6 +574,23 @@
     "promptOptional": "(optional)",
     "promptPlaceholder": "Enter the prompt / instructions for the agent…",
     "promptHint": "If provided, a task will be created and run immediately. If left empty, the next pending task will be executed."
+  },
+  "agentChat": {
+    "title": "Agent Chat",
+    "openChat": "Chat",
+    "reloadHistory": "Reload history",
+    "newSession": "New session",
+    "historyTruncated": "History logs are too large and were truncated.",
+    "empty": "No session content to show yet.",
+    "emptyHint": "Send a message to continue through the current agent CLI and session.",
+    "placeholder": "Message the agent…",
+    "sendHint": "Enter to send, Shift+Enter for a newline. This first version reuses agent run logs.",
+    "focusMode": "Focus mode",
+    "exitFocus": "Exit focus",
+    "modelLabel": "Model",
+    "modelUnknown": "Not configured",
+    "stopped": "Stopped",
+    "error": "Chat execution failed"
   },
   "context": {
     "runs": "Runs"

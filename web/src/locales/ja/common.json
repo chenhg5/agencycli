@@ -64,6 +64,13 @@
   "notifications": {
     "aria": "通知"
   },
+  "pageTabs": {
+    "addQuickLink": "クイックリンクに追加",
+    "rename": "一時的に名前変更",
+    "renamePrompt": "新しいタブ名を入力",
+    "resetName": "元の名前に戻す",
+    "closeOthers": "他のタブを閉じる"
+  },
   "theme": {
     "light": "ライト",
     "dark": "ダーク",
@@ -254,6 +261,10 @@
     "subtitle": "あなたの ToDo：各プロジェクトのエージェントからのメッセージと対応が必要なタスクを、ここでまとめて操作できます。",
     "tabMessages": "メッセージ",
     "tabTasks": "タスク",
+    "tabQuickLinks": "クイックリンク",
+    "quickLinksEmpty": "クイックリンクはありません",
+    "quickLinksHint": "上部タブを右クリックして「クイックリンクに追加」を選ぶと、次回ここから素早く移動できます。",
+    "quickLinkRemove": "クイックリンクを削除",
     "emptyMessages": "メッセージはありません",
     "emptyMessagesHint": "エージェントがあなた（human）にメッセージを送ると、ここに表示されます。",
     "emptyTasks": "タスクはありません",
@@ -563,6 +574,23 @@
     "promptOptional": "（任意）",
     "promptPlaceholder": "エージェントへの指示 / プロンプトを入力…",
     "promptHint": "プロンプトを入力するとタスクを作成して即時実行します。空欄の場合は次の保留タスクを実行します。"
+  },
+  "agentChat": {
+    "title": "Agent チャット",
+    "openChat": "チャット",
+    "reloadHistory": "履歴を再読み込み",
+    "newSession": "新しいセッション",
+    "historyTruncated": "履歴ログが大きいため、表示を省略しました。",
+    "empty": "表示できるセッション内容はまだありません。",
+    "emptyHint": "メッセージを送ると、現在の Agent CLI と Session で会話を続けます。",
+    "placeholder": "Agent に送るメッセージ…",
+    "sendHint": "Enter で送信、Shift+Enter で改行。初版では agent 実行ログ表示を再利用します。",
+    "focusMode": "集中モード",
+    "exitFocus": "集中を終了",
+    "modelLabel": "モデル",
+    "modelUnknown": "未設定",
+    "stopped": "停止しました",
+    "error": "チャット実行に失敗しました"
   },
   "context": {
     "runs": "実行回数"

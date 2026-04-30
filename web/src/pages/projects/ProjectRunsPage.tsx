@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, FileText, RefreshCw, StopCircle, X } from 'lucide-react'
+import { BarChart3, FileText, MessageSquareText, RefreshCw, StopCircle, X } from 'lucide-react'
 import { Pagination } from '../../components/ui/Pagination'
 import { PlaceholderCard } from '../../components/ui/PlaceholderCard'
 import { ConversationLog } from '../../components/ui/ConversationLog'
@@ -463,7 +463,16 @@ function RunDetailModal({ run, onClose }: { run: RunRow; onClose: () => void }) 
           {run.sessionId && (
             <div>
               <span className="text-xs font-medium text-neutral-400 dark:text-zinc-500">{t('runs.sessionLabel')}</span>
-              <p className="font-mono text-xs text-neutral-700 dark:text-zinc-300" title={run.sessionId}>{run.sessionId.length > 20 ? run.sessionId.slice(0, 20) + '…' : run.sessionId}</p>
+              <div className="mt-0.5 flex items-center gap-2">
+                <p className="font-mono text-xs text-neutral-700 dark:text-zinc-300" title={run.sessionId}>{run.sessionId.length > 20 ? run.sessionId.slice(0, 20) + '…' : run.sessionId}</p>
+                <Link
+                  to={`/projects/${encodeURIComponent(run.project)}/members/${encodeURIComponent(run.agent)}/chat?sessionId=${encodeURIComponent(run.sessionId)}`}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/20"
+                >
+                  <MessageSquareText className="size-3" strokeWidth={2} />
+                  {t('agentChat.openChat')}
+                </Link>
+              </div>
             </div>
           )}
           <div>

@@ -12,6 +12,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 export type PageTab = {
   path: string
   title: string
+  originalTitle?: string
+  renamed?: boolean
 }
 
 type PageTabsContextValue = {
@@ -21,6 +23,8 @@ type PageTabsContextValue = {
   closeOthers: (path: string) => void
   closeAll: () => void
   reorder: (fromIndex: number, toIndex: number) => void
+  rename: (path: string, title: string) => void
+  resetTitle: (path: string) => void
 }
 
 const Ctx = createContext<PageTabsContextValue>({
@@ -30,6 +34,8 @@ const Ctx = createContext<PageTabsContextValue>({
   closeOthers: () => {},
   closeAll: () => {},
   reorder: () => {},
+  rename: () => {},
+  resetTitle: () => {},
 })
 
 const STORAGE_KEY = 'page-tabs'
@@ -61,14 +67,19 @@ export function PageTabsProvider({ children, pageTitle }: { children: ReactNode;
       setTabs((prev) => {
         const idx = prev.findIndex((t) => t.path === path)
         if (idx >= 0) {
+          if (prev[idx].renamed) {
+            const next = [...prev]
+            next[idx] = { ...next[idx], originalTitle: title }
+            return next
+          }
           if (prev[idx].title !== title) {
             const next = [...prev]
-            next[idx] = { ...next[idx], title }
+            next[idx] = { ...next[idx], title, originalTitle: title }
             return next
           }
           return prev
         }
-        const next = [...prev, { path, title }]
+        const next = [...prev, { path, title, originalTitle: title }]
         if (next.length > MAX_TABS) next.shift()
         return next
       })
@@ -119,9 +130,23 @@ export function PageTabsProvider({ children, pageTitle }: { children: ReactNode;
     })
   }, [])
 
+  const rename = useCallback((path: string, title: string) => {
+    const nextTitle = title.trim()
+    if (!nextTitle) return
+    setTabs((prev) => prev.map((tab) => (
+      tab.path === path ? { ...tab, title: nextTitle, renamed: true } : tab
+    )))
+  }, [])
+
+  const resetTitle = useCallback((path: string) => {
+    setTabs((prev) => prev.map((tab) => (
+      tab.path === path ? { ...tab, title: tab.originalTitle || tab.title, renamed: false } : tab
+    )))
+  }, [])
+
   const value = useMemo<PageTabsContextValue>(
-    () => ({ tabs, activePath: pathname, close, closeOthers, closeAll, reorder }),
-    [tabs, pathname, close, closeOthers, closeAll, reorder],
+    () => ({ tabs, activePath: pathname, close, closeOthers, closeAll, reorder, rename, resetTitle }),
+    [tabs, pathname, close, closeOthers, closeAll, reorder, rename, resetTitle],
   )
 
   return (

@@ -9,6 +9,7 @@ import SettingsPage from './pages/SettingsPage'
 import SkillsPage from './pages/SkillsPage'
 import { ProjectBranch } from './pages/projects/ProjectBranch'
 import ProjectAgentDetailPage from './pages/projects/ProjectAgentDetailPage'
+import ProjectAgentChatPage from './pages/projects/ProjectAgentChatPage'
 import ProjectMembersPage from './pages/projects/ProjectMembersPage'
 import ProjectMessagesPage from './pages/projects/ProjectMessagesPage'
 import ProjectRunsPage from './pages/projects/ProjectRunsPage'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="milestones" element={<ProjectMilestonePage />} />
           <Route path="messages" element={<ProjectMessagesPage />} />
           <Route path="members" element={<ProjectMembersPage />} />
+          <Route path="members/:agentName/chat" element={<ProjectAgentChatPage />} />
           <Route path="members/:agentName" element={<ProjectAgentDetailPage />} />
           {isAdmin && <Route path="schedule" element={<ProjectSchedulePage />} />}
           <Route path="runs" element={<ProjectRunsPage />} />
