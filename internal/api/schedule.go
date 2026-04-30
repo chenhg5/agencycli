@@ -163,6 +163,7 @@ func cronToJSON(c *entity.Cron) map[string]any {
 		"prompt":       c.Prompt,
 		"runCount":     c.RunCount,
 		"sessionScope": c.SessionScope,
+		"jitter":       c.Jitter,
 	}
 	if c.SessionID != "" {
 		out["sessionId"] = c.SessionID
@@ -476,6 +477,8 @@ type postCronBody struct {
 	Prompt       string  `json:"prompt"`
 	Enabled      *bool   `json:"enabled"`
 	SessionScope *string `json:"sessionScope"`
+	Jitter       *string `json:"jitter"`
+	SessionID    *string `json:"sessionId"`
 }
 
 func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
@@ -516,6 +519,16 @@ func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
 	if body.SessionScope != nil {
 		scope = *body.SessionScope
 	}
+	jitter := ""
+	if body.Jitter != nil {
+		if t := strings.TrimSpace(*body.Jitter); t != "" {
+			if _, err := time.ParseDuration(t); err != nil {
+				s.jsonError(w, http.StatusBadRequest, "invalid jitter duration")
+				return
+			}
+			jitter = t
+		}
+	}
 	c := &entity.Cron{
 		ID:           id,
 		Title:        title,
@@ -523,6 +536,7 @@ func (s *Server) handlePostCron(w http.ResponseWriter, r *http.Request) {
 		Enabled:      enabled,
 		Prompt:       prompt,
 		SessionScope: scope,
+		Jitter:       jitter,
 	}
 	crons = append(crons, c)
 	if err := s.ts.SaveCrons(name, agent, crons); err != nil {
@@ -581,6 +595,29 @@ func (s *Server) handlePutCron(w http.ResponseWriter, r *http.Request) {
 		if *body.SessionScope != "persistent" {
 			target.SessionID = ""
 			target.SessionStartedAt = nil
+		}
+	}
+	if body.Jitter != nil {
+		if t := strings.TrimSpace(*body.Jitter); t != "" {
+			if _, err := time.ParseDuration(t); err != nil {
+				s.jsonError(w, http.StatusBadRequest, "invalid jitter duration")
+				return
+			}
+			target.Jitter = t
+		} else {
+			target.Jitter = ""
+		}
+	}
+	if body.SessionID != nil {
+		newSID := strings.TrimSpace(*body.SessionID)
+		if newSID != target.SessionID {
+			target.SessionID = newSID
+			if newSID == "" {
+				target.SessionStartedAt = nil
+			} else {
+				now := time.Now().UTC()
+				target.SessionStartedAt = &now
+			}
 		}
 	}
 	if err := s.ts.SaveCrons(name, agent, crons); err != nil {

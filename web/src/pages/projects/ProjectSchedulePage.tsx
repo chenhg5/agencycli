@@ -33,6 +33,7 @@ type CronRow = {
   id: string; title: string; schedule: string; enabled: boolean; prompt: string
   lastRun?: string; lastRunStatus?: string; runCount?: number
   sessionScope?: string; sessionId?: string; sessionStartedAt?: string
+  jitter?: string
 }
 
 type SessionUsage = {
@@ -708,16 +709,29 @@ function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId
   const [schedule, setSchedule] = useState(cron.schedule)
   const [prompt, setPrompt] = useState(cron.prompt)
   const [sessionScope, setSessionScope] = useState(cron.sessionScope || 'new')
+  const [sessionId, setSessionId] = useState(cron.sessionId ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const parseInterval = (v: string) => {
+    const m = v.match(/^(\d+(?:\.\d+)?)\s*(m|h|s)/)
+    if (m) return { num: parseFloat(m[1]), unit: m[2] }
+    return { num: 0, unit: 'm' }
+  }
+  const jt = parseInterval(cron.jitter ?? '0m')
+  const [jtNum, setJtNum] = useState(jt.num)
+  const [jtUnit, setJtUnit] = useState<'m' | 'h'>(jt.unit === 'h' ? 'h' : 'm')
 
   async function save() {
     setErr(null); setBusy(true)
     try {
-      await apiPut(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons/${encodeURIComponent(cron.id)}`, {
+      const jitterStr = jtNum > 0 ? `${jtNum}${jtUnit}` : ''
+      const body: Record<string, unknown> = {
         title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim(),
-        sessionScope,
-      })
+        sessionScope, jitter: jitterStr,
+      }
+      if (sessionId !== (cron.sessionId ?? '')) body.sessionId = sessionId
+      await apiPut(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons/${encodeURIComponent(cron.id)}`, body)
       onSaved()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
@@ -740,21 +754,48 @@ function EditCronModal({ projectId, agent, cron, onClose, onSaved }: { projectId
           <Field label={t('forms.prompt')}>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className={fieldCls} />
           </Field>
+
+          {/* Jitter */}
+          <Field label={t('schedule.jitter')}>
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} value={jtNum} onChange={(e) => setJtNum(Number(e.target.value))} className={cn(fieldCls, 'w-24 tabular-nums')} />
+              <select value={jtUnit} onChange={(e) => setJtUnit(e.target.value as 'm' | 'h')} className={cn(fieldCls, 'w-28')}>
+                <option value="m">{t('schedule.unitMinutes')}</option>
+                <option value="h">{t('schedule.unitHours')}</option>
+              </select>
+            </div>
+            <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.jitterHint')}</p>
+          </Field>
+
+          {/* Session */}
           <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-800/30">
             <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-zinc-400">{t('session.sessionLabel')}</p>
-            <Field label={t('session.scopeLabel')}>
-              <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={fieldCls}>
-                <option value="new">{t('schedule.cronSessionNew')}</option>
-                <option value="persistent">{t('session.scopePersistent')}</option>
-              </select>
-              <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
-            </Field>
-            {cron.sessionScope === 'persistent' && cron.sessionId && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500 dark:text-zinc-500">
-                <span>{t('session.sessionIdLabel')}:</span>
-                <span className="font-mono text-emerald-700 dark:text-emerald-400">{cron.sessionId.slice(0, 16)}…</span>
-              </div>
-            )}
+            <div className="space-y-3">
+              <Field label={t('session.scopeLabel')}>
+                <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={fieldCls}>
+                  <option value="new">{t('schedule.cronSessionNew')}</option>
+                  <option value="persistent">{t('session.scopePersistent')}</option>
+                </select>
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
+              </Field>
+              <Field label={t('session.sessionIdLabel')}>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    placeholder={t('session.sessionIdPlaceholder')}
+                    className={cn(fieldCls, 'flex-1 font-mono text-xs')}
+                  />
+                  {sessionId && (
+                    <button type="button" onClick={() => setSessionId('')}
+                      className="shrink-0 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50">
+                      {t('session.clearSession')}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-neutral-400 dark:text-zinc-500">{t('session.sessionIdHint')}</p>
+              </Field>
+            </div>
           </div>
         </div>
         {err && <p className="px-5 pb-2 text-sm text-red-600 dark:text-red-400">{err}</p>}
@@ -774,15 +815,18 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
   const [schedule, setSchedule] = useState('')
   const [prompt, setPrompt] = useState('')
   const [sessionScope, setSessionScope] = useState('new')
+  const [jtNum, setJtNum] = useState(0)
+  const [jtUnit, setJtUnit] = useState<'m' | 'h'>('m')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   async function create() {
     setErr(null); setBusy(true)
     try {
+      const jitterStr = jtNum > 0 ? `${jtNum}${jtUnit}` : ''
       await apiPost(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agent)}/crons`, {
         title: title.trim(), schedule: schedule.trim(), prompt: prompt.trim(),
-        sessionScope,
+        sessionScope, jitter: jitterStr || undefined,
       })
       onCreated()
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
@@ -811,14 +855,26 @@ function AddCronForm({ projectId, agents, defaultAgent, onClose, onCreated }: { 
         <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('forms.prompt')}</span>
         <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} className={fieldCls} />
       </div>
-      <div className="mt-3">
-        <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('session.scopeLabel')}</span>
-        <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={selectCls + ' w-full'}>
-          <option value="new">{t('schedule.cronSessionNew')}</option>
-          <option value="persistent">{t('session.scopePersistent')}</option>
-        </select>
-        <p className="mt-1 text-[11px] text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('session.scopeLabel')}</span>
+          <select value={sessionScope} onChange={(e) => setSessionScope(e.target.value)} className={selectCls + ' w-full'}>
+            <option value="new">{t('schedule.cronSessionNew')}</option>
+            <option value="persistent">{t('session.scopePersistent')}</option>
+          </select>
+        </div>
+        <div>
+          <span className="mb-1 block text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('schedule.jitter')}</span>
+          <div className="flex items-center gap-1.5">
+            <input type="number" min={0} value={jtNum} onChange={(e) => setJtNum(Number(e.target.value))} className={cn(fieldCls, 'w-20 tabular-nums')} />
+            <select value={jtUnit} onChange={(e) => setJtUnit(e.target.value as 'm' | 'h')} className={selectCls}>
+              <option value="m">{t('schedule.unitMinutes')}</option>
+              <option value="h">{t('schedule.unitHours')}</option>
+            </select>
+          </div>
+        </div>
       </div>
+      <p className="mt-1 text-[11px] text-neutral-400 dark:text-zinc-500">{t('schedule.cronSessionHint')}</p>
       {err && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{err}</p>}
       <div className="mt-3 flex gap-2">
         <button type="button" disabled={busy || !title.trim() || !schedule.trim() || !prompt.trim()} onClick={() => void create()} className="rounded-lg bg-sky-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-40">{busy ? t('forms.saving') : t('schedule.createCron')}</button>

@@ -817,7 +817,21 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 			return err
 		}
 
-		result, err := r.RunTask(project, agentName, task, sessionID)
+		// For cron tasks with persistent session, use the cron's own session ID.
+		taskSessionID := sessionID
+		if strings.HasPrefix(task.CreatedBy, "cron:") {
+			cronID := strings.TrimPrefix(task.CreatedBy, "cron:")
+			if allCrons, cerr := ts.ListCrons(project, agentName); cerr == nil {
+				for _, cc := range allCrons {
+					if cc.ID == cronID && cc.SessionScope == "persistent" && cc.SessionID != "" {
+						taskSessionID = cc.SessionID
+						break
+					}
+				}
+			}
+		}
+
+		result, err := r.RunTask(project, agentName, task, taskSessionID)
 		if err != nil {
 			task.Status = entity.TaskStatusDoneFailed
 			task.LastError = err.Error()
@@ -838,6 +852,27 @@ func runAllPendingTasks(ctx context.Context, root, project, agentName string,
 				latestHB.SessionStartedAt = &t
 			}
 			_ = ts.SaveHeartbeat(project, agentName, latestHB)
+		}
+
+		// Propagate session ID + run status back to the originating cron.
+		if strings.HasPrefix(task.CreatedBy, "cron:") {
+			cronID := strings.TrimPrefix(task.CreatedBy, "cron:")
+			if allCrons, cerr := ts.ListCrons(project, agentName); cerr == nil {
+				for _, cc := range allCrons {
+					if cc.ID == cronID {
+						cc.LastRunStatus = string(result.Status)
+						if result.SessionID != "" && cc.SessionScope == "persistent" {
+							cc.SessionID = result.SessionID
+							if cc.SessionStartedAt == nil {
+								t := time.Now().UTC()
+								cc.SessionStartedAt = &t
+							}
+						}
+						_ = ts.SaveCrons(project, agentName, allCrons)
+						break
+					}
+				}
+			}
 		}
 
 		finished := time.Now().UTC()
@@ -1001,8 +1036,6 @@ func fireDueCrons(ts taskstore.Store, project, agentName string) int {
 		if err != nil {
 			continue
 		}
-		// The cron is due if the last scheduled time before now is after LastRun.
-		// We look back 2 minutes to tolerate minor timing jitter.
 		lookback := now.Add(-2 * time.Minute)
 		lastExpected := prevCronTime(sched, now)
 		if lastExpected.IsZero() || lastExpected.Before(lookback) {
@@ -1011,7 +1044,23 @@ func fireDueCrons(ts taskstore.Store, project, agentName string) int {
 		if c.LastRun != nil && !c.LastRun.Before(lastExpected) {
 			continue // already ran this slot
 		}
-		// Enqueue task.
+		// Apply jitter: shift the expected fire time by a deterministic random offset
+		// so the decision is stable across minute-tick checks.
+		if c.Jitter != "" {
+			if jitterDur, jerr := time.ParseDuration(c.Jitter); jerr == nil && jitterDur > 0 {
+				seed := int64(0)
+				for _, ch := range c.ID + lastExpected.Format(time.RFC3339) {
+					seed = seed*31 + int64(ch)
+				}
+				if seed < 0 {
+					seed = -seed
+				}
+				offset := time.Duration(float64(jitterDur) * (float64(seed%1000) / 1000.0))
+				if now.Before(lastExpected.Add(offset)) {
+					continue // jitter hasn't elapsed yet
+				}
+			}
+		}
 		const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 		rb := make([]byte, 6)
 		for i := range rb {
@@ -1033,6 +1082,7 @@ func fireDueCrons(ts taskstore.Store, project, agentName string) int {
 			t := now
 			c.LastRun = &t
 			c.LastRunStatus = "enqueued"
+			c.RunCount++
 			changed = true
 			enqueued++
 		}

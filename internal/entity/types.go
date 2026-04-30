@@ -774,6 +774,11 @@ type Cron struct {
 	Enabled  bool   `yaml:"enabled"`
 	Prompt   string `yaml:"prompt"`
 
+	// Jitter adds a random delay in [0, Jitter) before the cron actually fires.
+	// Go duration string, e.g. "5m", "10m". Prevents thundering-herd when
+	// multiple crons share the same schedule.
+	Jitter string `yaml:"jitter,omitempty"`
+
 	// SessionScope controls whether each cron run starts a fresh session
 	// or continues in the same persistent session.
 	//   "new"        — each execution starts a new session (default)
