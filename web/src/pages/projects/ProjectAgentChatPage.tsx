@@ -41,6 +41,21 @@ function resetTextareaHeight(el: HTMLTextAreaElement | null) {
   if (el) el.style.height = 'auto'
 }
 
+function agentChatDraftKey(projectId?: string, agentName?: string) {
+  if (!projectId || !agentName) return null
+  return `agencycli.agentChatDraft:${projectId}:${agentName}`
+}
+
+function readAgentChatDraft(projectId?: string, agentName?: string) {
+  const key = agentChatDraftKey(projectId, agentName)
+  if (!key) return ''
+  try {
+    return window.sessionStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export default function ProjectAgentChatPage() {
   const { t } = useTranslation()
   const { projectId, agentName } = useParams<{ projectId: string; agentName: string }>()
@@ -48,7 +63,7 @@ export default function ProjectAgentChatPage() {
   const initialSessionId = searchParams.get('sessionId') ?? ''
   const [sessionId, setSessionId] = useState(initialSessionId)
   const [content, setContent] = useState('')
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => readAgentChatDraft(projectId, agentName))
   const [loading, setLoading] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyTruncated, setHistoryTruncated] = useState(false)
@@ -63,6 +78,7 @@ export default function ProjectAgentChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const draftKey = agentChatDraftKey(projectId, agentName)
 
   const historyPath = useCallback((sid: string) => {
     if (!projectId || !agentName) return null
@@ -110,6 +126,23 @@ export default function ProjectAgentChatPage() {
       if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     })
   }, [content, loading, followingLiveLog])
+
+  useEffect(() => {
+    if (!draftKey) return
+    try {
+      if (input) window.sessionStorage.setItem(draftKey, input)
+      else window.sessionStorage.removeItem(draftKey)
+    } catch {
+      // Ignore storage failures; losing a draft is better than breaking chat.
+    }
+  }, [draftKey, input])
+
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 128) + 'px'
+  }, [input])
 
   useEffect(() => {
     if (!projectId || !agentName || loading) return

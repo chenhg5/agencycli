@@ -104,12 +104,13 @@ function isFailed(status: string) {
 
 const kindStyles: Record<string, { text: string; cls: string }> = {
   wakeup: { text: 'Wakeup', cls: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' },
+  chat: { text: 'Chat', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
   task: { text: 'Task', cls: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
 }
 
 function resolveKind(r: RunRow): string {
-  if (r.kind === 'exec') return 'wakeup'
   if (r.taskTitle?.includes('[wakeup]')) return 'wakeup'
+  if (r.kind === 'exec') return 'chat'
   return 'task'
 }
 
@@ -321,6 +322,7 @@ export default function ProjectRunsPage() {
             <select value={filterKind} onChange={(e) => setFilterKind(e.target.value)} className={filterSelect}>
               <option value="all">{t('runs.filterKind')}</option>
               <option value="wakeup">Wakeup</option>
+              <option value="chat">Chat</option>
               <option value="task">Task</option>
             </select>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={filterSelect}>
