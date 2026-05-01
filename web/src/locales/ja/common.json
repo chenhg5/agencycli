@@ -595,6 +595,7 @@
     "sessionIdPlaceholder": "外部または既存の Session ID を入力",
     "switchSessionConfirm": "切替",
     "sessionSwitchHint": "別のターミナルやツールで作成された Session ID を貼り付けると、次のメッセージからその Session を再開します。",
+    "followingLiveLog": "この Agent の実行ログを追跡しています。完了後に実行記録へ書き込まれます。",
     "stopped": "停止しました",
     "error": "チャット実行に失敗しました"
   },

@@ -170,7 +170,10 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		args = append(args, "--no-session")
 	}
 
-	cmd := exec.CommandContext(r.Context(), s.sched.binPath, args...)
+	// Do not bind the child process to the HTTP request context. The browser
+	// aborts fetches when navigating away; killing the agent at that point would
+	// prevent run logs and telemetry from being recorded.
+	cmd := exec.Command(s.sched.binPath, args...)
 	cmd.Dir = s.root
 
 	stdout, err := cmd.StdoutPipe()
@@ -215,16 +218,24 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	detectedSessionID := sessionID
+	clientGone := false
 	for line := range lines {
 		if sid := extractAgentChatSessionID(line); sid != "" {
 			detectedSessionID = sid
 		}
-		fmt.Fprintf(w, "data: %s\n\n", line)
+		if clientGone {
+			continue
+		}
+		payload := chatSSELine(line)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", payload); err != nil {
+			clientGone = true
+			continue
+		}
 		flusher.Flush()
 	}
 
 	waitErr := cmd.Wait()
-	if waitErr != nil && r.Context().Err() == nil {
+	if waitErr != nil && !clientGone {
 		evt, _ := json.Marshal(map[string]any{
 			"type":  "chat_error",
 			"error": waitErr.Error(),
@@ -233,12 +244,24 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
+	if clientGone {
+		return
+	}
 	done, _ := json.Marshal(map[string]any{
 		"type":       "chat_done",
 		"session_id": detectedSessionID,
 	})
 	fmt.Fprintf(w, "data: %s\n\n", done)
 	flusher.Flush()
+}
+
+func chatSSELine(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "===") ||
+		strings.HasPrefix(trimmed, "Command:") || strings.HasPrefix(trimmed, "Started:") {
+		return line
+	}
+	return "=== " + line + " ==="
 }
 
 func extractAgentChatSessionID(line string) string {

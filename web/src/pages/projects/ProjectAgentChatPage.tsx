@@ -28,6 +28,11 @@ type ProviderOption = {
   model?: string
 }
 
+type LiveLogResp = {
+  content: string
+  finished: boolean
+}
+
 function appendLog(prev: string, line: string): string {
   return prev ? `${prev}\n${line}` : line
 }
@@ -54,6 +59,7 @@ export default function ProjectAgentChatPage() {
   const [providers, setProviders] = useState<ProviderOption[]>([])
   const [sessionEditorOpen, setSessionEditorOpen] = useState(false)
   const [sessionDraft, setSessionDraft] = useState(initialSessionId)
+  const [followingLiveLog, setFollowingLiveLog] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -103,7 +109,39 @@ export default function ProjectAgentChatPage() {
     requestAnimationFrame(() => {
       if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     })
-  }, [content, loading])
+  }, [content, loading, followingLiveLog])
+
+  useEffect(() => {
+    if (!projectId || !agentName || loading) return
+    let cancelled = false
+    let timer: number | null = null
+
+    const poll = async () => {
+      try {
+        const data = await apiFetch<LiveLogResp>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/live-log`,
+        )
+        if (cancelled) return
+        if (data.content && !data.finished) {
+          if (!sessionId || data.content.includes(sessionId)) {
+            setContent(data.content)
+            setFollowingLiveLog(true)
+          }
+        } else if (data.finished) {
+          setFollowingLiveLog(false)
+        }
+      } catch {
+        if (!cancelled) setFollowingLiveLog(false)
+      }
+      if (!cancelled) timer = window.setTimeout(poll, 2000)
+    }
+
+    void poll()
+    return () => {
+      cancelled = true
+      if (timer != null) window.clearTimeout(timer)
+    }
+  }, [projectId, agentName, sessionId, loading])
 
   useEffect(() => {
     if (!focusMode) return
@@ -304,6 +342,9 @@ export default function ProjectAgentChatPage() {
         </div>
         {historyTruncated && (
           <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{t('agentChat.historyTruncated')}</p>
+        )}
+        {followingLiveLog && !loading && (
+          <p className="mt-2 text-xs text-sky-600 dark:text-sky-400">{t('agentChat.followingLiveLog')}</p>
         )}
         {sessionEditorOpen && (
           <div className="mt-3 rounded-xl border border-sky-200/70 bg-sky-50/40 p-3 dark:border-sky-800/50 dark:bg-sky-950/20">

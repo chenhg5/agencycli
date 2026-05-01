@@ -595,6 +595,7 @@
     "sessionIdPlaceholder": "輸入外部或已有 Session ID",
     "switchSessionConfirm": "切換",
     "sessionSwitchHint": "可以貼上在其他終端或工具裡產生的 Session ID；送出下一則訊息時會用該 Session 繼續。",
+    "followingLiveLog": "正在跟隨該 Agent 的執行日誌，執行完成後會寫入執行記錄。",
     "stopped": "已停止",
     "error": "對話執行失敗"
   },
