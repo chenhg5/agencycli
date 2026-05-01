@@ -59,7 +59,8 @@
     "aria": "搜索",
     "noResults": "没有找到匹配项",
     "groupNav": "导航",
-    "groupProjects": "项目"
+    "groupProjects": "项目",
+    "groupMembers": "成员"
   },
   "notifications": {
     "aria": "通知"
@@ -576,7 +577,7 @@
     "promptHint": "如果填写了 Prompt，会先创建任务再立即运行。留空则执行下一个待处理任务。"
   },
   "agentChat": {
-    "title": "Agent 对话",
+    "title": "对话",
     "openChat": "对话",
     "reloadHistory": "重载历史",
     "newSession": "新会话",

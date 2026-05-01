@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/chenhg5/agencycli/internal/daemon"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +91,7 @@ Virtual directories in --index are created automatically.`,
 			fmt.Printf("✓ Document added: %s [%s]\n", entry.ID, index)
 			fmt.Printf("  Title: %s\n  Path:  %s\n", title, absPath)
 			fmt.Printf("  Web:   %s\n", docsWebPath(entry.ID))
-			if webURL := docsWebURL(entry.ID); webURL != "" {
+			if webURL := docsWebURL(root, entry.ID); webURL != "" {
 				fmt.Printf("  URL:   %s\n", webURL)
 			}
 			return nil
@@ -108,12 +110,71 @@ func docsWebPath(docID string) string {
 	return "/docs/" + url.PathEscape(docID)
 }
 
-func docsWebURL(docID string) string {
+func docsWebURL(root, docID string) string {
 	base := strings.TrimRight(strings.TrimSpace(os.Getenv("AGENCYCLI_WEB_BASE_URL")), "/")
-	if base == "" {
+	if base != "" {
+		return base + docsWebPath(docID)
+	}
+	if base := runningWebBaseURL(root); base != "" {
+		return base + docsWebPath(docID)
+	}
+	if base := daemonWebBaseURL(root); base != "" {
+		return base + docsWebPath(docID)
+	}
+	return ""
+}
+
+func runningWebBaseURL(root string) string {
+	meta, err := daemon.LoadWebRuntimeMeta(root)
+	if err != nil || meta.WorkDir != root || meta.Addr == "" {
 		return ""
 	}
-	return base + docsWebPath(docID)
+	base := webBaseURLFromAddr(meta.Addr)
+	if base == "" || !webHealthOK(base) {
+		return ""
+	}
+	return base
+}
+
+func daemonWebBaseURL(root string) string {
+	meta, err := daemon.LoadMeta()
+	if err != nil || meta.WorkDir != root || meta.Addr == "" {
+		return ""
+	}
+	base := webBaseURLFromAddr(meta.Addr)
+	if base == "" || !webHealthOK(base) {
+		return ""
+	}
+	return base
+}
+
+func webBaseURLFromAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return ""
+	}
+	host, port, ok := strings.Cut(addr, ":")
+	if !ok {
+		return "http://" + addr
+	}
+	switch strings.Trim(host, "[]") {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		host = "[" + host + "]"
+	}
+	return "http://" + host + ":" + port
+}
+
+func webHealthOK(base string) bool {
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	resp, err := client.Get(strings.TrimRight(base, "/") + "/api/v1/health")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
 func newDocsListCmd() *cobra.Command {

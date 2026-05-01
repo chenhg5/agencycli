@@ -59,7 +59,8 @@
     "aria": "Search",
     "noResults": "No results found",
     "groupNav": "Navigation",
-    "groupProjects": "Projects"
+    "groupProjects": "Projects",
+    "groupMembers": "Members"
   },
   "notifications": {
     "aria": "Notifications"
@@ -576,7 +577,7 @@
     "promptHint": "If provided, a task will be created and run immediately. If left empty, the next pending task will be executed."
   },
   "agentChat": {
-    "title": "Agent Chat",
+    "title": "Chat",
     "openChat": "Chat",
     "reloadHistory": "Reload history",
     "newSession": "New session",

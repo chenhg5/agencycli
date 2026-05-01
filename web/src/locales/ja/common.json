@@ -59,7 +59,8 @@
     "aria": "検索",
     "noResults": "該当する項目がありません",
     "groupNav": "ナビゲーション",
-    "groupProjects": "プロジェクト"
+    "groupProjects": "プロジェクト",
+    "groupMembers": "メンバー"
   },
   "notifications": {
     "aria": "通知"
@@ -576,7 +577,7 @@
     "promptHint": "プロンプトを入力するとタスクを作成して即時実行します。空欄の場合は次の保留タスクを実行します。"
   },
   "agentChat": {
-    "title": "Agent チャット",
+    "title": "チャット",
     "openChat": "チャット",
     "reloadHistory": "履歴を再読み込み",
     "newSession": "新しいセッション",

@@ -59,7 +59,8 @@
     "aria": "搜尋",
     "noResults": "沒有找到相符項目",
     "groupNav": "導航",
-    "groupProjects": "專案"
+    "groupProjects": "專案",
+    "groupMembers": "成員"
   },
   "notifications": {
     "aria": "通知"
@@ -576,7 +577,7 @@
     "promptHint": "如果填寫了 Prompt，會先建立任務再立即執行。留空則執行下一個待處理任務。"
   },
   "agentChat": {
-    "title": "Agent 對話",
+    "title": "對話",
     "openChat": "對話",
     "reloadHistory": "重載歷史",
     "newSession": "新會話",

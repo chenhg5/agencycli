@@ -100,7 +100,7 @@ func IsValidModel(m AgentModel) bool {
 type APIProvider struct {
 	ID      string            `yaml:"id"      json:"id"`
 	Name    string            `yaml:"name"    json:"name"`
-	Type    string            `yaml:"type"    json:"type"`     // anthropic, openai, gemini, custom
+	Type    string            `yaml:"type"    json:"type"` // anthropic, openai, gemini, custom
 	BaseURL string            `yaml:"base_url,omitempty" json:"baseUrl,omitempty"`
 	APIKey  string            `yaml:"api_key,omitempty"  json:"-"`
 	Model   string            `yaml:"model,omitempty"    json:"model,omitempty"`
@@ -160,13 +160,13 @@ type Skill struct {
 // instructions that are applied when an agent is hired into this role.
 // Stored at <root>/teams/<team>/roles/<name>/role.yaml.
 type Role struct {
-	Name        string    `yaml:"name"`
-	Description string    `yaml:"description,omitempty"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description,omitempty"`
 	// Skills lists skill names bound to this role (merged with team skills).
-	Skills      []string  `yaml:"skills,omitempty"`
+	Skills []string `yaml:"skills,omitempty"`
 	// Setup describes the workspace layout to create inside the agent directory
 	// when an agent is hired into this role.
-	Setup       RoleSetup `yaml:"setup,omitempty"`
+	Setup RoleSetup `yaml:"setup,omitempty"`
 }
 
 // RoleSetup describes the workspace scaffolding applied at hire time.
@@ -181,7 +181,7 @@ type RoleSetup struct {
 // RoleSetupFile is a file to create during workspace setup.
 type RoleSetupFile struct {
 	// Path is relative to the agent working directory.
-	Path    string `yaml:"path"`
+	Path string `yaml:"path"`
 	// Content is written verbatim. Empty creates an empty file.
 	Content string `yaml:"content,omitempty"`
 }
@@ -298,10 +298,10 @@ const (
 // SandboxConfig describes how to isolate an agent execution.
 // Resolved at hire/run time with agency → team → agent override priority.
 type SandboxConfig struct {
-	Provider SandboxProvider `yaml:"provider"`
+	Provider SandboxProvider `yaml:"provider" json:"provider"`
 
 	// Docker holds Docker-specific options. Used when Provider == "docker".
-	Docker *DockerSandboxConfig `yaml:"docker,omitempty"`
+	Docker *DockerSandboxConfig `yaml:"docker,omitempty" json:"docker,omitempty"`
 }
 
 // DockerSandboxConfig holds options for Docker-based sandbox execution.
@@ -312,35 +312,35 @@ type DockerSandboxConfig struct {
 	//   codex      → ghcr.io/agencycli/sandbox-codex:latest
 	//   gemini     → ghcr.io/agencycli/sandbox-gemini:latest
 	//   (others)   → ghcr.io/agencycli/sandbox-generic:latest
-	Image string `yaml:"image,omitempty"`
+	Image string `yaml:"image,omitempty" json:"image,omitempty"`
 
 	// NetworkMode controls Docker networking.
 	// "bridge" (default) — internet access, agent can reach GitHub/APIs.
 	// "none"             — fully offline, safest option.
 	// "host"             — shares host network (debug only, not recommended).
-	NetworkMode string `yaml:"network_mode,omitempty"`
+	NetworkMode string `yaml:"network_mode,omitempty" json:"network_mode,omitempty"`
 
 	// CredentialMounts mounts host credential paths into the container
 	// as read-only volumes. Format: "~/.claude:/root/.claude" or
 	// "~/.claude:/root/.claude:ro". The tilde is expanded at runtime.
 	// Defaults are set automatically per-model when empty.
-	CredentialMounts []string `yaml:"credential_mounts,omitempty"`
+	CredentialMounts []string `yaml:"credential_mounts,omitempty" json:"credential_mounts,omitempty"`
 
 	// ExtraVolumes mounts additional host paths. Same format as CredentialMounts.
-	ExtraVolumes []string `yaml:"extra_volumes,omitempty"`
+	ExtraVolumes []string `yaml:"extra_volumes,omitempty" json:"extra_volumes,omitempty"`
 
 	// ExtraEnv passes additional environment variables as "KEY=VALUE" pairs.
-	ExtraEnv []string `yaml:"extra_env,omitempty"`
+	ExtraEnv []string `yaml:"extra_env,omitempty" json:"extra_env,omitempty"`
 
 	// MemoryMB limits container memory (0 = no limit).
-	MemoryMB int `yaml:"memory_mb,omitempty"`
+	MemoryMB int `yaml:"memory_mb,omitempty" json:"memory_mb,omitempty"`
 
 	// CPUs limits CPU quota, e.g. 2.0 (0 = no limit).
-	CPUs float64 `yaml:"cpus,omitempty"`
+	CPUs float64 `yaml:"cpus,omitempty" json:"cpus,omitempty"`
 
 	// NoAutoCredentials disables the automatic per-model credential mount
 	// defaults. Set to true when you manage credential mounts manually.
-	NoAutoCredentials bool `yaml:"no_auto_credentials,omitempty"`
+	NoAutoCredentials bool `yaml:"no_auto_credentials,omitempty" json:"no_auto_credentials,omitempty"`
 }
 
 // ─────────────────────────────────────────────
@@ -428,10 +428,10 @@ type ProjectConfig struct {
 
 // AgentSpec is one agent definition inside ProjectConfig.
 type AgentSpec struct {
-	Name    string `yaml:"name"`
-	Role    string `yaml:"role,omitempty"`   // references teams/<team>/roles/<role>
-	Team    string `yaml:"team,omitempty"`   // team the role belongs to
-	Model   string `yaml:"model"`            // e.g. claudecode, codex, gemini
+	Name  string `yaml:"name"`
+	Role  string `yaml:"role,omitempty"` // references teams/<team>/roles/<role>
+	Team  string `yaml:"team,omitempty"` // team the role belongs to
+	Model string `yaml:"model"`          // e.g. claudecode, codex, gemini
 
 	// Sandbox configures isolated container execution for this agent.
 	// When nil the agent runs directly on the host (default behaviour).
@@ -555,16 +555,18 @@ func NewCommentID() string {
 // perspective.  The recipient reads it on their next wakeup.
 //
 // Recipient/sender format:
-//   "human"               → the agency owner's global inbox
-//   "project/agent"       → e.g. "cc-connect/pm"
+//
+//	"human"               → the agency owner's global inbox
+//	"project/agent"       → e.g. "cc-connect/pm"
 //
 // Storage:
-//   human:  <agency>/.agencycli/messages.yaml
-//   agent:  <agency>/projects/<project>/agents/<agent>/messages.yaml
+//
+//	human:  <agency>/.agencycli/messages.yaml
+//	agent:  <agency>/projects/<project>/agents/<agent>/messages.yaml
 type Message struct {
 	ID         string     `yaml:"id"`
-	From       string     `yaml:"from"`               // "human" or "project/agent"
-	To         string     `yaml:"to"`                 // "human" or "project/agent"
+	From       string     `yaml:"from"` // "human" or "project/agent"
+	To         string     `yaml:"to"`   // "human" or "project/agent"
 	Subject    string     `yaml:"subject,omitempty"`
 	Body       string     `yaml:"body"`
 	ReplyTo    string     `yaml:"reply_to,omitempty"` // ID of message being replied to
@@ -599,9 +601,9 @@ func randomAlpha(n int) string {
 // InboxItem is an entry in the confirmation inbox.
 // Stored at <workspace>/.agencycli/inbox.yaml.
 type InboxItem struct {
-	TaskID      string   `yaml:"task_id"`
-	Project     string   `yaml:"project"`
-	Agent       string   `yaml:"agent"`
+	TaskID  string `yaml:"task_id"`
+	Project string `yaml:"project"`
+	Agent   string `yaml:"agent"`
 	// To is the intended recipient of this confirmation request.
 	// "human" (default when empty) or "project/agent" (e.g. "cc-connect/pm").
 	To          string   `yaml:"to,omitempty"`
@@ -723,11 +725,11 @@ type HeartbeatConfig struct {
 	Triggers []TriggerType `yaml:"triggers,omitempty" json:"triggers,omitempty"`
 
 	// Runtime state (mutated by scheduler / runner).
-	PID               int        `yaml:"pid,omitempty"`
-	LastWakeup        *time.Time `yaml:"last_wakeup,omitempty"`
-	LastWakeupStatus  string     `yaml:"last_wakeup_status,omitempty"` // running | done | failed
-	SessionID         string     `yaml:"session_id,omitempty"`
-	SessionStartedAt  *time.Time `yaml:"session_started_at,omitempty"`
+	PID              int        `yaml:"pid,omitempty"`
+	LastWakeup       *time.Time `yaml:"last_wakeup,omitempty"`
+	LastWakeupStatus string     `yaml:"last_wakeup_status,omitempty"` // running | done | failed
+	SessionID        string     `yaml:"session_id,omitempty"`
+	SessionStartedAt *time.Time `yaml:"session_started_at,omitempty"`
 
 	// LastConditionStatus records the outcome of the most recent WakeupCondition
 	// evaluation: "met", "not_met", or "" (never evaluated).
@@ -742,11 +744,11 @@ type HeartbeatConfig struct {
 	Jitter string `yaml:"jitter,omitempty"`
 
 	// Scheduler runtime stats (persisted across scheduler restarts).
-	WakeupCount      int        `yaml:"wakeup_count,omitempty"`
-	WakeupCountToday int        `yaml:"wakeup_count_today,omitempty"`
-	WakeupDate       string     `yaml:"wakeup_date,omitempty"`
-	LastCycleDuration string    `yaml:"last_cycle_duration,omitempty"`
-	NextWakeupAt     *time.Time `yaml:"next_wakeup_at,omitempty"`
+	WakeupCount        int        `yaml:"wakeup_count,omitempty"`
+	WakeupCountToday   int        `yaml:"wakeup_count_today,omitempty"`
+	WakeupDate         string     `yaml:"wakeup_date,omitempty"`
+	LastCycleDuration  string     `yaml:"last_cycle_duration,omitempty"`
+	NextWakeupAt       *time.Time `yaml:"next_wakeup_at,omitempty"`
 	SchedulerStartedAt *time.Time `yaml:"scheduler_started_at,omitempty"`
 }
 
@@ -821,14 +823,14 @@ const (
 
 // KeyResult is a measurable outcome that drives an Objective forward.
 type KeyResult struct {
-	ID          string     `yaml:"id"           json:"id"`
-	Description string     `yaml:"description"  json:"description"`
-	MetricType  MetricType `yaml:"metric_type"  json:"metricType"`
-	TargetValue float64    `yaml:"target_value" json:"targetValue"`
-	CurrentValue float64   `yaml:"current_value" json:"currentValue"`
-	Unit        string     `yaml:"unit,omitempty" json:"unit,omitempty"`
-	Weight      float64    `yaml:"weight,omitempty" json:"weight,omitempty"` // 0 = equal weight
-	LinkedMilestones []string `yaml:"linked_milestones,omitempty" json:"linkedMilestones,omitempty"`
+	ID               string     `yaml:"id"           json:"id"`
+	Description      string     `yaml:"description"  json:"description"`
+	MetricType       MetricType `yaml:"metric_type"  json:"metricType"`
+	TargetValue      float64    `yaml:"target_value" json:"targetValue"`
+	CurrentValue     float64    `yaml:"current_value" json:"currentValue"`
+	Unit             string     `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Weight           float64    `yaml:"weight,omitempty" json:"weight,omitempty"` // 0 = equal weight
+	LinkedMilestones []string   `yaml:"linked_milestones,omitempty" json:"linkedMilestones,omitempty"`
 }
 
 // Progress returns 0-100 completion percentage.
@@ -958,9 +960,9 @@ type Milestone struct {
 	Owner       string          `yaml:"owner,omitempty" json:"owner,omitempty"`
 	Progress    int             `yaml:"progress"    json:"progress"` // 0-100, manual or auto-calc
 
-	Criteria    []string `yaml:"criteria,omitempty"    json:"criteria,omitempty"`
-	LinkedKR    []string `yaml:"linked_kr,omitempty"   json:"linkedKR,omitempty"`
-	TaskLabels  []string `yaml:"task_labels,omitempty" json:"taskLabels,omitempty"`
+	Criteria   []string `yaml:"criteria,omitempty"    json:"criteria,omitempty"`
+	LinkedKR   []string `yaml:"linked_kr,omitempty"   json:"linkedKR,omitempty"`
+	TaskLabels []string `yaml:"task_labels,omitempty" json:"taskLabels,omitempty"`
 
 	CreatedAt time.Time `yaml:"created_at" json:"createdAt"`
 	UpdatedAt time.Time `yaml:"updated_at" json:"updatedAt"`

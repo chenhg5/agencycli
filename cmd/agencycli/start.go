@@ -84,6 +84,15 @@ remote server. For local development with hot-reload, use
 
 			url := fmt.Sprintf("http://%s", addr)
 			log.Printf("agencycli web console: %s (workspace %s)", url, root)
+			if err := daemon.SaveWebRuntimeMeta(&daemon.WebRuntimeMeta{
+				WorkDir:   root,
+				Addr:      addr,
+				PID:       os.Getpid(),
+				StartedAt: daemon.NowISO(),
+			}); err != nil {
+				log.Printf("warning: failed to save web runtime metadata: %v", err)
+			}
+			defer daemon.RemoveWebRuntimeMeta(root)
 			if key != "" {
 				log.Printf("API key auth enabled")
 			}

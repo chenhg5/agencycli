@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Command } from 'cmdk'
@@ -6,6 +6,7 @@ import {
   BarChart3,
   Briefcase,
   CalendarClock,
+  MessageSquareText,
   FolderKanban,
   LayoutDashboard,
   ListTodo,
@@ -16,9 +17,12 @@ import {
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { apiFetch } from '../../lib/api'
 import { useApiJson } from '../../lib/use-api'
 
 type ProjectRow = { name: string }
+type ProjectAgent = { name: string; model?: string; team?: string; project?: string }
+type ProjectAgents = { project: string; agents: ProjectAgent[] }
 
 type SearchItem = {
   id: string
@@ -44,6 +48,11 @@ export function CommandPalette({
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         onOpenChange(!open)
+        return
+      }
+      if (e.key === 'Escape' && open) {
+        e.preventDefault()
+        onOpenChange(false)
       }
     }
     document.addEventListener('keydown', onKeyDown)
@@ -52,6 +61,28 @@ export function CommandPalette({
 
   const projectsState = useApiJson<ProjectRow[]>('/api/v1/projects', 0)
   const projects = projectsState.status === 'ok' ? (projectsState.data ?? []) : []
+  const [projectAgents, setProjectAgents] = useState<ProjectAgents[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (projects.length === 0) {
+      setProjectAgents([])
+      return
+    }
+    ;(async () => {
+      const rows: ProjectAgents[] = []
+      for (const project of projects) {
+        try {
+          const agents = await apiFetch<ProjectAgent[]>(`/api/v1/projects/${encodeURIComponent(project.name)}/agents`)
+          rows.push({ project: project.name, agents: agents ?? [] })
+        } catch {
+          rows.push({ project: project.name, agents: [] })
+        }
+      }
+      if (!cancelled) setProjectAgents(rows)
+    })()
+    return () => { cancelled = true }
+  }, [projects])
 
   const items = useMemo<SearchItem[]>(() => {
     const nav: SearchItem[] = [
@@ -75,8 +106,34 @@ export function CommandPalette({
       ]
     })
 
-    return [...nav, ...proj]
-  }, [t, projects])
+    const memberGroup = t('search.groupMembers')
+    const members: SearchItem[] = projectAgents.flatMap(({ project, agents }) => {
+      const base = `/projects/${encodeURIComponent(project)}/members`
+      return agents.flatMap((agent) => {
+        const agentName = agent.name
+        return [
+          {
+            id: `agent-${project}-${agentName}`,
+            label: `${project} / ${agentName}`,
+            group: memberGroup,
+            icon: Users,
+            to: `${base}/${encodeURIComponent(agentName)}`,
+            keywords: `agent member ${project} ${agentName} ${agent.model ?? ''} ${agent.team ?? ''}`,
+          },
+          {
+            id: `agent-chat-${project}-${agentName}`,
+            label: `${project} / ${agentName} / ${t('agentChat.title')}`,
+            group: memberGroup,
+            icon: MessageSquareText,
+            to: `${base}/${encodeURIComponent(agentName)}/chat`,
+            keywords: `chat conversation session agent member ${project} ${agentName} ${agent.model ?? ''}`,
+          },
+        ]
+      })
+    })
+
+    return [...nav, ...proj, ...members]
+  }, [t, projects, projectAgents])
 
   const groups = useMemo(() => {
     const map = new Map<string, SearchItem[]>()
