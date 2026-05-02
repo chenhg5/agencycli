@@ -27,6 +27,11 @@ function formatPermInput(toolName: string, input?: Record<string, unknown>): str
 }
 
 const STORAGE_KEY = 'assistant-btn-pos'
+type AssistantWidgetProps = {
+  hidden?: boolean
+  onHide?: () => void
+}
+
 function loadPos(): { x: number; y: number } | null {
   try {
     const v = localStorage.getItem(STORAGE_KEY)
@@ -62,7 +67,7 @@ function extractSummary(rawLog: string): string {
   return texts.join('\n').trim() || rawLog.slice(0, 300)
 }
 
-export default function AssistantWidget() {
+export default function AssistantWidget({ hidden = false, onHide }: AssistantWidgetProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
@@ -250,6 +255,8 @@ export default function AssistantWidget() {
   const panelRight = Math.max(8, window.innerWidth - pos.x - 48)
   const panelBottom = Math.max(8, window.innerHeight - pos.y + 8)
 
+  if (hidden) return null
+
   return (
     <>
       <button
@@ -257,6 +264,11 @@ export default function AssistantWidget() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setOpen(false)
+          onHide?.()
+        }}
         className={cn(
           'fixed z-[60] flex size-11 cursor-grab items-center justify-center rounded-full shadow-md backdrop-blur-sm transition-all active:cursor-grabbing',
           open
@@ -264,7 +276,7 @@ export default function AssistantWidget() {
             : 'bg-sky-600/50 text-white hover:bg-sky-600/75 dark:bg-sky-500/50 dark:hover:bg-sky-500/70',
         )}
         style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
-        title={t('assistant.title')}
+        title={t('assistant.hideHint')}
       >
         {open ? <X className="size-4" /> : <Sparkles className="size-4" />}
       </button>

@@ -228,7 +228,7 @@ func (s *Server) handleTelemetryLog(w http.ResponseWriter, r *http.Request) {
 	content := string(data)
 	truncated := false
 	if len(data) > maxBytes {
-		content = string(data[:maxBytes])
+		content = "=== earlier log content truncated ===\n" + string(data[len(data)-maxBytes:])
 		truncated = true
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{

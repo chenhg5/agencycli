@@ -240,5 +240,35 @@ func FormatExecCommand(executable string, args []string) string {
 	if len(args) == 0 {
 		return executable
 	}
-	return fmt.Sprintf("%s %s", executable, strings.Join(args, " "))
+	return fmt.Sprintf("%s %s", executable, strings.Join(RedactCommandArgs(args), " "))
+}
+
+// RedactCommandArgs removes explicit environment variable values from command
+// arguments before they are persisted to logs or telemetry.
+func RedactCommandArgs(args []string) []string {
+	out := make([]string, len(args))
+	copy(out, args)
+	for i := 0; i < len(out); i++ {
+		arg := out[i]
+		switch {
+		case arg == "-e" || arg == "--env":
+			if i+1 < len(out) {
+				out[i+1] = redactEnvValue(out[i+1])
+				i++
+			}
+		case strings.HasPrefix(arg, "--env="):
+			out[i] = "--env=" + redactEnvValue(strings.TrimPrefix(arg, "--env="))
+		case strings.HasPrefix(arg, "-e") && len(arg) > 2:
+			out[i] = "-e" + redactEnvValue(strings.TrimPrefix(arg, "-e"))
+		}
+	}
+	return out
+}
+
+func redactEnvValue(s string) string {
+	key, _, ok := strings.Cut(s, "=")
+	if !ok || strings.TrimSpace(key) == "" {
+		return s
+	}
+	return key + "=<redacted>"
 }

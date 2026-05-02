@@ -258,10 +258,7 @@ func CheckDocker() error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker sandbox: cannot reach Docker daemon — is Docker running?\n" +
-			"  Install Docker: https://docs.docker.com/get-docker/\n" +
-			"  Start daemon:  sudo systemctl start docker  (Linux)\n" +
-			"  Original error: " + err.Error())
+		return fmt.Errorf("docker sandbox: cannot reach Docker daemon — is Docker running?\n  Install Docker: https://docs.docker.com/get-docker/\n  Start daemon:  sudo systemctl start docker  (Linux)\n  Original error: %w", err)
 	}
 	return nil
 }

@@ -52,7 +52,8 @@
   "footer": {
     "madeWith": "こだわりの",
     "docs": "ドキュメント",
-    "updateAvailable": "更新あり: {{version}}"
+    "updateAvailable": "更新あり: {{version}}",
+    "showAssistant": "AI アシスタントを表示"
   },
   "search": {
     "placeholder": "タスク、メッセージ、メンバーを検索…",
@@ -699,6 +700,7 @@
     "welcome": "こんにちは！エージェンシーの管理をお手伝いします。",
     "examples": "例：「新しいプロジェクトを作成」「pmにメッセージを送信」",
     "placeholder": "エージェンシーについて何でも聞いてください...",
+    "hideHint": "AI アシスタント（右クリックで非表示）",
     "clear": "クリア",
     "stop": "停止",
     "permissionTitle": "権限のリクエスト",

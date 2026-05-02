@@ -94,13 +94,13 @@ func TestValidateWakeupCondition(t *testing.T) {
 			name:      "output redirection",
 			condition: "gh issue list > /tmp/issues",
 			wantErr:   true,
-			errContains: "blocked pattern",
+			errContains: "file redirection",
 		},
 		{
 			name:      "input redirection",
 			condition: "grep pattern < /etc/passwd",
 			wantErr:   true,
-			errContains: "blocked pattern",
+			errContains: "file redirection",
 		},
 		{
 			name:      "background execution",

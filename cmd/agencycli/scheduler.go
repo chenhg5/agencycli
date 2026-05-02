@@ -1364,16 +1364,15 @@ func validateWakeupCondition(condition string) error {
 	}
 
 	// Block dangerous shell metacharacters that enable command injection.
+	// Note: > and < are allowed because they're used in jq expressions like 'length > 0'.
 	dangerousPatterns := []string{
 		";",     // command separator
 		"&&",    // AND operator
 		"||",    // OR operator
 		"$(",    // command substitution
 		"`",     // backtick command substitution
-		">",     // output redirection
-		"<",     // input redirection
 		">>",    // append redirection
-"&",     // background execution
+		"&",     // background execution
 		"\n",    // newline (could hide commands)
 		"\r",    // carriage return
 	}
@@ -1386,7 +1385,17 @@ func validateWakeupCondition(condition string) error {
 		}
 	}
 
-// Allow only whitelisted commands as the first word in each pipe segment.
+	// Block file redirection patterns (> or < followed by a path, not inside single quotes).
+	// This allows jq expressions like 'length > 0' while blocking 'gh issue list > /tmp/file'.
+	// Strategy: remove all single-quoted strings, then check for > or < followed by a path.
+	stripQuotes := regexp.MustCompile(`'[^']*'`)
+	stripped := stripQuotes.ReplaceAllString(condition, "")
+	redirectPattern := regexp.MustCompile(`[<>]\s*/`)
+	if redirectPattern.MatchString(stripped) {
+		return fmt.Errorf("wakeup condition contains file redirection (command injection risk)")
+	}
+
+	// Allow only whitelisted commands as the first word in each pipe segment.
 	// Split by pipe and validate each segment's command.
 	allowedCommands := []string{
 		"gh",        // GitHub CLI

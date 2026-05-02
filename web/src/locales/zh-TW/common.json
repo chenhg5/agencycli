@@ -52,7 +52,8 @@
   "footer": {
     "madeWith": "用心打造",
     "docs": "文件",
-    "updateAvailable": "新版本: {{version}}"
+    "updateAvailable": "新版本: {{version}}",
+    "showAssistant": "顯示 AI 助手"
   },
   "search": {
     "placeholder": "搜尋任務、訊息、成員…",
@@ -699,6 +700,7 @@
     "welcome": "你好！我可以幫你管理你的 Agency。",
     "examples": "試試：「建立一個新專案」或「傳訊息給 pm」",
     "placeholder": "問我任何關於你的 Agency 的問題...",
+    "hideHint": "AI 助手（右鍵隱藏）",
     "clear": "清空",
     "stop": "停止",
     "permissionTitle": "請求權限",

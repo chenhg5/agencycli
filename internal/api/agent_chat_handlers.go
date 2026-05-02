@@ -91,11 +91,14 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 		}
 	}
 
-	const maxBytes = 768 * 1024
-	var sb strings.Builder
-	total := 0
+	type historySegment struct {
+		row     telemetry.RunRow
+		logPath string
+		data    []byte
+	}
+
+	segments := make([]historySegment, 0, len(filtered))
 	truncated := false
-	outRuns := make([]agentChatHistoryRun, 0, len(filtered))
 	for _, row := range filtered {
 		logPath := row.LogPath
 		absLogPath := logPath
@@ -109,28 +112,46 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 			}
 			return "", nil, false, err
 		}
-		if total+len(data) > maxBytes {
+		segments = append(segments, historySegment{
+			row:     row,
+			logPath: logPath,
+			data:    data,
+		})
+	}
+
+	const maxBytes = 768 * 1024
+	total := 0
+	selected := make([]historySegment, 0, len(segments))
+	for i := len(segments) - 1; i >= 0; i-- {
+		seg := segments[i]
+		if total+len(seg.data) > maxBytes {
 			remaining := maxBytes - total
 			if remaining <= 0 {
 				truncated = true
 				break
 			}
-			data = data[:remaining]
+			seg.data = append([]byte("=== earlier log content truncated ===\n"), seg.data[len(seg.data)-remaining:]...)
 			truncated = true
 		}
-		if sb.Len() > 0 {
-			sb.WriteString("\n\n")
-		}
-		sb.Write(data)
-		total += len(data)
-		outRuns = append(outRuns, agentChatHistoryRun{
-			StartedAt: row.StartedAt.UTC().Format(time.RFC3339Nano),
-			Status:    row.Status,
-			LogPath:   logPath,
-		})
+		selected = append([]historySegment{seg}, selected...)
+		total += len(seg.data)
 		if truncated {
 			break
 		}
+	}
+
+	var sb strings.Builder
+	outRuns := make([]agentChatHistoryRun, 0, len(selected))
+	for _, seg := range selected {
+		if sb.Len() > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.Write(seg.data)
+		outRuns = append(outRuns, agentChatHistoryRun{
+			StartedAt: seg.row.StartedAt.UTC().Format(time.RFC3339Nano),
+			Status:    seg.row.Status,
+			LogPath:   seg.logPath,
+		})
 	}
 	return sb.String(), outRuns, truncated, nil
 }

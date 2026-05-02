@@ -52,7 +52,8 @@
   "footer": {
     "madeWith": "Made with",
     "docs": "Docs",
-    "updateAvailable": "Update: {{version}}"
+    "updateAvailable": "Update: {{version}}",
+    "showAssistant": "Show AI Assistant"
   },
   "search": {
     "placeholder": "Search tasks, messages, members…",
@@ -699,6 +700,7 @@
     "welcome": "Hi! I can help you manage your agency.",
     "examples": "Try: \"Create a new project\" or \"Send a message to pm\"",
     "placeholder": "Ask me anything about your agency...",
+    "hideHint": "AI Assistant (right-click to hide)",
     "clear": "Clear",
     "stop": "Stop",
     "permissionTitle": "Permission requested",

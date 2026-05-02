@@ -120,6 +120,7 @@ function Breadcrumbs({ crumbs }: { crumbs: BreadcrumbSegment[] }) {
 }
 
 const SIDEBAR_KEY = 'sidebar-collapsed'
+const ASSISTANT_HIDDEN_KEY = 'assistant-hidden'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -127,6 +128,7 @@ export function AppShell() {
   const crumbs = useBreadcrumbs()
   const [searchOpen, setSearchOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
+  const [assistantHidden, setAssistantHidden] = useState(() => localStorage.getItem(ASSISTANT_HIDDEN_KEY) === '1')
   const [appVersion, setAppVersion] = useState('…')
   const [updateInfo, setUpdateInfo] = useState<{ hasUpdate: boolean; latestVersion?: string } | null>(null)
 
@@ -146,6 +148,11 @@ export function AppShell() {
       localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0')
       return next
     })
+  }
+
+  function setAssistantHiddenState(hidden: boolean) {
+    localStorage.setItem(ASSISTANT_HIDDEN_KEY, hidden ? '1' : '0')
+    setAssistantHidden(hidden)
   }
 
   useEffect(() => {
@@ -185,6 +192,15 @@ export function AppShell() {
                 )}
               </div>
               <div className="flex items-center gap-3">
+                {assistantHidden && (
+                  <button
+                    type="button"
+                    onClick={() => setAssistantHiddenState(false)}
+                    className="rounded-md px-2 py-0.5 text-xs text-sky-500 transition-colors hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-900/20"
+                  >
+                    {t('footer.showAssistant')}
+                  </button>
+                )}
                 <a href="https://github.com/chenhg5/agencycli/wiki" target="_blank" rel="noopener noreferrer"
                   className="rounded-md px-2 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300">
                   {t('footer.docs')}
@@ -198,7 +214,7 @@ export function AppShell() {
           </div>
           <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
         </div>
-        <AssistantWidget />
+        <AssistantWidget hidden={assistantHidden} onHide={() => setAssistantHiddenState(true)} />
         <ToastContainer />
       </>
     </PageTabsProvider>

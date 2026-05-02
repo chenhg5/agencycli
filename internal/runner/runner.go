@@ -176,7 +176,7 @@ func (r *Runner) ExecPrompt(project, agentName, prompt, sessionID string) (*RunR
 		sandboxLabel = string(meta.Sandbox.Provider)
 	}
 	fmt.Fprintf(logFile, "=== agencycli exec: %s/%s sandbox=%s ===\n", project, agentName, sandboxLabel)
-	fmt.Fprintf(logFile, "Command: %s %s\n", executable, strings.Join(args, " "))
+	fmt.Fprintf(logFile, "Command: %s\n", telemetry.FormatExecCommand(executable, args))
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Stream output to stdout AND the log file simultaneously.
@@ -373,7 +373,7 @@ func (r *Runner) RunTask(project, agentName string, task *entity.Task, sessionID
 	}
 	fmt.Fprintf(logFile, "=== agencycli run: %s/%s task=%s sandbox=%s ===\n",
 		project, agentName, task.ID, sandboxLabel)
-	fmt.Fprintf(logFile, "Command: %s %s\n", executable, strings.Join(args, " "))
+	fmt.Fprintf(logFile, "Command: %s\n", telemetry.FormatExecCommand(executable, args))
 	fmt.Fprintf(logFile, "Started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 
 	// Run the agent.
