@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chenhg5/agencycli/internal/avatar"
 	"github.com/chenhg5/agencycli/internal/ctxbuild"
 	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/formatter"
@@ -143,6 +144,7 @@ To switch an existing agent to another runtime (e.g. claudecode → codex), use
 					Role:    role,
 					Model:   agentModel,
 					HiredAt: time.Now().UTC(),
+					Avatar:  avatar.RandomURL(project, agentName),
 				}
 				if err := s.SaveAgentMeta(project, agentName, meta); err != nil {
 					return fmt.Errorf("%s: save agent meta: %w", use, err)
@@ -263,6 +265,7 @@ To switch an existing agent to another runtime (e.g. claudecode → codex), use
 				Role:        role,
 				Model:       agentModel,
 				HiredAt:     time.Now().UTC(),
+				Avatar:      avatar.RandomURL(project, agentName),
 				ContextHash: ctxbuild.LayerHashes(mc),
 				Sandbox:     sandboxCfg,
 				AddDirs:     addDirs,

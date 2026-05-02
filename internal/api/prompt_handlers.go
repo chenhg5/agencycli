@@ -215,6 +215,7 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		"model":       string(meta.Model),
 		"team":        meta.Team,
 		"role":        meta.Role,
+		"avatar":      meta.Avatar,
 		"syncedAt":    meta.SyncedAt,
 		"skills":      skills,
 		"workDir":     agentDir,

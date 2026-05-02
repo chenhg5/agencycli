@@ -28,6 +28,35 @@ type AgentRow = {
   team: string
   project: string
   hiredAt: string
+  avatar?: string
+}
+
+function MemberAvatar({ row }: { row: AgentRow }) {
+  const isHuman = row.model === 'human'
+  const IconCmp = isHuman ? User : Bot
+  const iconBg = isHuman
+    ? 'bg-indigo-100 dark:bg-indigo-900/30'
+    : 'bg-violet-100 dark:bg-violet-900/30'
+  const iconColor = isHuman
+    ? 'text-indigo-600 dark:text-indigo-400'
+    : 'text-violet-600 dark:text-violet-400'
+
+  if (row.avatar) {
+    return (
+      <img
+        src={row.avatar}
+        alt=""
+        className="size-10 shrink-0 rounded-lg bg-neutral-100 object-cover dark:bg-zinc-800"
+        loading="lazy"
+      />
+    )
+  }
+
+  return (
+    <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', iconBg)}>
+      <IconCmp className={cn('size-5', iconColor)} strokeWidth={1.8} />
+    </div>
+  )
 }
 
 export default function ProjectMembersPage() {
@@ -83,15 +112,7 @@ export default function ProjectMembersPage() {
         {agentsState.status === 'ok' && members.length > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {members.map((row) => {
-              const isHuman = row.model === 'human'
               const modelCls = MODEL_COLORS[row.model] ?? 'bg-neutral-100 text-neutral-600 dark:bg-zinc-800 dark:text-zinc-400'
-              const IconCmp = isHuman ? User : Bot
-              const iconBg = isHuman
-                ? 'bg-indigo-100 dark:bg-indigo-900/30'
-                : 'bg-violet-100 dark:bg-violet-900/30'
-              const iconColor = isHuman
-                ? 'text-indigo-600 dark:text-indigo-400'
-                : 'text-violet-600 dark:text-violet-400'
               return (
                 <div
                   key={row.name}
@@ -101,9 +122,7 @@ export default function ProjectMembersPage() {
                     to={`/projects/${encodeURIComponent(projectId!)}/members/${encodeURIComponent(row.name)}`}
                     className="flex items-center gap-3"
                   >
-                    <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', iconBg)}>
-                      <IconCmp className={cn('size-5', iconColor)} strokeWidth={1.8} />
-                    </div>
+                    <MemberAvatar row={row} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-mono text-sm font-semibold text-neutral-900 dark:text-zinc-100">{row.name}</p>
                       <p className="mt-0.5 truncate text-xs text-neutral-500 dark:text-zinc-500">{row.team}</p>

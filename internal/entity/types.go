@@ -195,6 +195,7 @@ type AgentMeta struct {
 	Team    string     `yaml:"team"`
 	Model   AgentModel `yaml:"model"`
 	HiredAt time.Time  `yaml:"hired_at"`
+	Avatar  string     `yaml:"avatar,omitempty"`
 
 	// SyncedAt is updated each time `agencycli sync` rewrites this agent's
 	// context. It is nil for agents that have never been synced after hire.

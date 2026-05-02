@@ -540,6 +540,7 @@ func (s *Server) handleProjectAgents(w http.ResponseWriter, r *http.Request) {
 			"team":    a.Meta.Team,
 			"project": a.Meta.Project,
 			"hiredAt": a.Meta.HiredAt.UTC().Format(time.RFC3339Nano),
+			"avatar":  a.Meta.Avatar,
 		})
 	}
 	_ = json.NewEncoder(w).Encode(out)

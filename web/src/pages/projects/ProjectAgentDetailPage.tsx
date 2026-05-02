@@ -66,6 +66,7 @@ type AgentContext = {
   model: string
   team: string
   role: string
+  avatar?: string
   syncedAt: string | null
   skills: string[]
   httpAgent?: HTTPAgentConfig
@@ -486,15 +487,20 @@ export default function ProjectAgentDetailPage() {
   const HeaderIcon = isHuman ? User : Bot
   const headerIconBg = isHuman ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-violet-100 dark:bg-violet-900/30'
   const headerIconColor = isHuman ? 'text-indigo-600 dark:text-indigo-400' : 'text-violet-600 dark:text-violet-400'
+  const avatar = ctxState.status === 'ok' ? ctxState.data.avatar : ''
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-6 pt-5 pb-4">
         <div className="flex items-center gap-4">
-          <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl', headerIconBg)}>
-            <HeaderIcon className={cn('size-6', headerIconColor)} strokeWidth={1.8} />
-          </div>
+          {avatar ? (
+            <img src={avatar} alt="" className="size-12 shrink-0 rounded-xl bg-neutral-100 object-cover dark:bg-zinc-800" />
+          ) : (
+            <div className={cn('flex size-12 shrink-0 items-center justify-center rounded-xl', headerIconBg)}>
+              <HeaderIcon className={cn('size-6', headerIconColor)} strokeWidth={1.8} />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{agentName}</h1>
             <div className="mt-1 flex items-center gap-3">
