@@ -12,8 +12,8 @@
   <a href="https://go.dev/">
     <img src="https://img.shields.io/github/go-mod/go-version/chenhg5/agencycli?logo=go&logoColor=white&style=flat-square" alt="Go"/>
   </a>
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"/>
+  <a href="https://www.gnu.org/licenses/agpl-3.0">
+    <img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square" alt="License: AGPL v3"/>
   </a>
   <a href="https://goreportcard.com/report/github.com/chenhg5/agencycli">
     <img src="https://goreportcard.com/badge/github.com/chenhg5/agencycli?style=flat-square" alt="Go Report Card"/>
@@ -221,4 +221,4 @@ Those are frameworks — you write Python to wire agents together. **agencycli i
 
 ## License
 
-MIT
+AGPL-3.0 — Free to use and modify, but any modifications must be open-sourced. This prevents cloud providers from offering closed-source forks as a service.
