@@ -33,17 +33,13 @@ export default function ProjectSettingsPage() {
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         <div className="space-y-6">
           {/* Basic info */}
-          {detail && (
-            <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
-              <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
-                <h2 className="text-sm font-semibold text-neutral-800 dark:text-zinc-200">{t('projectSettings.basicInfo')}</h2>
-              </div>
-              <dl className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-                <InfoRow label={t('projectSettings.name')} value={detail.name} mono />
-                <InfoRow label={t('projectSettings.description')} value={detail.description || '—'} />
-                <InfoRow label={t('projectSettings.repo')} value={detail.repo || '—'} mono />
-              </dl>
-            </section>
+          {detail && projectId && (
+            <BasicInfoEditor
+              projectId={projectId}
+              name={detail.name}
+              initialDescription={detail.description}
+              initialRepo={detail.repo}
+            />
           )}
 
           {/* Project prompt */}
@@ -60,12 +56,90 @@ export default function ProjectSettingsPage() {
   )
 }
 
-function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function BasicInfoEditor({
+  projectId,
+  name,
+  initialDescription,
+  initialRepo,
+}: {
+  projectId: string
+  name: string
+  initialDescription: string
+  initialRepo: string
+}) {
+  const { t } = useTranslation()
+  const [description, setDescription] = useState(initialDescription ?? '')
+  const [repo, setRepo] = useState(initialRepo ?? '')
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const save = useCallback(async () => {
+    setSaving(true); setSaved(false)
+    try {
+      await apiPut(`/api/v1/projects/${encodeURIComponent(projectId)}`, { description, repo })
+      setDirty(false); setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) { alert(String(e)) }
+    finally { setSaving(false) }
+  }, [projectId, description, repo])
+
+  const change = useCallback((setter: (v: string) => void) => (v: string) => {
+    setter(v); setDirty(true); setSaved(false)
+  }, [])
+
   return (
-    <div className="flex items-baseline gap-4 px-5 py-2.5">
-      <dt className="w-28 shrink-0 text-xs font-medium text-neutral-500 dark:text-zinc-500">{label}</dt>
-      <dd className={cn('text-sm text-neutral-800 dark:text-zinc-200', mono && 'font-mono')}>{value}</dd>
-    </div>
+    <section className="rounded-lg border border-neutral-200/80 bg-white dark:border-zinc-700/60 dark:bg-zinc-900/40">
+      <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-neutral-800 dark:text-zinc-200">{t('projectSettings.basicInfo')}</span>
+          {dirty && <span className="text-[10px] text-amber-500">●</span>}
+          {saved && <span className="text-[10px] text-emerald-500">{t('prompt.saved')}</span>}
+        </div>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !dirty}
+          className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+        >
+          <Save className="size-3" strokeWidth={2} />
+          {saving ? t('prompt.saving') : t('prompt.save')}
+        </button>
+      </div>
+      <dl className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
+        {/* Name — read-only */}
+        <div className="flex items-baseline gap-4 px-5 py-2.5">
+          <dt className="w-28 shrink-0 text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('projectSettings.name')}</dt>
+          <dd className="font-mono text-sm text-neutral-800 dark:text-zinc-200">{name}</dd>
+        </div>
+        {/* Description — editable */}
+        <div className="flex items-start gap-4 px-5 py-2.5">
+          <dt className="w-28 shrink-0 pt-1.5 text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('projectSettings.description')}</dt>
+          <dd className="flex-1">
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => change(setDescription)(e.target.value)}
+              placeholder="—"
+              className="w-full rounded-md border border-neutral-200 bg-transparent px-2.5 py-1 text-sm text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-sky-400 focus:ring-1 focus:ring-sky-400/30 dark:border-zinc-700 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-sky-500"
+            />
+          </dd>
+        </div>
+        {/* Repo — editable */}
+        <div className="flex items-start gap-4 px-5 py-2.5">
+          <dt className="w-28 shrink-0 pt-1.5 text-xs font-medium text-neutral-500 dark:text-zinc-500">{t('projectSettings.repo')}</dt>
+          <dd className="flex-1">
+            <input
+              type="text"
+              value={repo}
+              onChange={(e) => change(setRepo)(e.target.value)}
+              placeholder="/path/to/repo"
+              className="w-full rounded-md border border-neutral-200 bg-transparent px-2.5 py-1 font-mono text-sm text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-sky-400 focus:ring-1 focus:ring-sky-400/30 dark:border-zinc-700 dark:text-zinc-200 dark:placeholder:text-zinc-600 dark:focus:border-sky-500"
+            />
+          </dd>
+        </div>
+      </dl>
+    </section>
   )
 }
 

@@ -208,6 +208,10 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		skills = []string{}
 	}
 
+	addDirs := meta.AddDirs
+	if addDirs == nil {
+		addDirs = []string{}
+	}
 	resp := map[string]any{
 		"contextFile": contextFile,
 		"context":     string(merged),
@@ -219,6 +223,7 @@ func (s *Server) handleGetAgentContext(w http.ResponseWriter, r *http.Request) {
 		"syncedAt":    meta.SyncedAt,
 		"skills":      skills,
 		"workDir":     agentDir,
+		"addDirs":     addDirs,
 	}
 	if meta.HTTPAgent != nil {
 		resp["httpAgent"] = meta.HTTPAgent
@@ -375,10 +380,11 @@ func (s *Server) handlePutAgentSandbox(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Provider string `json:"provider"`
-		Image    string `json:"image"`
-		Network  string `json:"network"`
-		MemoryMB int    `json:"memoryMb"`
+		Provider string   `json:"provider"`
+		Image    string   `json:"image"`
+		Network  string   `json:"network"`
+		MemoryMB int      `json:"memoryMb"`
+		AddDirs  []string `json:"addDirs"`
 	}
 	if err := s.readJSON(w, r, &body); err != nil {
 		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
@@ -404,6 +410,12 @@ func (s *Server) handlePutAgentSandbox(w http.ResponseWriter, r *http.Request) {
 			}
 			meta.Sandbox.Docker = dc
 		}
+	}
+
+	// Update add_dirs — always overwrite with whatever the client sent.
+	// nil body.AddDirs (field absent) is treated as "no change"; empty slice clears all.
+	if body.AddDirs != nil {
+		meta.AddDirs = body.AddDirs
 	}
 
 	if err := s.st.SaveAgentMeta(project, agent, meta); err != nil {

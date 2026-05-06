@@ -995,7 +995,10 @@
     "networkDefault": "default",
     "networkOffline": "offline",
     "memory": "Memory Limit (MB)",
-    "memoryPlaceholder": "0 = unlimited"
+    "memoryPlaceholder": "0 = unlimited",
+    "addDirs": "Extra Mount Paths",
+    "addDirsHint": "Directories mounted into the Docker container at the same absolute path. Used so agents can read/write code repos inside the sandbox.",
+    "addDirsAdd": "Add"
   },
   "cron": {
     "modePreset": "Presets",

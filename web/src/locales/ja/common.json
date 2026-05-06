@@ -995,7 +995,10 @@
     "networkDefault": "デフォルト",
     "networkOffline": "オフライン",
     "memory": "メモリ制限 (MB)",
-    "memoryPlaceholder": "0 = 無制限"
+    "memoryPlaceholder": "0 = 無制限",
+    "addDirs": "追加マウントパス",
+    "addDirsHint": "Docker コンテナに同じ絶対パスでマウントするディレクトリ。コードリポジトリを指定すると、エージェントがサンドボックス内で読み書きできます。",
+    "addDirsAdd": "追加"
   },
   "cron": {
     "modePreset": "プリセット",

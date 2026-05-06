@@ -995,7 +995,10 @@
     "networkDefault": "預設",
     "networkOffline": "離線",
     "memory": "記憶體限制 (MB)",
-    "memoryPlaceholder": "0 = 不限制"
+    "memoryPlaceholder": "0 = 不限制",
+    "addDirs": "額外掛載路徑",
+    "addDirsHint": "以相同絕對路徑掛載進 Docker 容器的目錄，通常是程式碼儲存庫，讓 Agent 能在沙箱內讀寫程式碼。",
+    "addDirsAdd": "新增"
   },
   "cron": {
     "modePreset": "常用",

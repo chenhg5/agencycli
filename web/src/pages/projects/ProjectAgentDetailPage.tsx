@@ -75,6 +75,7 @@ type AgentContext = {
   workDir?: string
   sandbox?: SandboxConfig
   setupChecks?: SetupCheck[]
+  addDirs?: string[]
 }
 
 const WELL_KNOWN_ENV: Record<string, { keys: string[]; hint: string }> = {
@@ -609,6 +610,7 @@ export default function ProjectAgentDetailPage() {
                     project={projectId}
                     agentName={agentName}
                     initial={ctx.sandbox}
+                    initialAddDirs={ctx.addDirs ?? []}
                     onChanged={() => setCtxReload((k) => k + 1)}
                   />
                 </div>
@@ -707,14 +709,16 @@ function InfoCard({ icon: Icon, label, value, mono }: { icon?: LucideIcon; label
   )
 }
 
-function SandboxEditor({ project, agentName, initial, onChanged }: {
-  project: string; agentName: string; initial?: SandboxConfig; onChanged: () => void
+function SandboxEditor({ project, agentName, initial, initialAddDirs, onChanged }: {
+  project: string; agentName: string; initial?: SandboxConfig; initialAddDirs: string[]; onChanged: () => void
 }) {
   const { t } = useTranslation()
   const [provider, setProvider] = useState(initial?.provider ?? '')
   const [image, setImage] = useState(initial?.docker?.image ?? '')
   const [network, setNetwork] = useState(initial?.docker?.network_mode ?? '')
   const [memoryMb, setMemoryMb] = useState(initial?.docker?.memory_mb ?? 0)
+  const [addDirs, setAddDirs] = useState<string[]>(initialAddDirs)
+  const [newDir, setNewDir] = useState('')
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
@@ -729,10 +733,24 @@ function SandboxEditor({ project, agentName, initial, onChanged }: {
         image,
         network,
         memoryMb,
+        addDirs,
       })
       setDirty(false)
       onChanged()
     } finally { setSaving(false) }
+  }
+
+  function addDir() {
+    const d = newDir.trim()
+    if (!d || addDirs.includes(d)) return
+    setAddDirs(prev => [...prev, d])
+    setNewDir('')
+    setDirty(true)
+  }
+
+  function removeDir(dir: string) {
+    setAddDirs(prev => prev.filter(d => d !== dir))
+    setDirty(true)
   }
 
   return (
@@ -780,6 +798,40 @@ function SandboxEditor({ project, agentName, initial, onChanged }: {
             </div>
           </>
         )}
+
+        {/* Add Dirs — always visible, works with both docker and host mode */}
+        <div>
+          <label className={labelCls}>{t('sandbox.addDirs')}</label>
+          <p className="mb-1.5 text-[11px] text-neutral-400 dark:text-zinc-500">{t('sandbox.addDirsHint')}</p>
+          {addDirs.length > 0 && (
+            <div className="mb-2 space-y-1">
+              {addDirs.map(dir => (
+                <div key={dir} className="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-1.5 dark:bg-zinc-800/40">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-neutral-700 dark:text-zinc-300">{dir}</span>
+                  <button type="button" onClick={() => removeDir(dir)}
+                    className="shrink-0 text-neutral-400 transition-colors hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400">
+                    <X className="size-3.5" strokeWidth={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newDir}
+              onChange={(e) => setNewDir(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addDir() } }}
+              placeholder="/path/to/repo"
+              className="min-w-0 flex-1 rounded-md border border-neutral-200/80 bg-white px-3 py-1.5 font-mono text-xs text-neutral-800 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/30 dark:border-zinc-700/60 dark:bg-zinc-800/50 dark:text-zinc-200 dark:focus:border-sky-500"
+            />
+            <button type="button" onClick={addDir}
+              className="flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:border-sky-400 hover:text-sky-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-sky-600 dark:hover:text-sky-400">
+              <Plus className="size-3.5" strokeWidth={2} />
+              {t('sandbox.addDirsAdd')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

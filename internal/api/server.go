@@ -133,6 +133,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{name}/prompt", s.handleGetProjectPrompt)
 	mux.HandleFunc("PUT /api/v1/projects/{name}/prompt", s.handlePutProjectPrompt)
 	mux.HandleFunc("GET /api/v1/projects/{name}", s.handleProject)
+	mux.HandleFunc("PUT /api/v1/projects/{name}", s.handlePutProject)
 	mux.HandleFunc("GET /api/v1/prompts/agency", s.handleGetAgencyPrompt)
 	mux.HandleFunc("PUT /api/v1/prompts/agency", s.handlePutAgencyPrompt)
 	mux.HandleFunc("GET /api/v1/prompts/teams/{teamPath...}", s.handleGetTeamPrompt)
@@ -508,6 +509,37 @@ func (s *Server) handleProject(w http.ResponseWriter, r *http.Request) {
 		"description": p.Description,
 		"repo":        p.Repo,
 	})
+}
+
+func (s *Server) handlePutProject(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !s.checkProjectAccess(w, r, name) {
+		return
+	}
+	p, err := s.st.Project(name)
+	if err != nil {
+		if isNotFoundErr(err) {
+			s.jsonError(w, http.StatusNotFound, "project not found")
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	var body struct {
+		Description string `json:"description"`
+		Repo        string `json:"repo"`
+	}
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	p.Description = body.Description
+	p.Repo = body.Repo
+	if err := s.st.SaveProject(name, p); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
 func (s *Server) handleProjectAgents(w http.ResponseWriter, r *http.Request) {

@@ -995,7 +995,10 @@
     "networkDefault": "默认",
     "networkOffline": "离线",
     "memory": "内存限制 (MB)",
-    "memoryPlaceholder": "0 = 不限制"
+    "memoryPlaceholder": "0 = 不限制",
+    "addDirs": "额外挂载路径",
+    "addDirsHint": "以相同绝对路径挂载进 Docker 容器的目录，通常是代码仓库路径，让 agent 能在沙箱内读写代码。",
+    "addDirsAdd": "添加"
   },
   "cron": {
     "modePreset": "常用",
