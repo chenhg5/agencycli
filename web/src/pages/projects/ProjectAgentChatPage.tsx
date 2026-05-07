@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Edit3, Maximize2, Minimize2, RefreshCw, Send, Sparkles, Square } from 'lucide-react'
 import { ConversationLog } from '../../components/ui/ConversationLog'
-import { apiFetch, apiUrl } from '../../lib/api'
+import { apiFetch, apiDelete, apiUrl } from '../../lib/api'
 import { getStoredToken } from '../../lib/auth'
 import { cn } from '../../lib/cn'
 
@@ -75,6 +75,7 @@ export default function ProjectAgentChatPage() {
   const [sessionEditorOpen, setSessionEditorOpen] = useState(false)
   const [sessionDraft, setSessionDraft] = useState(initialSessionId)
   const [followingLiveLog, setFollowingLiveLog] = useState(false)
+  const [stopped, setStopped] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -145,7 +146,7 @@ export default function ProjectAgentChatPage() {
   }, [input])
 
   useEffect(() => {
-    if (!projectId || !agentName || loading) return
+    if (!projectId || !agentName || loading || stopped) return
     let cancelled = false
     let timer: number | null = null
 
@@ -174,7 +175,7 @@ export default function ProjectAgentChatPage() {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [projectId, agentName, sessionId, loading])
+  }, [projectId, agentName, sessionId, loading, stopped])
 
   useEffect(() => {
     if (!focusMode) return
@@ -193,6 +194,7 @@ export default function ProjectAgentChatPage() {
     resetTextareaHeight(inputRef.current)
     setError(null)
     setLoading(true)
+    setStopped(false)
     setContent((prev) => appendLog(prev, JSON.stringify({ type: 'human', content: text })))
 
     const controller = new AbortController()
@@ -274,6 +276,14 @@ export default function ProjectAgentChatPage() {
     }
   }
 
+  function stopChat() {
+    abortRef.current?.abort()
+    setStopped(true)
+    if (projectId && agentName) {
+      void apiDelete(`/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/chat`)
+    }
+  }
+
   function startFresh() {
     abortRef.current?.abort()
     setSessionId('')
@@ -281,6 +291,7 @@ export default function ProjectAgentChatPage() {
     setContent('')
     setError(null)
     setFreshNext(true)
+    setStopped(false)
     resetTextareaHeight(inputRef.current)
     inputRef.current?.focus()
   }
@@ -452,7 +463,7 @@ export default function ProjectAgentChatPage() {
           {loading ? (
             <button
               type="button"
-              onClick={() => abortRef.current?.abort()}
+              onClick={stopChat}
               className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
             >
               <Square className="size-3" fill="currentColor" />

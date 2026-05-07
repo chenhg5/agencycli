@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -30,6 +31,12 @@ type UpdateChecker func() (latestVersion, releaseNotes string, hasUpdate bool)
 // DaemonStatusFunc returns daemon status as a JSON-friendly map.
 type DaemonStatusFunc func() map[string]any
 
+// execProcess tracks a running agent exec process for one-shot chat sessions.
+type execProcess struct {
+	cmd     *exec.Cmd
+	started time.Time
+}
+
 // Server serves JSON for one workspace root.
 type Server struct {
 	root         string
@@ -47,6 +54,8 @@ type Server struct {
 	daemonStatus      DaemonStatusFunc
 	assistantMu       sync.Mutex
 	assistantSessions map[string]*assistantSession
+	execMu       sync.Mutex
+	execProcs    map[string]*execProcess // key = "project/agent"
 }
 
 // NewServer builds an API server for the given workspace root.
@@ -65,6 +74,7 @@ func NewServer(root, apiKey string) *Server {
 		ccStore:   store.NewCCConnectStore(root),
 		okrStore:  store.NewOKRStore(root),
 		msStore:   store.NewMilestoneStore(root),
+		execProcs: make(map[string]*execProcess),
 	}
 }
 
@@ -125,6 +135,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/context", s.handleGetAgentContext)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/chat/history", s.handleAgentChatHistory)
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/chat", s.handleAgentChat)
+	mux.HandleFunc("DELETE /api/v1/projects/{name}/agents/{agent}/chat", s.handleAgentChatStop)
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/set-model", s.handleSetModel)
 	mux.HandleFunc("PUT /api/v1/projects/{name}/agents/{agent}/env", s.handlePutAgentEnv)
 	mux.HandleFunc("PUT /api/v1/projects/{name}/agents/{agent}/wakeup", s.handlePutAgentWakeup)

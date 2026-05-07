@@ -486,7 +486,7 @@ const mdComponents = {
 
 function MdBlock({ text, className }: { text: string; className?: string }) {
   return (
-    <div className={cn('prose-none text-sm leading-relaxed text-neutral-800 dark:text-zinc-200', className)}>
+    <div className={cn('prose-none overflow-x-auto text-sm leading-relaxed text-neutral-800 dark:text-zinc-200', className)}>
       <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
         {text}
       </Markdown>
@@ -498,14 +498,14 @@ function ToolInputDisplay({ input }: { input: unknown }) {
   if (input == null) return null
   const str = typeof input === 'string' ? input : JSON.stringify(input, null, 2)
   if (str.length <= 200) {
-    return <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] leading-relaxed text-neutral-500 dark:text-zinc-500">{str}</pre>
+    return <pre className="mt-1 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-neutral-500 dark:text-zinc-500">{str}</pre>
   }
   return (
     <details className="mt-1">
       <summary className="text-[11px] text-neutral-400 hover:text-neutral-600 dark:text-zinc-500 dark:hover:text-zinc-400">
         展开参数
       </summary>
-      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-neutral-500 dark:text-zinc-500">{str}</pre>
+      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-neutral-500 dark:text-zinc-500">{str}</pre>
     </details>
   )
 }
@@ -519,14 +519,14 @@ export function ConversationLog({ content }: { content: string }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 overflow-x-hidden">
       {items.map((item, i) => {
         switch (item.kind) {
           case 'header':
             return (
-              <div key={i} className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-zinc-500">
+              <div key={i} className="flex min-w-0 items-center gap-2 overflow-x-hidden text-[11px] text-neutral-400 dark:text-zinc-500">
                 <Terminal className="size-3 shrink-0" strokeWidth={1.5} />
-                <span className="font-mono">{item.text}</span>
+                <span className="truncate font-mono">{item.text}</span>
               </div>
             )
 
@@ -546,7 +546,7 @@ export function ConversationLog({ content }: { content: string }) {
                   <span>Thinking</span>
                   <span className="text-[10px] opacity-60">({item.text.length} chars)</span>
                 </summary>
-                <div className="ml-5 mt-1 max-h-48 overflow-auto rounded-md border border-neutral-200/60 bg-neutral-50/50 px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-neutral-500 dark:border-zinc-700/40 dark:bg-zinc-800/20 dark:text-zinc-500">
+                <div className="ml-5 mt-1 max-h-48 overflow-auto rounded-md border border-neutral-200/60 bg-neutral-50/50 px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words text-neutral-500 dark:border-zinc-700/40 dark:bg-zinc-800/20 dark:text-zinc-500">
                   {truncateStr(item.text, 4000)}
                 </div>
               </details>
@@ -612,7 +612,7 @@ export function ConversationLog({ content }: { content: string }) {
                     ? 'border-red-200/60 bg-red-50/50 dark:border-red-800/30 dark:bg-red-900/10'
                     : 'border-neutral-200/60 bg-neutral-50/50 dark:border-zinc-700/40 dark:bg-zinc-800/20',
                 )}>
-                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-neutral-600 dark:text-zinc-400">
+                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-600 dark:text-zinc-400">
                     {truncateStr(item.content, 2000)}
                   </pre>
                 </div>

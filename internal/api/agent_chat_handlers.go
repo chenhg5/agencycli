@@ -182,6 +182,17 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If a process is already running for this project/agent, kill it first.
+	key := project + "/" + agent
+	s.execMu.Lock()
+	if existing, ok := s.execProcs[key]; ok {
+		if existing.cmd.Process != nil {
+			killProcessGroup(existing.cmd.Process.Pid)
+		}
+	}
+	s.execProcs[key] = nil // placeholder; will be replaced after cmd.Start
+	s.execMu.Unlock()
+
 	args := []string{"--dir", s.root, "exec", "--project", project, "--agent", agent, "--prompt", msg}
 	sessionID := strings.TrimSpace(body.SessionID)
 	if sessionID != "" && !body.NoSession {
@@ -196,6 +207,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	// prevent run logs and telemetry from being recorded.
 	cmd := exec.Command(s.sched.binPath, args...)
 	cmd.Dir = s.root
+	setProcGroup(cmd)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -211,6 +223,11 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+
+	// Register the running process so it can be stopped via the /chat DELETE endpoint.
+	s.execMu.Lock()
+	s.execProcs[key] = &execProcess{cmd: cmd, started: time.Now()}
+	s.execMu.Unlock()
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -256,6 +273,12 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	waitErr := cmd.Wait()
+
+	// Unregister the process now that it has finished.
+	s.execMu.Lock()
+	delete(s.execProcs, key)
+	s.execMu.Unlock()
+
 	if waitErr != nil && !clientGone {
 		evt, _ := json.Marshal(map[string]any{
 			"type":  "chat_error",
@@ -274,6 +297,42 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	})
 	fmt.Fprintf(w, "data: %s\n\n", done)
 	flusher.Flush()
+}
+
+// handleAgentChatStop kills a running agent exec process for a project/agent.
+func (s *Server) handleAgentChatStop(w http.ResponseWriter, r *http.Request) {
+	project, agent, ok := s.parseProjectAgent(w, r)
+	if !ok {
+		return
+	}
+	if !s.checkProjectAccess(w, r, project) {
+		return
+	}
+
+	key := project + "/" + agent
+	s.execMu.Lock()
+	proc, ok := s.execProcs[key]
+	if ok {
+		delete(s.execProcs, key)
+	}
+	s.execMu.Unlock()
+
+	if proc == nil || proc.cmd.Process == nil {
+		// No process running, treat as success (idempotent).
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "msg": "no process running"})
+		return
+	}
+
+	pid := proc.cmd.Process.Pid
+	killProcessGroup(pid)
+
+	// Give it a moment then force kill if still alive.
+	time.Sleep(500 * time.Millisecond)
+	if proc.cmd.Process != nil {
+		_ = proc.cmd.Process.Kill()
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "pid": pid})
 }
 
 func chatSSELine(line string) string {
