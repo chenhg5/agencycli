@@ -73,6 +73,7 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [stopping, setStopping] = useState(false)
   const [streamLog, setStreamLog] = useState('')
   const [pendingPerm, setPendingPerm] = useState<PermissionRequest | null>(null)
   const sessionIdRef = useRef<string>('')
@@ -122,6 +123,7 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
 
   function stopStream() {
     abortRef.current?.abort()
+    setStopping(true)
   }
 
   async function send() {
@@ -198,6 +200,11 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
               setPendingPerm(null)
               continue
             }
+            if (evt.type === 'stopped') {
+              // Server acknowledged the stop - show stopping state until abort completes
+              setStopping(true)
+              continue
+            }
           } catch { /* not JSON, treat as raw line */ }
           accumulated += data + '\n'
           setStreamLog(accumulated)
@@ -214,6 +221,7 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
       abortRef.current = null
       setStreamLog('')
       setLoading(false)
+      setStopping(false)
       setPendingPerm(null)
       sessionIdRef.current = ''
       if (accumulated.trim()) {
@@ -324,12 +332,12 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
                 </div>
               )
             ))}
-            {loading && streamLog && (
+            {(loading || stopping) && streamLog && (
               <div className="w-full">
                 <ConversationLog content={streamLog} />
               </div>
             )}
-            {loading && (
+            {loading && !stopping && (
               <div className="flex items-center justify-center pt-1">
                 <button
                   type="button"
@@ -341,7 +349,15 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
                 </button>
               </div>
             )}
-            {loading && !streamLog && (
+            {stopping && (
+              <div className="flex items-center justify-center pt-1">
+                <div className="flex items-center gap-1.5 rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-600 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-400">
+                  <Square className="size-2.5" fill="currentColor" />
+                  Stopping...
+                </div>
+              </div>
+            )}
+            {(loading || stopping) && !streamLog && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-neutral-100 px-4 py-3 dark:bg-zinc-800">
                   <span className="size-1.5 animate-bounce rounded-full bg-neutral-400 dark:bg-zinc-500" style={{ animationDelay: '0ms' }} />
@@ -403,12 +419,17 @@ export default function AssistantWidget({ hidden = false, onHide }: AssistantWid
                   el.style.height = Math.min(el.scrollHeight, 120) + 'px'
                 }}
               />
-              {loading ? (
+              {(loading || stopping) ? (
                 <button
                   type="button"
-                  onClick={stopStream}
-                  className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-red-500 text-white transition-colors hover:bg-red-600"
-                  title="Stop"
+                  disabled={stopping}
+                  className={cn(
+                    'flex size-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors',
+                    stopping
+                      ? 'bg-amber-500 cursor-not-allowed'
+                      : 'bg-red-500 hover:bg-red-600'
+                  )}
+                  title={stopping ? 'Stopping...' : 'Stop'}
                 >
                   <Square className="size-3" fill="currentColor" />
                 </button>

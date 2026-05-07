@@ -177,7 +177,7 @@ function SkillAdder({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-40 mt-1 w-48 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+          <div className="absolute left-0 top-full z-40 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
             {available.map((sk) => (
               <button
                 key={sk.name}

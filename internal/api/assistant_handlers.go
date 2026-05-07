@@ -293,10 +293,21 @@ func (s *Server) assistantStreamClaude(w http.ResponseWriter, ctx context.Contex
 	flusher.Flush()
 
 	lineCount := 0
+	stopped := false
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 
 	for scanner.Scan() {
+		// If client disconnected (context cancelled), send stop indicator and drain pipe
+		if ctx.Err() != nil {
+			if !stopped {
+				stopped = true
+				fmt.Fprintf(w, "data: {\"type\":\"stopped\",\"reason\":\"client_disconnected\"}\n\n")
+				flusher.Flush()
+			}
+			// Continue draining pipe to avoid SIGPIPE, but don't send data to client
+			continue
+		}
 		line := scanner.Text()
 		if line == "" {
 			continue
