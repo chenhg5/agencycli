@@ -76,6 +76,10 @@ export default function ProjectAgentChatPage() {
   const [sessionDraft, setSessionDraft] = useState(initialSessionId)
   const [followingLiveLog, setFollowingLiveLog] = useState(false)
   const [stopped, setStopped] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  // Ref to track whether SSE has ever started; prevents in-flight live-log
+  // polls (sent before SSE) from overwriting SSE-streamed content.
+  const sseActiveRef = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -94,20 +98,26 @@ export default function ProjectAgentChatPage() {
     setError(null)
     try {
       const data = await apiFetch<HistoryResp>(path)
+      console.log('[loadHistory]', { sid, sessionId: data.sessionId, contentLen: data.content?.length, truncated: data.truncated, first200: data.content?.slice(0, 200) })
       setSessionId(data.sessionId ?? sid)
       setSessionDraft(data.sessionId ?? sid)
       setContent(data.content ?? '')
       setHistoryTruncated(Boolean(data.truncated))
     } catch (e) {
+      console.log('[loadHistory error]', (e as Error).message)
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setHistoryLoading(false)
     }
   }, [historyPath])
 
+  // Load history only once on mount (when URL has a sessionId), not after SSE runs.
   useEffect(() => {
-    void loadHistory(initialSessionId)
-  }, [initialSessionId, loadHistory])
+    if (initialSessionId) {
+      void loadHistory(initialSessionId)
+      setHistoryLoaded(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!projectId || !agentName) return
@@ -159,9 +169,10 @@ export default function ProjectAgentChatPage() {
         const data = await apiFetch<LiveLogResp>(
           `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/live-log`,
         )
-        // Guard: if SSE has taken over (loading became false and then true again),
-        // don't overwrite SSE content.
-        if (cancelled || loading) return
+        console.log('[live-log poll]', { loading, cancelled, sseActive: sseActiveRef.current, hasContent: Boolean(data.content), finished: data.finished })
+        // Guard: if SSE has taken over (loading became true) OR an in-flight poll
+        // arrived after SSE started, don't overwrite SSE content.
+        if (cancelled || loading || sseActiveRef.current) return
         if (data.content && !data.finished) {
           setContent(data.content)
           setFollowingLiveLog(true)
@@ -170,9 +181,9 @@ export default function ProjectAgentChatPage() {
           setFollowingLiveLog(false)
         }
       } catch {
-        if (!cancelled && !loading) setFollowingLiveLog(false)
+        if (!cancelled && !loading && !sseActiveRef.current) setFollowingLiveLog(false)
       }
-      if (!cancelled && !loading) timer = window.setTimeout(poll, 2000)
+      if (!cancelled && !loading && !sseActiveRef.current) timer = window.setTimeout(poll, 2000)
     }
 
     void poll()
@@ -200,6 +211,7 @@ export default function ProjectAgentChatPage() {
     setError(null)
     setLoading(true)
     setStopped(false)
+    sseActiveRef.current = true
     setContent((prev) => appendLog(prev, JSON.stringify({ type: 'human', content: text })))
 
     const controller = new AbortController()
@@ -242,8 +254,11 @@ export default function ProjectAgentChatPage() {
           if (!part.startsWith('data: ')) continue
           const data = part.slice(6)
           if (!data) continue
+          // DEBUG: log raw SSE data to understand what's coming through
+          console.log('[SSE received]', data.slice(0, 200))
           try {
             const evt = JSON.parse(data)
+            console.log('[SSE parsed]', evt.type, evt.subtype)
             if (evt.type === 'chat_done') {
               if (evt.session_id) setSessionId(evt.session_id)
               continue
@@ -262,6 +277,7 @@ export default function ProjectAgentChatPage() {
         }
       }
     } catch (e) {
+      console.log('[SSE error]', (e as Error).name, (e as Error).message)
       const stopped = (e as Error).name === 'AbortError'
       const msg = stopped ? t('agentChat.stopped') : (e instanceof Error ? e.message : String(e))
       setError(stopped ? null : msg)
@@ -270,6 +286,7 @@ export default function ProjectAgentChatPage() {
       abortRef.current = null
       setFreshNext(false)
       setLoading(false)
+      sseActiveRef.current = false
       inputRef.current?.focus()
     }
   }

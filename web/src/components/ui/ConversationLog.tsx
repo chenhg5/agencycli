@@ -284,6 +284,7 @@ function parseCodexLog(lines: string[]): ConversationItem[] {
 
 function parseLog(content: string): ConversationItem[] {
   const lines = content.split('\n')
+  console.log('[parseLog] content length:', content.length, 'lines:', lines.length, 'firstLine:', lines[0]?.slice(0, 100))
 
   if (isCodexLog(lines)) return parseCodexLog(lines)
 
@@ -456,6 +457,7 @@ function parseLog(content: string): ConversationItem[] {
   }
 
   flushThinking()
+  console.log('[parseLog] returning', items.length, 'items:', items.map(i => i.kind + ':' + ('text' in i ? i.text?.slice(0, 50) : 'blocks:' + ('blocks' in i ? i.blocks?.length : 0))))
   return items
 }
 
@@ -549,6 +551,7 @@ function ToolInputDisplay({ input }: { input: unknown }) {
 export function ConversationLog({ content }: { content: string }) {
   const { t } = useTranslation()
   const items = useMemo(() => parseLog(content), [content])
+  console.log('[ConversationLog] content len:', content.length, 'items:', items.length)
 
   if (items.length === 0) {
     return <p className="py-4 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('runs.logEmpty')}</p>
