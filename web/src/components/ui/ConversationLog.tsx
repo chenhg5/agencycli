@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, User, Wrench, Terminal, AlertTriangle, CheckCircle2, Info, BrainCircuit } from 'lucide-react'
+import { Bot, User, Wrench, Terminal, AlertTriangle, CheckCircle2, Info, BrainCircuit, FileDiff } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
 type ContentBlock =
@@ -48,6 +48,36 @@ type ConversationItem =
   | { kind: 'assistant'; blocks: ContentBlock[] }
   | { kind: 'tool_result'; name?: string; content: string; isError: boolean }
   | { kind: 'result'; text: string; cost?: number; turns?: number; isError: boolean }
+  | { kind: 'usage'; text: string }
+
+function pushAssistantText(items: ConversationItem[], text: string) {
+  if (!text.trim()) return
+  const last = items[items.length - 1]
+  if (last?.kind === 'assistant') {
+    const lastBlock = last.blocks[last.blocks.length - 1]
+    if (lastBlock?.type === 'text') {
+      lastBlock.text = lastBlock.text ? `${lastBlock.text}\n${text}` : text
+      return
+    }
+  }
+  items.push({ kind: 'assistant', blocks: [{ type: 'text', text }] })
+}
+
+function pushAssistantBlocks(items: ConversationItem[], blocks: ContentBlock[]) {
+  const textParts = blocks
+    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+    .map((b) => b.text)
+    .filter((text) => text.trim())
+  const toolUseBlocks = blocks.filter((b) => b.type === 'tool_use')
+
+  if (textParts.length > 0 && toolUseBlocks.length === 0) {
+    pushAssistantText(items, textParts.join('\n'))
+    return
+  }
+  if (textParts.length > 0 || toolUseBlocks.length > 0) {
+    items.push({ kind: 'assistant', blocks: [...textParts.map((text) => ({ type: 'text' as const, text })), ...toolUseBlocks] })
+  }
+}
 
 function extractCursorToolInfo(tc: Record<string, unknown>): { name: string; desc: string; input: unknown } | null {
   const toolNames: Record<string, (inner: Record<string, unknown>) => { name: string; desc: string; input: unknown }> = {
@@ -166,7 +196,7 @@ function parseCodexLog(lines: string[]): ConversationItem[] {
         })
         break
       case 'response':
-        items.push({ kind: 'assistant', blocks: [{ type: 'text', text }] })
+        pushAssistantText(items, text)
         break
     }
   }
@@ -266,16 +296,7 @@ function parseCodexLog(lines: string[]): ConversationItem[] {
   if (tokensTotal > 0) {
     const lastResult = items.findIndex(it => it.kind === 'result')
     if (lastResult === -1) {
-      const lastAssistant = [...items].reverse().find(it => it.kind === 'assistant')
-      const resultText = lastAssistant && lastAssistant.kind === 'assistant'
-        ? lastAssistant.blocks.find(b => b.type === 'text')?.text || 'Completed'
-        : 'Completed'
-      items.push({
-        kind: 'result',
-        text: `${tokensTotal.toLocaleString()} tokens used`,
-        isError: false,
-      })
-      void resultText
+      items.push({ kind: 'usage', text: `${tokensTotal.toLocaleString()} tokens used` })
     }
   }
 
@@ -390,7 +411,7 @@ function parseLog(content: string): ConversationItem[] {
     if (ev.type === 'content' && ev.content_block) {
       const blk = ev.content_block as Record<string, unknown>
       if (blk.type === 'text' && typeof blk.text === 'string' && blk.text) {
-        items.push({ kind: 'assistant', blocks: [{ type: 'text', text: blk.text }] })
+        pushAssistantText(items, blk.text)
       } else if (blk.type === 'tool_use' && typeof blk.name === 'string') {
         const name = blk.name as string
         const input = blk.input
@@ -421,7 +442,7 @@ function parseLog(content: string): ConversationItem[] {
         const toolResultBlocks = blocks.filter((b) => b.type === 'tool_result')
 
         if (textBlocks.length > 0 || toolUseBlocks.length > 0) {
-          items.push({ kind: 'assistant', blocks: [...textBlocks, ...toolUseBlocks] })
+          pushAssistantBlocks(items, [...textBlocks, ...toolUseBlocks])
         }
         for (const tr of toolResultBlocks) {
           if (tr.type === 'tool_result') {
@@ -433,7 +454,7 @@ function parseLog(content: string): ConversationItem[] {
           }
         }
       } else if (typeof c === 'string' && c) {
-        items.push({ kind: 'assistant', blocks: [{ type: 'text', text: c }] })
+        pushAssistantText(items, c)
       }
       continue
     }
@@ -464,6 +485,37 @@ function parseLog(content: string): ConversationItem[] {
 
 function truncateStr(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
+}
+
+function isDiffLike(text: string): boolean {
+  const lines = text.split('\n').map((line) => line.trimEnd()).filter(Boolean)
+  if (lines.length < 4) return false
+  if (lines.some((line) => line.startsWith('diff --git ') || line.startsWith('Index: '))) return true
+  const hasHunk = lines.some((line) => /^@@ .* @@/.test(line))
+  const hasFileMarkers = lines.some((line) => line.startsWith('--- ')) && lines.some((line) => line.startsWith('+++ '))
+  const changed = lines.filter((line) =>
+    (/^[+-]/.test(line) && !line.startsWith('+++') && !line.startsWith('---')) ||
+    line.startsWith('@@ '),
+  ).length
+  return (hasHunk || hasFileMarkers) && changed >= 3
+}
+
+function DiffBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: boolean }) {
+  const lineCount = text.split('\n').length
+  return (
+    <details open={defaultOpen} className="group rounded-md border border-neutral-200/70 bg-neutral-50/70 dark:border-zinc-700/50 dark:bg-zinc-900/40">
+      <summary className="flex min-w-0 items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100/70 dark:text-zinc-400 dark:hover:bg-zinc-800/70">
+        <FileDiff className="size-3.5 shrink-0 text-sky-600 dark:text-sky-400" strokeWidth={1.8} />
+        <span className="truncate">Diff</span>
+        <span className="shrink-0 font-normal text-neutral-400 dark:text-zinc-500">{lineCount.toLocaleString()} lines</span>
+        <span className="ml-auto shrink-0 text-[11px] font-normal text-neutral-400 group-open:hidden dark:text-zinc-500">Expand</span>
+        <span className="ml-auto hidden shrink-0 text-[11px] font-normal text-neutral-400 group-open:inline dark:text-zinc-500">Collapse</span>
+      </summary>
+      <pre className="max-h-72 overflow-auto border-t border-neutral-200/70 bg-white/70 p-3 text-xs leading-relaxed whitespace-pre text-neutral-700 dark:border-zinc-700/50 dark:bg-zinc-950/50 dark:text-zinc-300">
+        {text}
+      </pre>
+    </details>
+  )
 }
 
 const mdComponents = {
@@ -524,6 +576,9 @@ const mdComponents = {
 } as import('react-markdown').Components
 
 function MdBlock({ text, className }: { text: string; className?: string }) {
+  if (isDiffLike(text)) {
+    return <DiffBlock text={text} />
+  }
   return (
     <div className={cn('prose-none overflow-x-auto text-sm leading-relaxed text-neutral-800 dark:text-zinc-200', className)}>
       <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -651,9 +706,13 @@ export function ConversationLog({ content }: { content: string }) {
                     ? 'border-red-200/60 bg-red-50/50 dark:border-red-800/30 dark:bg-red-900/10'
                     : 'border-neutral-200/60 bg-neutral-50/50 dark:border-zinc-700/40 dark:bg-zinc-800/20',
                 )}>
-                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-600 dark:text-zinc-400">
-                    {truncateStr(item.content, 2000)}
-                  </pre>
+                  {isDiffLike(item.content) ? (
+                    <DiffBlock text={item.content} />
+                  ) : (
+                    <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-neutral-600 dark:text-zinc-400">
+                      {truncateStr(item.content, 2000)}
+                    </pre>
+                  )}
                 </div>
               </div>
             )
@@ -681,6 +740,15 @@ export function ConversationLog({ content }: { content: string }) {
                     )}
                   </p>
                   <MdBlock text={item.text} className="mt-1" />
+                </div>
+              </div>
+            )
+
+          case 'usage':
+            return (
+              <div key={i} className="flex items-center justify-center">
+                <div className="rounded-full border border-neutral-200/70 bg-neutral-50 px-3 py-1 text-[11px] font-medium text-neutral-500 dark:border-zinc-700/50 dark:bg-zinc-900/70 dark:text-zinc-500">
+                  {item.text}
                 </div>
               </div>
             )
