@@ -12,6 +12,7 @@
 FROM ubuntu:24.04
 
 ARG CN_MIRROR=0
+ARG GO_VERSION=1.25.7
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_VERSION=22 \
@@ -48,8 +49,23 @@ RUN if [ "$CN_MIRROR" = "1" ]; then \
       npm config set registry https://registry.npmmirror.com; \
     fi
 
+# ── Go ────────────────────────────────────────────────────────────────────────
+RUN if [ "$CN_MIRROR" = "1" ]; then \
+      curl -fsSL "https://mirrors.aliyun.com/golang/go${GO_VERSION}.linux-amd64.tar.gz" \
+        | tar -C /usr/local -xzf -; \
+    else \
+      curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+        | tar -C /usr/local -xzf -; \
+    fi
+ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}" \
+    GOPATH="/root/go" \
+    GOMODCACHE="/root/go/pkg/mod"
+RUN if [ "$CN_MIRROR" = "1" ]; then \
+      go env -w GOPROXY=https://goproxy.cn,direct GONOSUMDB='*'; \
+    fi
+
 # ── Codex CLI ─────────────────────────────────────────────────────────────────
-RUN npm install -g @openai/codex
+RUN npm install -g @openai/codex pnpm
 
 # ── GitHub CLI ─────────────────────────────────────────────────────────────────
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \

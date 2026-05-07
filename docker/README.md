@@ -6,15 +6,17 @@ Pre-built Docker images for running AI agents in isolated containers.
 
 | Image | Agent | Base |
 |-------|-------|------|
-| `ghcr.io/agencycli/sandbox-claudecode:latest` | Claude Code (`claude`) | ubuntu:24.04 + Node 22 |
-| `ghcr.io/agencycli/sandbox-codex:latest` | OpenAI Codex (`codex`) | ubuntu:24.04 + Node 22 |
+| `ghcr.io/agencycli/sandbox-claudecode:latest` | Claude Code (`claude`) | ubuntu:24.04 + Node 22 + Go |
+| `ghcr.io/agencycli/sandbox-codex:latest` | OpenAI Codex (`codex`) | ubuntu:24.04 + Node 22 + Go + pnpm |
 | `ghcr.io/agencycli/sandbox-gemini:latest` | Gemini CLI (`gemini`) | ubuntu:24.04 + Node 22 |
 | `ghcr.io/agencycli/sandbox-generic:latest` | Any / custom | ubuntu:24.04 + Node 22 |
 
-All images include: `git`, `gh` (GitHub CLI), `curl`, `jq`, `ripgrep`, `make`, `openssh-client`.
+All images include: `git`, `gh` (GitHub CLI), `curl`, `jq`, `ripgrep`, `make`, `openssh-client`, `python3`, and `sqlite3`.
+
+Claude Code and Codex images also include Go. Codex additionally includes `pnpm`.
 
 **Not included by default** (install inside the container or in a custom image):
-Go, Python, Rust, database clients, etc. Agents can install these during a task via `apt-get` or the appropriate package manager.
+Rust, database clients beyond SQLite, etc. Agents can install these during a task via `apt-get` or the appropriate package manager.
 
 ## Build locally
 

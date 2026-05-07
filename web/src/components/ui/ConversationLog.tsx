@@ -490,7 +490,7 @@ function truncateStr(s: string, max: number): string {
 function isDiffLike(text: string): boolean {
   const lines = text.split('\n').map((line) => line.trimEnd()).filter(Boolean)
   if (lines.length < 4) return false
-  if (lines.some((line) => line.startsWith('diff --git ') || line.startsWith('Index: '))) return true
+  if (lines[0]?.startsWith('diff --git ') || lines[0]?.startsWith('Index: ')) return true
   const hasHunk = lines.some((line) => /^@@ .* @@/.test(line))
   const hasFileMarkers = lines.some((line) => line.startsWith('--- ')) && lines.some((line) => line.startsWith('+++ '))
   const changed = lines.filter((line) =>
@@ -500,8 +500,14 @@ function isDiffLike(text: string): boolean {
   return (hasHunk || hasFileMarkers) && changed >= 3
 }
 
+function findDiffStart(text: string): number {
+  const lines = text.split('\n')
+  return lines.findIndex((line) => line.startsWith('diff --git ') || line.startsWith('Index: '))
+}
+
 function DiffBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: boolean }) {
   const lineCount = text.split('\n').length
+  const lines = text.split('\n')
   return (
     <details open={defaultOpen} className="group rounded-md border border-neutral-200/70 bg-neutral-50/70 dark:border-zinc-700/50 dark:bg-zinc-900/40">
       <summary className="flex min-w-0 items-center gap-2 px-3 py-2 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-100/70 dark:text-zinc-400 dark:hover:bg-zinc-800/70">
@@ -511,11 +517,36 @@ function DiffBlock({ text, defaultOpen = false }: { text: string; defaultOpen?: 
         <span className="ml-auto shrink-0 text-[11px] font-normal text-neutral-400 group-open:hidden dark:text-zinc-500">Expand</span>
         <span className="ml-auto hidden shrink-0 text-[11px] font-normal text-neutral-400 group-open:inline dark:text-zinc-500">Collapse</span>
       </summary>
-      <pre className="max-h-72 overflow-auto border-t border-neutral-200/70 bg-white/70 p-3 text-xs leading-relaxed whitespace-pre text-neutral-700 dark:border-zinc-700/50 dark:bg-zinc-950/50 dark:text-zinc-300">
-        {text}
+      <pre className="max-h-72 overflow-auto border-t border-neutral-200/70 bg-white/70 p-0 text-xs leading-relaxed whitespace-pre dark:border-zinc-700/50 dark:bg-zinc-950/50">
+        <code className="block min-w-max py-3 font-mono">
+          {lines.map((line, i) => (
+            <span key={i} className={cn('block px-3', diffLineClass(line))}>
+              {line || ' '}
+            </span>
+          ))}
+        </code>
       </pre>
     </details>
   )
+}
+
+function diffLineClass(line: string): string {
+  if (line.startsWith('diff --git ') || line.startsWith('Index: ')) {
+    return 'bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300'
+  }
+  if (line.startsWith('@@ ')) {
+    return 'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300'
+  }
+  if (line.startsWith('+++') || line.startsWith('---')) {
+    return 'bg-neutral-100 text-neutral-600 dark:bg-zinc-900 dark:text-zinc-400'
+  }
+  if (line.startsWith('+')) {
+    return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
+  }
+  if (line.startsWith('-')) {
+    return 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
+  }
+  return 'text-neutral-700 dark:text-zinc-300'
 }
 
 const mdComponents = {
@@ -576,9 +607,27 @@ const mdComponents = {
 } as import('react-markdown').Components
 
 function MdBlock({ text, className }: { text: string; className?: string }) {
-  if (isDiffLike(text)) {
-    return <DiffBlock text={text} />
+  const diffStart = findDiffStart(text)
+  if (diffStart >= 0) {
+    const lines = text.split('\n')
+    const before = lines.slice(0, diffStart).join('\n').trim()
+    const diff = lines.slice(diffStart).join('\n').trim()
+    if (isDiffLike(diff)) {
+      return (
+        <div className={cn('space-y-2', className)}>
+          {before && <MarkdownBlock text={before} />}
+          <DiffBlock text={diff} />
+        </div>
+      )
+    }
   }
+  if (isDiffLike(text.trim())) {
+    return <DiffBlock text={text.trim()} />
+  }
+  return <MarkdownBlock text={text} className={className} />
+}
+
+function MarkdownBlock({ text, className }: { text: string; className?: string }) {
   return (
     <div className={cn('prose-none overflow-x-auto text-sm leading-relaxed text-neutral-800 dark:text-zinc-200', className)}>
       <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -746,10 +795,9 @@ export function ConversationLog({ content }: { content: string }) {
 
           case 'usage':
             return (
-              <div key={i} className="flex items-center justify-center">
-                <div className="rounded-full border border-neutral-200/70 bg-neutral-50 px-3 py-1 text-[11px] font-medium text-neutral-500 dark:border-zinc-700/50 dark:bg-zinc-900/70 dark:text-zinc-500">
-                  {item.text}
-                </div>
+              <div key={i} className="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-1.5 dark:bg-zinc-800/40">
+                <Info className="size-3.5 shrink-0 text-neutral-400 dark:text-zinc-500" strokeWidth={1.8} />
+                <span className="text-xs text-neutral-500 dark:text-zinc-500">{item.text}</span>
               </div>
             )
 

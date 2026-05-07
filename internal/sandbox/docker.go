@@ -41,6 +41,11 @@ const (
 	// container. If <root>/bin/ exists on the host, it is mounted here and
 	// prepended to PATH so those binaries are directly accessible.
 	AgencycliBin = "/agencycli/bin"
+
+	// ContainerDefaultPATH mirrors the tool locations provided by the sandbox
+	// images. Keep Go paths here because Docker -e PATH=... replaces the image
+	// ENV PATH instead of expanding it.
+	ContainerDefaultPATH = "/usr/local/go/bin:/root/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )
 
 // defaultImage returns the default Docker image for a given agent model.
@@ -162,7 +167,7 @@ func BuildArgs(agentDir string, model entity.AgentModel, cfg *entity.DockerSandb
 	)
 	if fi, err := os.Stat(binHostDir); err == nil && fi.IsDir() {
 		args = append(args, "-v", binHostDir+":"+AgencycliBin)
-		args = append(args, "-e", "PATH="+AgencycliBin+":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+		args = append(args, "-e", "PATH="+AgencycliBin+":"+ContainerDefaultPATH)
 	}
 
 	// ── Credential mounts ────────────────────────────────────────────────────
