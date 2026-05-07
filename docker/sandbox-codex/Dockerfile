@@ -22,12 +22,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # ── APT source mirrors ─────────────────────────────────────────────────────────
 RUN if [ "$CN_MIRROR" = "1" ]; then \
       if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
-        sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g; \
-                s|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+        sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g; \
+                s|http://security.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g' \
             /etc/apt/sources.list.d/ubuntu.sources; \
       else \
-        sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g; \
-                s|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+        sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g; \
+                s|http://security.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g' \
             /etc/apt/sources.list; \
       fi; \
     fi

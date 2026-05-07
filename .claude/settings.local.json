@@ -150,7 +150,11 @@
       "Bash(ping -c 2 10.25.1.1)",
       "Bash(nslookup github.com 8.8.8.8)",
       "Bash(nslookup github.com 1.1.1.1)",
-      "Bash(dig *)"
+      "Bash(dig *)",
+      "Bash(npm view *)",
+      "Bash(unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)"
     ]
   }
 }
