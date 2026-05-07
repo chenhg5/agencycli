@@ -50,6 +50,11 @@ const btn = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm fon
 const btnPrimary = `${btn} bg-sky-600 text-white hover:bg-sky-700`
 const btnGhost = `${btn} text-neutral-500 hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800`
 
+function useNavSidebarWidth() {
+  const collapsed = localStorage.getItem('sidebar-collapsed') === '1'
+  return collapsed ? '3.5rem' : '14.5rem'
+}
+
 export default function DocsPage() {
   const { t } = useTranslation()
   const location = useLocation()
@@ -63,7 +68,16 @@ export default function DocsPage() {
   const [searchQ, setSearchQ] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [navSidebarWidth, setNavSidebarWidth] = useState(useNavSidebarWidth)
   const initialRouteHandled = useRef(false)
+
+  // Keep navSidebarWidth in sync with nav sidebar collapse state.
+  useEffect(() => {
+    const update = () => setNavSidebarWidth(useNavSidebarWidth())
+    update()
+    window.addEventListener('storage', update)
+    return () => window.removeEventListener('storage', update)
+  }, [])
 
   const load = useCallback(async () => {
     const [t, d] = await Promise.all([
@@ -74,6 +88,12 @@ export default function DocsPage() {
     setAllDocs(d ?? [])
     return d ?? []
   }, [])
+
+  // Inject nav sidebar width CSS variable so the fixed docs sidebar can
+  // position itself correctly even when the nav sidebar is collapsed.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--nav-sidebar-width', navSidebarWidth)
+  }, [navSidebarWidth])
 
   useEffect(() => { load() }, [load])
 
@@ -149,7 +169,7 @@ export default function DocsPage() {
     <div className="flex h-full">
       {/* Sidebar */}
       {sidebarOpen && (
-        <div className="w-72 shrink-0 border-r border-neutral-200 dark:border-zinc-700/60 overflow-y-auto bg-neutral-50/50 dark:bg-zinc-900/50 flex flex-col">
+        <div className="fixed inset-y-0 left-[var(--nav-sidebar-width)] z-20 w-72 shrink-0 border-r border-neutral-200 dark:border-zinc-700/60 overflow-y-auto bg-neutral-50/50 dark:bg-zinc-900/50 flex flex-col shadow-xl lg:shadow-none">
           <div className="p-3 border-b border-neutral-200 dark:border-zinc-700/60 flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
@@ -190,7 +210,7 @@ export default function DocsPage() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-x-auto">
         {selectedDoc ? (
           <DocViewer
             doc={selectedDoc} content={docContent}
