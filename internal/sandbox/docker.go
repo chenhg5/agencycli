@@ -31,7 +31,7 @@ const (
 	DefaultMemoryMB = 4096
 
 	// Image registry prefix for agencycli-provided sandbox images.
-	imagePrefix = "ghcr.io/agencycli"
+	imagePrefix = "ghcr.io/chenhg5/agencycli"
 
 	// AgencycliMount is where the agencycli binary is mounted inside the
 	// container so that agents can run `agencycli task add` etc.
