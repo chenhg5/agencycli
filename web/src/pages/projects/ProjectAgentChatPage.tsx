@@ -145,6 +145,10 @@ export default function ProjectAgentChatPage() {
     el.style.height = Math.min(el.scrollHeight, 128) + 'px'
   }, [input])
 
+  // Live-log polling: only runs when SSE is NOT active (loading=false).
+  // SSE is the primary real-time source; live-log is a fallback for initial
+  // content when SSE delivers nothing. Guard inside poll to handle in-flight
+  // requests that arrive after SSE starts.
   useEffect(() => {
     if (!projectId || !agentName || loading || stopped) return
     let cancelled = false
@@ -155,19 +159,20 @@ export default function ProjectAgentChatPage() {
         const data = await apiFetch<LiveLogResp>(
           `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/live-log`,
         )
-        if (cancelled) return
+        // Guard: if SSE has taken over (loading became false and then true again),
+        // don't overwrite SSE content.
+        if (cancelled || loading) return
         if (data.content && !data.finished) {
-          if (!sessionId || data.content.includes(sessionId)) {
-            setContent(data.content)
-            setFollowingLiveLog(true)
-          }
-        } else if (data.finished) {
+          setContent(data.content)
+          setFollowingLiveLog(true)
+        }
+        if (data.finished) {
           setFollowingLiveLog(false)
         }
       } catch {
-        if (!cancelled) setFollowingLiveLog(false)
+        if (!cancelled && !loading) setFollowingLiveLog(false)
       }
-      if (!cancelled) timer = window.setTimeout(poll, 2000)
+      if (!cancelled && !loading) timer = window.setTimeout(poll, 2000)
     }
 
     void poll()
@@ -175,7 +180,7 @@ export default function ProjectAgentChatPage() {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [projectId, agentName, sessionId, loading, stopped])
+  }, [projectId, agentName, loading, stopped])
 
   useEffect(() => {
     if (!focusMode) return
