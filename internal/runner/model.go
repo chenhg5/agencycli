@@ -112,12 +112,16 @@ func (c *codexInvoker) Args(promptFile, sessionID string) []string {
 	// When sessionID is provided, use `codex exec resume` to continue a session.
 	var args []string
 	if sessionID != "" {
-		args = []string{"codex", "exec", "resume", sessionID}
+		// --add-dir must come before the 'resume' subcommand
+		for _, dir := range c.addDirs {
+			args = append(args, "--add-dir", dir)
+		}
+		args = append(args, "codex", "exec", "resume", sessionID)
 	} else {
 		args = []string{"codex", "exec", "--skip-git-repo-check"}
-	}
-	for _, dir := range c.addDirs {
-		args = append(args, "--add-dir", dir)
+		for _, dir := range c.addDirs {
+			args = append(args, "--add-dir", dir)
+		}
 	}
 	args = append(args, "-")
 	return args
