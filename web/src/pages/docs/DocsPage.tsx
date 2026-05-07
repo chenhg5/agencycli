@@ -7,7 +7,7 @@ import rehypeHighlight from 'rehype-highlight'
 import type { Components } from 'react-markdown'
 import {
   BookOpen, ChevronRight, ChevronDown, FileText, FolderOpen, Folder,
-  ListTree, Maximize2, Minimize2, Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
+  Maximize2, Minimize2, Plus, Search, ArrowLeft, Pencil, Trash2, X, Save, Copy, Check,
   Calendar, User, Tag, FolderTree, Download, PanelLeftClose, PanelLeft,
 } from 'lucide-react'
 import { apiFetch, apiPost, apiUrl } from '../../lib/api'
@@ -49,11 +49,10 @@ type TreeNode = { name: string; children?: TreeNode[]; docs?: DocEntry[] }
 const btn = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors'
 const btnPrimary = `${btn} bg-sky-600 text-white hover:bg-sky-700`
 const btnGhost = `${btn} text-neutral-500 hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800`
-
-function useNavSidebarWidth() {
-  const collapsed = localStorage.getItem('sidebar-collapsed') === '1'
-  return collapsed ? '3.5rem' : '14.5rem'
-}
+const DOCS_SIDEBAR_WIDTH = 288
+const MAIN_SIDEBAR_EXPANDED_WIDTH = 232
+const READER_MIN_WIDTH = 900
+const TOC_WIDTH = 224
 
 export default function DocsPage() {
   const { t } = useTranslation()
@@ -68,16 +67,8 @@ export default function DocsPage() {
   const [searchQ, setSearchQ] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [navSidebarWidth, setNavSidebarWidth] = useState(useNavSidebarWidth)
   const initialRouteHandled = useRef(false)
-
-  // Keep navSidebarWidth in sync with nav sidebar collapse state.
-  useEffect(() => {
-    const update = () => setNavSidebarWidth(useNavSidebarWidth())
-    update()
-    window.addEventListener('storage', update)
-    return () => window.removeEventListener('storage', update)
-  }, [])
+  const lastMainSidebarPreference = useRef<boolean | null>(null)
 
   const load = useCallback(async () => {
     const [t, d] = await Promise.all([
@@ -89,13 +80,42 @@ export default function DocsPage() {
     return d ?? []
   }, [])
 
-  // Inject nav sidebar width CSS variable so the fixed docs sidebar can
-  // position itself correctly even when the nav sidebar is collapsed.
-  useEffect(() => {
-    document.documentElement.style.setProperty('--nav-sidebar-width', navSidebarWidth)
-  }, [navSidebarWidth])
+  useEffect(() => { void Promise.resolve().then(load) }, [load])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    function updateMainSidebarPreference() {
+      const tocWidth = window.innerWidth >= 1280 ? TOC_WIDTH : 0
+      const docsNavWidth = sidebarOpen ? DOCS_SIDEBAR_WIDTH : 0
+      const requiredWidth = MAIN_SIDEBAR_EXPANDED_WIDTH + docsNavWidth + READER_MIN_WIDTH + tocWidth
+      const shouldCollapse = Boolean(selectedDoc) && window.innerWidth < requiredWidth
+
+      if (lastMainSidebarPreference.current === shouldCollapse) return
+      lastMainSidebarPreference.current = shouldCollapse
+      window.dispatchEvent(new CustomEvent('docs-sidebar-preference', {
+        detail: { collapsed: shouldCollapse },
+      }))
+    }
+
+    updateMainSidebarPreference()
+    window.addEventListener('resize', updateMainSidebarPreference)
+    return () => {
+      window.removeEventListener('resize', updateMainSidebarPreference)
+      if (lastMainSidebarPreference.current === true) {
+        lastMainSidebarPreference.current = false
+        window.dispatchEvent(new CustomEvent('docs-sidebar-preference', {
+          detail: { collapsed: false },
+        }))
+      }
+    }
+  }, [selectedDoc, sidebarOpen])
+
+  const openDoc = useCallback(async (doc: DocEntry) => {
+    setSelectedDoc(doc)
+    const slug = doc.index ? `${doc.index}/${slugify(doc.title)}` : slugify(doc.title)
+    navigate(`/docs/${slug}`, { replace: true })
+    const res = await apiFetch<DocEntry & { content: string }>(`/api/v1/docs/${doc.id}?content=true`)
+    setDocContent(res?.content ?? '')
+  }, [navigate])
 
   // URL -> state: on first load or navigation, resolve /docs/<path> to a doc or index
   useEffect(() => {
@@ -107,16 +127,16 @@ export default function DocsPage() {
     const decoded = decodeURIComponent(sub)
     // Try to find a doc whose id matches
     const byId = allDocs.find(d => d.id === decoded)
-    if (byId) { openDoc(byId); return }
+    if (byId) { void Promise.resolve().then(() => openDoc(byId)); return }
     // Try to find a doc whose index+title slug matches
     const byIndex = allDocs.find(d => d.index === decoded || `${d.index}/${slugify(d.title)}` === decoded)
-    if (byIndex) { openDoc(byIndex); return }
+    if (byIndex) { void Promise.resolve().then(() => openDoc(byIndex)); return }
     // Treat as index/directory
     const hasDocsUnder = allDocs.some(d => d.index === decoded || d.index.startsWith(decoded + '/'))
-    if (hasDocsUnder) { setSelectedIndex(decoded); return }
+    if (hasDocsUnder) { void Promise.resolve().then(() => setSelectedIndex(decoded)); return }
     // Single doc under this index
     const underIndex = allDocs.filter(d => d.index.startsWith(decoded))
-    if (underIndex.length === 1) { openDoc(underIndex[0]); return }
+    if (underIndex.length === 1) { void Promise.resolve().then(() => openDoc(underIndex[0])); return }
   }, [allDocs, location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function onSearch(q: string) {
@@ -145,14 +165,6 @@ export default function DocsPage() {
     return docs.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [allDocs, selectedIndex, searchQ])
 
-  async function openDoc(doc: DocEntry) {
-    setSelectedDoc(doc)
-    const slug = doc.index ? `${doc.index}/${slugify(doc.title)}` : slugify(doc.title)
-    navigate(`/docs/${slug}`, { replace: true })
-    const res = await apiFetch<DocEntry & { content: string }>(`/api/v1/docs/${doc.id}?content=true`)
-    setDocContent(res?.content ?? '')
-  }
-
   function goBackToList() {
     setSelectedDoc(null)
     navigate(selectedIndex ? `/docs/${selectedIndex}` : '/docs', { replace: true })
@@ -169,7 +181,7 @@ export default function DocsPage() {
     <div className="flex h-full">
       {/* Sidebar */}
       {sidebarOpen && (
-        <div className="fixed inset-y-0 left-[var(--nav-sidebar-width)] z-20 w-72 shrink-0 border-r border-neutral-200 dark:border-zinc-700/60 overflow-y-auto bg-neutral-50/50 dark:bg-zinc-900/50 flex flex-col shadow-xl lg:shadow-none">
+        <div className="w-72 shrink-0 border-r border-neutral-200 dark:border-zinc-700/60 overflow-y-auto bg-neutral-50/50 dark:bg-zinc-900/50 flex flex-col">
           <div className="p-3 border-b border-neutral-200 dark:border-zinc-700/60 flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
@@ -210,7 +222,7 @@ export default function DocsPage() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 overflow-x-auto">
+      <div className="flex-1 overflow-y-auto">
         {selectedDoc ? (
           <DocViewer
             doc={selectedDoc} content={docContent}
@@ -478,22 +490,6 @@ const mdComponents: Components = {
   em: ({ children }) => <em className="italic text-neutral-600 dark:text-zinc-400">{children}</em>,
 }
 
-function CopyPathBtn({ path }: { path: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={e => {
-        e.stopPropagation()
-        navigator.clipboard.writeText(path).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
-      }}
-      title={path}
-      className="rounded p-0.5 text-neutral-300 hover:text-neutral-500 dark:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
-    >
-      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-    </button>
-  )
-}
-
 /* ─── Table of contents ────────────────────────────────────────────────────── */
 
 type TocItem = { level: number; text: string; id: string }
@@ -568,45 +564,6 @@ function DocToc({ items, scrollRef }: {
         ))}
       </ul>
     </nav>
-  )
-}
-
-function FloatingToc({ items, scrollRef }: {
-  items: TocItem[]
-  scrollRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    function onClick(e: MouseEvent) {
-      if ((e.target as HTMLElement).closest('[data-floating-toc]')) return
-      setOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    return () => document.removeEventListener('mousedown', onClick)
-  }, [open])
-
-  if (items.length <= 1) return null
-
-  return (
-    <div className="xl:hidden" data-floating-toc>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className={`fixed bottom-6 right-6 z-40 rounded-full p-3 shadow-lg transition-colors ${
-          open
-            ? 'bg-sky-600 text-white'
-            : 'bg-white/80 text-neutral-500 hover:bg-white hover:text-neutral-700 dark:bg-zinc-800/80 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
-        } backdrop-blur-sm border border-neutral-200/60 dark:border-zinc-700/60`}
-      >
-        <ListTree className="size-5" />
-      </button>
-      {open && (
-        <div className="fixed bottom-20 right-6 z-40 w-60 max-h-[60vh] overflow-y-auto rounded-xl border border-neutral-200/60 bg-white/85 p-4 shadow-xl backdrop-blur-md dark:border-zinc-700/60 dark:bg-zinc-900/85">
-          <DocToc items={items} scrollRef={scrollRef} />
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -698,7 +655,6 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             )}
           </div>
         </div>
-        <FloatingToc items={tocItems} scrollRef={scrollRef} />
       </div>
     )
   }
@@ -743,10 +699,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
 
       {/* Meta info bar */}
       <div className="flex items-center gap-5 border-b border-neutral-100 dark:border-zinc-800 px-5 py-2 text-xs text-neutral-400 dark:text-zinc-500">
-        <span className="flex items-center gap-1">
-          <FolderTree className="size-3.5" /> {doc.index}
-          <CopyPathBtn path={doc.filePath} />
-        </span>
+        <span className="flex items-center gap-1"><FolderTree className="size-3.5" /> {doc.index}</span>
         <span className="flex items-center gap-1"><User className="size-3.5" /> {doc.createdBy}</span>
         <span className="flex items-center gap-1"><Calendar className="size-3.5" /> {fmtDate(doc.createdAt)}</span>
         {doc.tags && doc.tags.length > 0 && (
@@ -801,7 +754,6 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
           )}
         </div>
       </div>
-      <FloatingToc items={tocItems} scrollRef={scrollRef} />
     </div>
   )
 }

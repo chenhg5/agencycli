@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
@@ -131,6 +131,7 @@ export function AppShell() {
   const [assistantHidden, setAssistantHidden] = useState(() => localStorage.getItem(ASSISTANT_HIDDEN_KEY) === '1')
   const [appVersion, setAppVersion] = useState('…')
   const [updateInfo, setUpdateInfo] = useState<{ hasUpdate: boolean; latestVersion?: string } | null>(null)
+  const autoCollapsedSidebar = useRef(false)
 
   useEffect(() => {
     apiFetch<{ version: string }>('/api/v1/health')
@@ -146,6 +147,7 @@ export function AppShell() {
     setCollapsed((v) => {
       const next = !v
       localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0')
+      autoCollapsedSidebar.current = false
       return next
     })
   }
@@ -161,6 +163,25 @@ export function AppShell() {
       recordVisit(pathname, title)
     }
   }, [pathname, crumbs])
+
+  useEffect(() => {
+    function onDocsLayoutPreference(event: Event) {
+      const preferCollapsed = Boolean((event as CustomEvent<{ collapsed?: boolean }>).detail?.collapsed)
+      if (preferCollapsed) {
+        setCollapsed((current) => {
+          if (!current) autoCollapsedSidebar.current = true
+          return true
+        })
+        return
+      }
+      if (!autoCollapsedSidebar.current) return
+      autoCollapsedSidebar.current = false
+      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1')
+    }
+
+    window.addEventListener('docs-sidebar-preference', onDocsLayoutPreference)
+    return () => window.removeEventListener('docs-sidebar-preference', onDocsLayoutPreference)
+  }, [])
 
   const pageTitle = crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''
 
