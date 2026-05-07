@@ -211,6 +211,7 @@ export default function ProjectAgentChatPage() {
 
     const controller = new AbortController()
     abortRef.current = controller
+    let processReplaced = false
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -273,11 +274,21 @@ export default function ProjectAgentChatPage() {
       const msg = stopped ? t('agentChat.stopped') : (e instanceof Error ? e.message : String(e))
       setError(stopped ? null : msg)
       setContent((prev) => appendLog(prev, `=== ${msg} ===`))
+      // Flag for finally: if SSE ended for any reason other than user abort
+      // (i.e. another process took over the log), keep sseActiveRef=true so
+      // live-log polling stays suppressed (the log now belongs to the newer
+      // process and must not overwrite this conversation's content).
+      processReplaced = !stopped
+      // Re-throw so finally runs after catch propagates.
+      throw e
     } finally {
       abortRef.current = null
       setFreshNext(false)
       setLoading(false)
-      sseActiveRef.current = false
+      // Only reset sseActiveRef if the SSE ended cleanly (user stopped or
+      // normal completion). If processReplaced=true, a newer SSE is owning the
+      // log file — leave sseActiveRef=true to block live-log polling.
+      if (!processReplaced) sseActiveRef.current = false
       inputRef.current?.focus()
     }
   }
