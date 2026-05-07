@@ -113,7 +113,7 @@ function extractCursorToolResult(tc: Record<string, unknown>): { content: string
       }
       if (key === 'readToolCall') {
         const text = (s.content as string) || (s.text as string) || ''
-        return { content: text ? truncateStr(text, 3000) : '(read ok)', isError: false }
+        return { content: text ? truncateStr(text, 8000) : '(read ok)', isError: false }
       }
       return { content: JSON.stringify(s, null, 2), isError: false }
     }
@@ -372,7 +372,7 @@ function parseLog(content: string): ConversationItem[] {
             blocks: [{
               type: 'tool_use',
               id: ev.call_id,
-              name: info.name + (info.desc ? `: ${truncateStr(info.desc, 80)}` : ''),
+              name: info.name + (info.desc ? `: ${truncateStr(info.desc, 120)}` : ''),
               input: info.input,
             }],
           })
