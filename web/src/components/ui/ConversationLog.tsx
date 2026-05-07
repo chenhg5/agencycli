@@ -34,6 +34,9 @@ type StreamEvent = {
   usage?: { input_tokens?: number; output_tokens?: number }
   content?: ContentBlock[] | string
   role?: string
+  // claude -p stream-json content block events
+  index?: number
+  content_block?: Record<string, any>
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -380,6 +383,32 @@ function parseLog(content: string): ConversationItem[] {
       continue
     }
 
+    // --- claude -p stream-json content block events ---
+    if (ev.type === 'content' && ev.content_block) {
+      const blk = ev.content_block as Record<string, unknown>
+      if (blk.type === 'text' && typeof blk.text === 'string' && blk.text) {
+        items.push({ kind: 'assistant', blocks: [{ type: 'text', text: blk.text }] })
+      } else if (blk.type === 'tool_use' && typeof blk.name === 'string') {
+        const name = blk.name as string
+        const input = blk.input
+        items.push({
+          kind: 'assistant',
+          blocks: [{
+            type: 'tool_use',
+            name,
+            input,
+          }],
+        })
+      } else if (blk.type === 'tool_result' && typeof blk.content === 'string' && blk.content) {
+        items.push({
+          kind: 'tool_result',
+          content: blk.content,
+          isError: Boolean(blk.is_error),
+        })
+      }
+      continue
+    }
+
     if (ev.type === 'assistant') {
       const c = ev.message?.content
       if (Array.isArray(c)) {
@@ -416,6 +445,13 @@ function parseLog(content: string): ConversationItem[] {
         isError: ev.is_error ?? false,
       })
       continue
+    }
+
+    // Fallback: completely unrecognized event types — show as raw header so we can debug.
+    // (content/type events with unrecognized block types also land here)
+    const knownTypes = ['thinking', 'system', 'human', 'user', 'tool_call', 'assistant', 'content', 'result']
+    if (!knownTypes.includes(ev.type)) {
+      items.push({ kind: 'header', text: `[raw:${ev.type}] ${line.slice(0, 120)}` })
     }
   }
 
