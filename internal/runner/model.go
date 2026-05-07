@@ -125,7 +125,19 @@ func (c *codexInvoker) Args(promptFile, sessionID string) []string {
 
 func (c *codexInvoker) UseStdinPrompt() bool { return true }
 
-func (c *codexInvoker) ParseSessionID(_ string) string { return "" }
+func (c *codexInvoker) ParseSessionID(output string) string {
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		lower := strings.ToLower(line)
+		for _, prefix := range []string{"session id:", "session:", "session :"} {
+			if after, ok := strings.CutPrefix(lower, prefix); ok {
+				start := len(line) - len(after)
+				return strings.TrimSpace(line[start:])
+			}
+		}
+	}
+	return ""
+}
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
 

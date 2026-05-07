@@ -126,11 +126,11 @@ function extractCursorToolResult(tc: Record<string, unknown>): { content: string
 }
 
 function isCodexLog(lines: string[]): boolean {
-  // Only match true Codex CLI logs, not agencycli logs.
-  // True Codex logs have "OpenAI Codex" or "model:" metadata at the start.
-  // agencycli logs have "=== agencycli exec:" headers, not model: headers.
-  return lines.some(l => l.includes('OpenAI Codex') || /^model:\s/.test(l.trim())) &&
-    !lines.some(l => l.includes('=== agencycli exec:'))
+  // agencycli prepends its own run headers before the Codex transcript, so do
+  // not reject logs just because they contain "=== agencycli exec".
+  const trimmed = lines.map((l) => l.trim())
+  return trimmed.some(l => l.includes('OpenAI Codex') || /^model:\s/.test(l)) ||
+    (trimmed.includes('user') && trimmed.includes('codex'))
 }
 
 function parseCodexLog(lines: string[]): ConversationItem[] {
@@ -141,7 +141,6 @@ function parseCodexLog(lines: string[]): ConversationItem[] {
   let execCmd = ''
   let execExitCode = -1
   let tokensTotal = 0
-  let seenResponse = false
 
   const isNoise = (l: string) =>
     /^\d{4}-\d{2}-\d{2}T.*\s(ERROR|WARN)\s/.test(l) ||
@@ -167,10 +166,7 @@ function parseCodexLog(lines: string[]): ConversationItem[] {
         })
         break
       case 'response':
-        if (!seenResponse) {
-          seenResponse = true
-          items.push({ kind: 'assistant', blocks: [{ type: 'text', text }] })
-        }
+        items.push({ kind: 'assistant', blocks: [{ type: 'text', text }] })
         break
     }
   }

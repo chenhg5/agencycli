@@ -108,11 +108,10 @@ export default function ProjectAgentChatPage() {
     }
   }, [historyPath])
 
-  // Load history only once on mount (when URL has a sessionId), not after SSE runs.
+  // Load history once on mount. When the URL has no sessionId, the API resolves
+  // the current heartbeat session or falls back to the latest recorded run.
   useEffect(() => {
-    if (initialSessionId) {
-      void loadHistory(initialSessionId)
-    }
+    void loadHistory(initialSessionId)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

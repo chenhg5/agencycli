@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/telemetry"
 )
 
@@ -44,12 +45,20 @@ func (s *Server) handleAgentChatHistory(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	resolvedSessionID := sessionID
 	content := ""
 	truncated := false
 	runs := []agentChatHistoryRun{}
 	if sessionID != "" {
 		var err error
-		content, runs, truncated, err = s.readAgentSessionHistory(project, agent, sessionID)
+		content, runs, resolvedSessionID, truncated, err = s.readAgentSessionHistory(project, agent, sessionID)
+		if err != nil {
+			s.serverError(w, err)
+			return
+		}
+	} else {
+		var err error
+		content, runs, resolvedSessionID, truncated, err = s.readAgentSessionHistory(project, agent, "")
 		if err != nil {
 			s.serverError(w, err)
 			return
@@ -57,38 +66,45 @@ func (s *Server) handleAgentChatHistory(w http.ResponseWriter, r *http.Request) 
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"sessionId": sessionID,
+		"sessionId": resolvedSessionID,
 		"content":   content,
 		"runs":      runs,
 		"truncated": truncated,
 	})
 }
 
-func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (string, []agentChatHistoryRun, bool, error) {
+func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (string, []agentChatHistoryRun, string, bool, error) {
 	db, err := telemetry.OpenReadOnly(s.root)
 	if err != nil {
 		if err == telemetry.ErrNoDatabase {
-			return "", []agentChatHistoryRun{}, false, nil
+			return "", []agentChatHistoryRun{}, sessionID, false, nil
 		}
-		return "", nil, false, err
+		return "", nil, sessionID, false, err
 	}
 	defer db.Close()
 
 	rows, err := telemetry.ReadRuns(db, nil, nil, project)
 	if err != nil {
-		return "", nil, false, err
+		return "", nil, sessionID, false, err
 	}
 
 	const maxRuns = 8
 	filtered := make([]telemetry.RunRow, 0, maxRuns)
-	for _, row := range rows {
-		if row.Agent != agent || !row.SessionID.Valid || row.SessionID.String != sessionID || row.LogPath == "" {
+	for i := len(rows) - 1; i >= 0; i-- {
+		row := rows[i]
+		if row.Agent != agent || row.LogPath == "" {
+			continue
+		}
+		if sessionID != "" && (!row.SessionID.Valid || row.SessionID.String != sessionID) {
 			continue
 		}
 		filtered = append(filtered, row)
-		if len(filtered) > maxRuns {
-			filtered = filtered[len(filtered)-maxRuns:]
+		if len(filtered) >= maxRuns {
+			break
 		}
+	}
+	for i, j := 0, len(filtered)-1; i < j; i, j = i+1, j-1 {
+		filtered[i], filtered[j] = filtered[j], filtered[i]
 	}
 
 	type historySegment struct {
@@ -110,7 +126,14 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 			if os.IsNotExist(err) {
 				continue
 			}
-			return "", nil, false, err
+			return "", nil, sessionID, false, err
+		}
+		if sessionID == "" {
+			if row.SessionID.Valid && row.SessionID.String != "" {
+				sessionID = row.SessionID.String
+			} else if sid := extractAgentChatSessionID(string(data)); sid != "" {
+				sessionID = sid
+			}
 		}
 		segments = append(segments, historySegment{
 			row:     row,
@@ -153,7 +176,7 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 			LogPath:   seg.logPath,
 		})
 	}
-	return sb.String(), outRuns, truncated, nil
+	return sb.String(), outRuns, sessionID, truncated, nil
 }
 
 func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +279,10 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	detectedSessionID := sessionID
+	agentModel := entity.AgentModel("")
+	if meta, err := s.st.AgentMeta(project, agent); err == nil && meta != nil {
+		agentModel = meta.Model
+	}
 	clientGone := false
 	for line := range lines {
 		if sid := extractAgentChatSessionID(line); sid != "" {
@@ -264,7 +291,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		if clientGone {
 			continue
 		}
-		payload := chatSSELine(line)
+		payload := chatSSELine(line, agentModel)
 		if _, err := fmt.Fprintf(w, "data: %s\n\n", payload); err != nil {
 			clientGone = true
 			continue
@@ -335,8 +362,11 @@ func (s *Server) handleAgentChatStop(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "pid": pid})
 }
 
-func chatSSELine(line string) string {
+func chatSSELine(line string, model entity.AgentModel) string {
 	trimmed := strings.TrimSpace(line)
+	if model == entity.ModelCodex || model == entity.ModelQoder {
+		return line
+	}
 	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "===") ||
 		strings.HasPrefix(trimmed, "Command:") || strings.HasPrefix(trimmed, "Started:") {
 		return line
@@ -345,14 +375,28 @@ func chatSSELine(line string) string {
 }
 
 func extractAgentChatSessionID(line string) string {
+	if strings.Contains(line, "\n") {
+		scanner := bufio.NewScanner(strings.NewReader(line))
+		for scanner.Scan() {
+			if sid := extractAgentChatSessionID(scanner.Text()); sid != "" {
+				return sid
+			}
+		}
+		return ""
+	}
 	var raw map[string]any
 	if strings.Contains(line, `"session_id"`) && json.Unmarshal([]byte(line), &raw) == nil {
 		if sid, ok := raw["session_id"].(string); ok && sid != "" {
 			return sid
 		}
 	}
-	if after, ok := strings.CutPrefix(strings.TrimSpace(line), "session :"); ok {
-		return strings.TrimSpace(after)
+	trimmed := strings.TrimSpace(line)
+	lower := strings.ToLower(trimmed)
+	for _, prefix := range []string{"session id:", "session:", "session :"} {
+		if after, ok := strings.CutPrefix(lower, prefix); ok {
+			start := len(trimmed) - len(after)
+			return strings.TrimSpace(trimmed[start:])
+		}
 	}
 	return ""
 }
