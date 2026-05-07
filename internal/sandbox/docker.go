@@ -68,7 +68,7 @@ var defaultCredentialMounts = map[entity.AgentModel][]string{
 		"~/.ssh:/root/.ssh:ro",
 	},
 	entity.ModelCodex: {
-		"~/.codex:/root/.codex:ro",
+		"~/.codex:/root/.codex",
 		"~/.config/gh:/root/.config/gh:ro",
 		"~/.ssh:/root/.ssh:ro",
 	},
