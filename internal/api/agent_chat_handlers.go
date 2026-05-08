@@ -318,6 +318,10 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	if clientGone {
 		return
 	}
+	if waitErr != nil {
+		detectedSessionID = ""
+	}
+
 	done, _ := json.Marshal(map[string]any{
 		"type":       "chat_done",
 		"session_id": detectedSessionID,

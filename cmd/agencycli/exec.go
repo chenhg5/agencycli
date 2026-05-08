@@ -102,7 +102,7 @@ Examples:
 			if result.SessionID != "" {
 				fmt.Fprintf(os.Stderr, "session : %s\n", result.SessionID)
 				// Auto-save so the next exec resumes this conversation.
-				if !noSession {
+				if !noSession && result.Status != entity.TaskStatusDoneFailed {
 					if hb, err2 := ts.GetHeartbeat(project, agentName); err2 == nil {
 						hb.SessionID = result.SessionID
 						if err2 = ts.SaveHeartbeat(project, agentName, hb); err2 == nil {
