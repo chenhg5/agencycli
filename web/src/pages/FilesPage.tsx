@@ -455,28 +455,28 @@ function PreviewModal({ entry, onClose }: { entry: FileEntry; onClose: () => voi
           {cat === 'image' && (
             <>
               <button onClick={() => setZoom(z => Math.min(10, z + 0.25))}
-                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors">
                 <ZoomIn className="size-4" />
               </button>
               <button onClick={() => setZoom(z => Math.max(0.1, z - 0.25))}
-                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors">
                 <ZoomOut className="size-4" />
               </button>
               <button onClick={resetZoom}
-                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors">
                 <Maximize2 className="size-4" />
               </button>
               <span className="text-xs text-white/50 w-12 text-center">{Math.round(zoom * 100)}%</span>
             </>
           )}
           <CopyPathBtn path={entry.path}
-            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors" />
+            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors" />
           <a href={url} download={entry.name} onClick={e => e.stopPropagation()}
-            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors">
             <Download className="size-4" />
           </a>
           <button onClick={onClose}
-            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+            className="rounded-lg p-2 text-white/70 hover:text-white hover:bg-white/10 dark:hover:bg-white/15 transition-colors">
             <X className="size-5" />
           </button>
         </div>
@@ -510,7 +510,7 @@ function PreviewModal({ entry, onClose }: { entry: FileEntry; onClose: () => voi
             <File className="size-16" />
             <p className="text-sm">{t('files.noPreview')}</p>
             <a href={url} download={entry.name}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 dark:hover:bg-white/25 transition-colors">
               <Download className="size-4" /> {t('files.download')}
             </a>
           </div>

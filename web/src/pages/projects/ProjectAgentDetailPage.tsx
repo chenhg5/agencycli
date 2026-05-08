@@ -323,19 +323,19 @@ function SessionPanel({ project, agentName }: { project: string; agentName: stri
         <div className="flex items-center gap-2">
           <Link
             to={`/projects/${encodeURIComponent(project)}/members/${encodeURIComponent(agentName)}/chat${hasSession ? `?sessionId=${encodeURIComponent(info.sessionId!)}` : ''}`}
-            className="flex items-center gap-1 rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400"
+            className="flex items-center gap-1 rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50"
           >
             <MessageSquareText className="size-3.5" strokeWidth={2} />
             {t('agentChat.openChat')}
           </Link>
           {hasSession && (
             <button type="button" onClick={() => void doReset()} disabled={resetting}
-              className="cursor-pointer rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+              className="cursor-pointer rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50">
               {resetting ? t('session.resettingSession') : t('session.resetSession')}
             </button>
           )}
           <button type="button" onClick={() => void doRun()} disabled={running}
-            className="cursor-pointer rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400">
+            className="cursor-pointer rounded-md border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50">
             {running ? t('session.running') : t('session.run')}
           </button>
         </div>
@@ -642,7 +642,7 @@ export default function ProjectAgentDetailPage() {
                       type="button"
                       onClick={doSync}
                       disabled={syncing}
-                      className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600"
+                      className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
                     >
                       <RefreshCw className={cn('size-4', syncing && 'animate-spin')} strokeWidth={2} />
                       {syncing ? t('prompt.syncing') : t('prompt.sync')}
@@ -762,7 +762,7 @@ function SandboxEditor({ project, agentName, initial, initialAddDirs, onChanged 
         </div>
         {dirty && (
           <button type="button" onClick={() => void save()} disabled={saving}
-            className="flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400">
+            className="flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50">
             <Save className="size-3" strokeWidth={2} />
             {saving ? t('common.save') + '...' : t('common.save')}
           </button>

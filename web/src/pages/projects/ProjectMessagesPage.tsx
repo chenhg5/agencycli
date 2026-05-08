@@ -211,13 +211,13 @@ export default function ProjectMessagesPage() {
             {t('messages.selected', { count: String(checked.size) })}
           </span>
           <div className="flex items-center gap-1.5">
-            <button type="button" disabled={batchBusy} onClick={() => void batchMarkRead()} className="whitespace-nowrap rounded-md border border-sky-200 bg-white px-2.5 py-1 text-[12px] font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+            <button type="button" disabled={batchBusy} onClick={() => void batchMarkRead()} className="whitespace-nowrap rounded-md border border-sky-200 bg-white px-2.5 py-1 text-[12px] font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-40 dark:border-sky-800 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-900/60">
               {t('messages.batchMarkRead')}
             </button>
-            <button type="button" disabled={batchBusy} onClick={() => void batchArchive()} className="whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+            <button type="button" disabled={batchBusy} onClick={() => void batchArchive()} className="whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-[12px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800">
               {t('messages.batchArchive')}
             </button>
-            <button type="button" disabled={batchBusy} onClick={() => void batchDelete()} className="whitespace-nowrap rounded-md border border-red-200 bg-white px-2.5 py-1 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
+            <button type="button" disabled={batchBusy} onClick={() => void batchDelete()} className="whitespace-nowrap rounded-md border border-red-200 bg-white px-2.5 py-1 text-[12px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/50">
               {t('messages.batchDelete')}
             </button>
           </div>

@@ -10,7 +10,7 @@ import { addQuickLink } from '../../lib/quick-links'
 import { cn } from '../../lib/cn'
 
 const iconBtn =
-  'flex size-7 items-center justify-center rounded-md text-neutral-400 transition-all duration-150 hover:bg-neutral-500/[0.07] hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-white/[0.06] dark:hover:text-zinc-300'
+  'flex size-7 items-center justify-center rounded-md text-neutral-400 transition-all duration-150 hover:bg-neutral-500/[0.07] hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-700/50 dark:hover:text-zinc-300'
 
 const languages = [
   { code: 'en', label: 'English' },
