@@ -336,12 +336,18 @@ function parseLog(content: string): ConversationItem[] {
       continue
     }
 
-    if (!line.startsWith('{')) continue
+    if (!line.startsWith('{')) {
+      // Treat any non-empty non-JSON line as a debug header so we don't silently drop things like api_retry.
+      if (line) items.push({ kind: 'header', text: `[raw] ${line.slice(0, 120)}` })
+      continue
+    }
 
     let ev: StreamEvent
     try {
       ev = JSON.parse(line)
     } catch {
+      // Malformed JSON — show as debug header.
+      items.push({ kind: 'header', text: `[raw:json-err] ${line.slice(0, 120)}` })
       continue
     }
 
@@ -358,10 +364,17 @@ function parseLog(content: string): ConversationItem[] {
     if (thinkingBuf) flushThinking()
 
     if (ev.type === 'system') {
-      const info = ev.subtype === 'init' && ev.session_id
-        ? `Session: ${ev.session_id}`
-        : ev.subtype || 'system'
-      items.push({ kind: 'system', text: info })
+      if (ev.subtype === 'api_retry') {
+        items.push({
+          kind: 'system',
+          text: `api_retry (attempt ${ev.attempt}/${ev.max_retries}) — ${ev.error_status} ${ev.error}`,
+        })
+      } else {
+        const info = ev.subtype === 'init' && ev.session_id
+          ? `Session: ${ev.session_id}`
+          : ev.subtype || 'system'
+        items.push({ kind: 'system', text: info })
+      }
       continue
     }
 

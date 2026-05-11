@@ -452,7 +452,7 @@ function MessagesPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectA
 
 type TaskView = 'list' | 'kanban'
 
-function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
+function TasksPanel({ projectsAgents, onMutated }: { projectsAgents: ProjectAgents[]; onMutated?: () => void }) {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
   const [view, setView] = useState<TaskView>('list')
@@ -478,7 +478,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
   const rawTasks = state.status === 'ok' ? (state.data ?? []) : []
 
   const tasks = useMemo(() => {
-    let filtered = rawTasks
+    let filtered = rawTasks.filter((t) => !t.archived)
     if (priorityFilter !== '') filtered = filtered.filter((t) => t.priority === Number(priorityFilter))
     const sorted = [...filtered]
     if (taskSort === 'oldest') sorted.reverse()
@@ -499,7 +499,7 @@ function TasksPanel({ projectsAgents }: { projectsAgents: ProjectAgents[] }) {
     return Array.from(s).sort()
   }, [tasks])
 
-  const reload = useCallback(() => { setReloadKey((k) => k + 1); setChecked(new Set()) }, [])
+  const reload = useCallback(() => { setReloadKey((k) => k + 1); setChecked(new Set()); onMutated?.() }, [onMutated])
 
   async function handleKanbanStatusChange(task: TaskRow, newStatus: string) {
     await apiPut('/api/v1/tasks/update', { project: task.project, agent: task.agent, id: task.id, status: newStatus })
@@ -1066,7 +1066,7 @@ export default function WorkbenchPage() {
   const msgCount = useApiJson<MessageRow[]>('/api/v1/workbench/messages?direction=inbox&read=unread', badgeKey)
   const unreadMsgs = msgCount.status === 'ok' ? msgCount.data.length : 0
   const taskCount = useApiJson<TaskRow[]>('/api/v1/workbench/tasks?status=pending', badgeKey)
-  const pendingTasks = taskCount.status === 'ok' ? taskCount.data.length : 0
+  const pendingTasks = taskCount.status === 'ok' ? taskCount.data.filter((t) => !t.archived).length : 0
   const refreshBadge = useCallback(() => setBadgeKey((k) => k + 1), [])
   const refreshQuickLinks = useCallback(() => setQuickLinksVersion((v) => v + 1), [])
 
@@ -1117,7 +1117,7 @@ export default function WorkbenchPage() {
       {tab === 'overview' && <OverviewPanel />}
       {tab === 'quickLinks' && <QuickLinksPanel onChanged={refreshQuickLinks} />}
       {tab === 'messages' && <MessagesPanel projectsAgents={projectsAgents} onMutated={refreshBadge} />}
-      {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} />}
+      {tab === 'tasks' && <TasksPanel projectsAgents={projectsAgents} onMutated={refreshBadge} />}
     </div>
   )
 }

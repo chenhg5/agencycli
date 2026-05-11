@@ -201,7 +201,7 @@ func (s *Server) handleWorkbenchTasks(w http.ResponseWriter, r *http.Request) {
 				if statusFilter != "" && string(t.Status) != statusFilter {
 					continue
 				}
-				isArchived := t.Status.IsTerminal() && !containsTask(active, t.ID)
+				isArchived := !containsTask(active, t.ID)
 				rows = append(rows, taskToRow(t, proj, ag, isArchived))
 			}
 		}
