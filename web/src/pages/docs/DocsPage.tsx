@@ -569,6 +569,22 @@ function DocToc({ items, scrollRef }: {
 
 /* ─── Document viewer ──────────────────────────────────────────────────────── */
 
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation()
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <button onClick={copy} title={text} className="ml-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+    </button>
+  )
+}
+
 function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onToggleSidebar }: {
   doc: DocEntry; content: string; onBack: () => void; onRemove: () => void; onUpdated: () => void
   sidebarOpen: boolean; onToggleSidebar: () => void
@@ -699,7 +715,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
 
       {/* Meta info bar */}
       <div className="flex items-center gap-5 border-b border-neutral-100 dark:border-zinc-800 px-5 py-2 text-xs text-neutral-400 dark:text-zinc-500">
-        <span className="flex items-center gap-1"><FolderTree className="size-3.5" /> {doc.index}</span>
+        <span className="flex items-center gap-1"><FolderTree className="size-3.5" /> {doc.index} <CopyBtn text={doc.index} /></span>
         <span className="flex items-center gap-1"><User className="size-3.5" /> {doc.createdBy}</span>
         <span className="flex items-center gap-1"><Calendar className="size-3.5" /> {fmtDate(doc.createdAt)}</span>
         {doc.tags && doc.tags.length > 0 && (
