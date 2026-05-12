@@ -664,7 +664,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             </article>
             {tocItems.length > 1 && (
               <aside className="hidden xl:block w-56 shrink-0 py-10 pr-6">
-                <div className="sticky top-10">
+                <div className="sticky top-10 max-h-[calc(100vh-120px)] overflow-y-auto">
                   <DocToc items={tocItems} scrollRef={scrollRef} />
                 </div>
               </aside>
@@ -763,7 +763,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
           </article>
           {tocItems.length > 1 && (
             <aside className="hidden xl:block w-56 shrink-0 py-8 pr-6">
-              <div className="sticky top-8">
+              <div className="sticky top-8 max-h-[calc(100vh-120px)] overflow-y-auto">
                 <DocToc items={tocItems} scrollRef={scrollRef} />
               </div>
             </aside>
