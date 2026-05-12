@@ -296,7 +296,7 @@ export default function DocsPage() {
         )}
       </div>
 
-      {showAdd && <AddDocModal onClose={() => setShowAdd(false)} onAdded={() => { setShowAdd(false); load() }} />}
+      {showAdd && <AddDocModal allDocs={allDocs} onClose={() => setShowAdd(false)} onAdded={() => { setShowAdd(false); load() }} />}
     </div>
   )
 }
@@ -774,17 +774,101 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
   )
 }
 
+/* ─── File picker modal ────────────────────────────────────────────────────── */
+
+type FileEntry = { name: string; path: string; isDir: boolean }
+
+function FilePickerModal({ onClose, onSelect }: { onClose: () => void; onSelect: (path: string) => void }) {
+  const [currentPath, setCurrentPath] = useState('')
+  const [entries, setEntries] = useState<FileEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const params = currentPath ? `?path=${encodeURIComponent(currentPath)}` : ''
+    const data = await apiFetch<FileEntry[]>(`/api/v1/files${params}`)
+    setEntries(data ?? [])
+    setLoading(false)
+  }, [currentPath])
+
+  useEffect(() => { void load() }, [load])
+
+  const breadcrumbs = currentPath ? currentPath.split('/').filter(Boolean) : []
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-neutral-200 bg-white dark:border-zinc-700 dark:bg-zinc-900 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-zinc-700/60 px-5 py-3">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-zinc-100">选择文件</h3>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+            <X className="size-4" />
+          </button>
+        </div>
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1 px-5 py-2 text-xs text-neutral-500 border-b border-neutral-100 dark:border-zinc-700/60 overflow-x-auto">
+          <button onClick={() => setCurrentPath('')} className="hover:text-sky-600 shrink-0">根目录</button>
+          {breadcrumbs.map((seg, i) => (
+            <span key={i} className="flex items-center gap-1 shrink-0">
+              <ChevronRight className="size-3" />
+              <button onClick={() => setCurrentPath(breadcrumbs.slice(0, i + 1).join('/'))} className="hover:text-sky-600">
+                {seg}
+              </button>
+            </span>
+          ))}
+        </div>
+        {/* File list */}
+        <div className="max-h-80 overflow-y-auto p-2">
+          {loading ? (
+            <div className="py-8 text-center text-sm text-neutral-400">加载中...</div>
+          ) : entries.length === 0 ? (
+            <div className="py-8 text-center text-sm text-neutral-400">空目录</div>
+          ) : (
+            <div className="space-y-0.5">
+              {entries.map(entry => (
+                <button
+                  key={entry.path}
+                  onClick={() => entry.isDir ? setCurrentPath(entry.path) : onSelect(entry.path)}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-zinc-800"
+                >
+                  {entry.isDir ? (
+                    <Folder className="size-4 text-amber-500" />
+                  ) : (
+                    <FileText className="size-4 text-neutral-400" />
+                  )}
+                  <span className="text-neutral-700 dark:text-zinc-300">{entry.name}</span>
+                  {entry.isDir && <span className="ml-auto text-xs text-neutral-400">/</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Add document modal ───────────────────────────────────────────────────── */
 
-function AddDocModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+function AddDocModal({ allDocs, onClose, onAdded }: { allDocs: DocEntry[]; onClose: () => void; onAdded: () => void }) {
   const { t } = useTranslation()
   const [filePath, setFilePath] = useState('')
+  const [showPicker, setShowPicker] = useState(false)
   const [title, setTitle] = useState('')
   const [index, setIndex] = useState('')
   const [createdBy, setCreatedBy] = useState('human')
   const [tags, setTags] = useState('')
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const uniqueIndexes = useMemo(() => {
+    const set = new Set(allDocs.map(d => d.index).filter(Boolean))
+    return Array.from(set).sort()
+  }, [allDocs])
+
+  const uniqueTags = useMemo(() => {
+    const set = new Set(allDocs.flatMap(d => d.tags ?? []))
+    return Array.from(set).sort()
+  }, [allDocs])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -814,9 +898,15 @@ function AddDocModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
         <div className="space-y-3">
           <label className="block space-y-1">
             <span className="text-sm text-neutral-600 dark:text-zinc-400">{t('docs.filePath')} *</span>
-            <input required value={filePath} onChange={e => setFilePath(e.target.value)} placeholder="/path/to/file.md"
-              className={inputCls} />
+            <div className="flex gap-2">
+              <input required value={filePath} onChange={e => setFilePath(e.target.value)} placeholder="/path/to/file.md"
+                className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200" />
+              <button type="button" onClick={() => setShowPicker(true)} className={btnGhost}>
+                <FolderOpen className="size-4" />
+              </button>
+            </div>
           </label>
+          {showPicker && <FilePickerModal onClose={() => setShowPicker(false)} onSelect={p => { setFilePath(p); setShowPicker(false) }} />}
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
               <span className="text-sm text-neutral-600 dark:text-zinc-400">Title</span>
@@ -826,7 +916,8 @@ function AddDocModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
             <label className="block space-y-1">
               <span className="text-sm text-neutral-600 dark:text-zinc-400">{t('docs.virtualDir')}</span>
               <input value={index} onChange={e => setIndex(e.target.value)} placeholder="category/subcategory"
-                className={inputCls} />
+                className={inputCls} list="index-suggestions" />
+              {uniqueIndexes.length > 0 && <datalist id="index-suggestions">{uniqueIndexes.map(idx => <option key={idx} value={idx} />)}</datalist>}
             </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -838,7 +929,8 @@ function AddDocModal({ onClose, onAdded }: { onClose: () => void; onAdded: () =>
             <label className="block space-y-1">
               <span className="text-sm text-neutral-600 dark:text-zinc-400">{t('docs.tags')}</span>
               <input value={tags} onChange={e => setTags(e.target.value)} placeholder="tag1, tag2"
-                className={inputCls} />
+                className={inputCls} list="tag-suggestions" />
+              {uniqueTags.length > 0 && <datalist id="tag-suggestions">{uniqueTags.map(tag => <option key={tag} value={tag} />)}</datalist>}
             </label>
           </div>
           <label className="block space-y-1">
