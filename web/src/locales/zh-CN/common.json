@@ -340,6 +340,11 @@
     "exitFullscreen": "退出全屏",
     "searchResults": "搜索结果",
     "collapseSidebar": "收起目录",
+    "references": "引用文档",
+    "referencedBy": "被引用",
+    "addRef": "添加引用",
+    "removeRef": "移除引用",
+    "noRefs": "无",
     "expandSidebar": "展开目录"
   },
   "api": {

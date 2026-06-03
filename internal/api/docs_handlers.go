@@ -262,6 +262,72 @@ func (s *Server) handleDocsDelete(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
+// ── refs handlers ─────────────────────────────────────────────────────────────
+
+func (s *Server) handleDocsGetRefs(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	ds := store.NewDocsStore(s.root)
+	refs, err := ds.GetRefs(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	backrefs, err := ds.GetBackrefs(id)
+	if err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"refs":     refs,
+		"backrefs": backrefs,
+	})
+}
+
+type docsAddRefBody struct {
+	RefID string `json:"refId"`
+}
+
+func (s *Server) handleDocsAddRef(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body docsAddRefBody
+	if err := s.readJSON(w, r, &body); err != nil {
+		return
+	}
+	if body.RefID == "" {
+		s.jsonError(w, http.StatusBadRequest, "refId is required")
+		return
+	}
+	ds := store.NewDocsStore(s.root)
+	if err := ds.AddRef(id, body.RefID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+func (s *Server) handleDocsRemoveRef(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	refID := r.PathValue("refId")
+	ds := store.NewDocsStore(s.root)
+	if err := ds.RemoveRef(id, refID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
 // ── query / lint handlers ─────────────────────────────────────────────────────
 
 func (s *Server) handleDocsQuery(w http.ResponseWriter, r *http.Request) {

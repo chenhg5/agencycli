@@ -20,6 +20,8 @@ type DocEntry struct {
 	CreatedBy   string    `yaml:"created_by" json:"createdBy"`
 	Tags        []string  `yaml:"tags,omitempty" json:"tags,omitempty"`
 	Description string    `yaml:"description,omitempty" json:"description,omitempty"`
+	// Refs lists the IDs of documents this document references (outbound links).
+	Refs        []string  `yaml:"refs,omitempty" json:"refs,omitempty"`
 	CreatedAt   time.Time `yaml:"created_at" json:"createdAt"`
 	UpdatedAt   time.Time `yaml:"updated_at" json:"updatedAt"`
 }
@@ -246,6 +248,79 @@ func (ds *DocsStore) ReadContent(filePath string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// ── Document references ───────────────────────────────────────────────────────
+
+// AddRef adds refID as an outbound reference from docID. Idempotent.
+func (ds *DocsStore) AddRef(docID, refID string) error {
+	// Validate both exist
+	if _, err := ds.Get(docID); err != nil {
+		return fmt.Errorf("source document: %w", err)
+	}
+	if _, err := ds.Get(refID); err != nil {
+		return fmt.Errorf("target document: %w", err)
+	}
+	if docID == refID {
+		return fmt.Errorf("a document cannot reference itself")
+	}
+	return ds.Update(docID, func(e *DocEntry) {
+		for _, r := range e.Refs {
+			if r == refID {
+				return // already linked
+			}
+		}
+		e.Refs = append(e.Refs, refID)
+	})
+}
+
+// RemoveRef removes refID from docID's outbound references.
+func (ds *DocsStore) RemoveRef(docID, refID string) error {
+	return ds.Update(docID, func(e *DocEntry) {
+		out := e.Refs[:0]
+		for _, r := range e.Refs {
+			if r != refID {
+				out = append(out, r)
+			}
+		}
+		e.Refs = out
+	})
+}
+
+// GetRefs returns the documents that docID directly references (outbound).
+func (ds *DocsStore) GetRefs(docID string) ([]*DocEntry, error) {
+	doc, err := ds.Get(docID)
+	if err != nil {
+		return nil, err
+	}
+	var refs []*DocEntry
+	for _, rid := range doc.Refs {
+		if ref, err := ds.Get(rid); err == nil {
+			refs = append(refs, ref)
+		}
+	}
+	return refs, nil
+}
+
+// GetBackrefs returns documents that reference docID (inbound links).
+func (ds *DocsStore) GetBackrefs(docID string) ([]*DocEntry, error) {
+	docs, err := ds.load()
+	if err != nil {
+		return nil, err
+	}
+	var backrefs []*DocEntry
+	for _, d := range docs {
+		if d.ID == docID {
+			continue
+		}
+		for _, r := range d.Refs {
+			if r == docID {
+				backrefs = append(backrefs, d)
+				break
+			}
+		}
+	}
+	return backrefs, nil
 }
 
 // QueryResult is one document match returned by QueryDocs.

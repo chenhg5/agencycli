@@ -42,6 +42,9 @@ Common agent operations:
 		newDocsSearchCmd(),
 		newDocsQueryCmd(),
 		newDocsLintCmd(),
+		newDocsLinkCmd(),
+		newDocsUnlinkCmd(),
+		newDocsRefsCmd(),
 	)
 	return cmd
 }
@@ -54,6 +57,7 @@ func newDocsAddCmd() *cobra.Command {
 		createdBy   string
 		tags        []string
 		description string
+		refs        []string
 	)
 	cmd := &cobra.Command{
 		Use:   "add",
@@ -64,7 +68,10 @@ only metadata is recorded.
   agencycli docs add --path ./docs/design.md --title "System Design" \
     --index "cc-connect/architecture" --created-by human
 
+Use --ref to record which existing documents this one is derived from or references.
 Virtual directories in --index are created automatically.`,
+		Example: `  agencycli docs add --path ./notes/auth-summary.md --title "Auth Summary" \
+    --created-by project/agent --ref doc-20260603-abc123 --ref doc-20260603-def456`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -96,12 +103,22 @@ Virtual directories in --index are created automatically.`,
 				CreatedBy:   createdBy,
 				Tags:        tags,
 				Description: description,
+				Refs:        refs,
 			}
 			if err := ds.Add(entry); err != nil {
 				return err
 			}
+			// Validate refs exist (warn but don't fail — IDs may be added later)
+			for _, ref := range refs {
+				if _, err := ds.Get(ref); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: ref %q not found in index\n", ref)
+				}
+			}
 			fmt.Printf("✓ Document added: %s [%s]\n", entry.ID, index)
 			fmt.Printf("  Title: %s\n  Path:  %s\n", title, absPath)
+			if len(refs) > 0 {
+				fmt.Printf("  Refs:  %s\n", strings.Join(refs, ", "))
+			}
 			fmt.Printf("  Web:   %s\n", docsWebPath(entry.ID))
 			if webURL := docsWebURL(root, entry.ID); webURL != "" {
 				fmt.Printf("  URL:   %s\n", webURL)
@@ -115,6 +132,7 @@ Virtual directories in --index are created automatically.`,
 	cmd.Flags().StringVar(&createdBy, "created-by", "", "who added this (required, e.g. human, project/agent)")
 	cmd.Flags().StringArrayVar(&tags, "tag", nil, "tags (repeatable)")
 	cmd.Flags().StringVar(&description, "description", "", "short description")
+	cmd.Flags().StringArrayVar(&refs, "ref", nil, "document IDs this doc references (repeatable)")
 	return cmd
 }
 
@@ -539,6 +557,152 @@ making "docs query" and "docs list" far more useful.`,
 				fmt.Printf("    %s\n", s)
 			}
 			fmt.Println("\nFix: agencycli docs update <id> --description \"what this document contains\"")
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output as JSON")
+	return cmd
+}
+
+// ── docs link / unlink / refs ─────────────────────────────────────────────────
+
+func newDocsLinkCmd() *cobra.Command {
+	var refID string
+	cmd := &cobra.Command{
+		Use:   "link <doc-id>",
+		Short: "Add a reference from one document to another",
+		Long: `Record that <doc-id> references another document (--ref <target-id>).
+This creates a directional link: <doc-id> → <target-id>.
+
+Useful when an agent produces a document derived from or based on existing docs.
+The link is stored in the index and visible via "docs refs".`,
+		Example: `  # Agent's summary references two source docs
+  agencycli docs link doc-20260603-summary --ref doc-20260603-source1
+  agencycli docs link doc-20260603-summary --ref doc-20260603-source2`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if refID == "" {
+				return fmt.Errorf("--ref is required")
+			}
+			ds := store.NewDocsStore(root)
+			if err := ds.AddRef(args[0], refID); err != nil {
+				return err
+			}
+			src, _ := ds.Get(args[0])
+			tgt, _ := ds.Get(refID)
+			srcTitle := refID
+			if src != nil {
+				srcTitle = src.Title
+			}
+			tgtTitle := refID
+			if tgt != nil {
+				tgtTitle = tgt.Title
+			}
+			fmt.Printf("✓ Linked: \"%s\" → \"%s\"\n", srcTitle, tgtTitle)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&refID, "ref", "", "target document ID (required)")
+	return cmd
+}
+
+func newDocsUnlinkCmd() *cobra.Command {
+	var refID string
+	cmd := &cobra.Command{
+		Use:   "unlink <doc-id>",
+		Short: "Remove a reference between two documents",
+		Example: `  agencycli docs unlink doc-20260603-summary --ref doc-20260603-source1`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			if refID == "" {
+				return fmt.Errorf("--ref is required")
+			}
+			ds := store.NewDocsStore(root)
+			if err := ds.RemoveRef(args[0], refID); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Unlinked %s → %s\n", args[0], refID)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&refID, "ref", "", "target document ID to remove (required)")
+	return cmd
+}
+
+func newDocsRefsCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "refs <doc-id>",
+		Short: "Show outbound references and inbound back-references for a document",
+		Long: `Shows two sets of related documents:
+
+  References  — documents that <doc-id> explicitly references (outbound)
+  Referenced by — documents that cite <doc-id> (inbound / back-references)
+
+Agents can use this to navigate a graph of related knowledge.`,
+		Example: `  agencycli docs refs doc-20260603-summary
+  agencycli docs refs doc-20260603-source1 --json`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			ds := store.NewDocsStore(root)
+			doc, err := ds.Get(args[0])
+			if err != nil {
+				return err
+			}
+			refs, err := ds.GetRefs(args[0])
+			if err != nil {
+				return err
+			}
+			backrefs, err := ds.GetBackrefs(args[0])
+			if err != nil {
+				return err
+			}
+
+			if asJSON {
+				return printJSON(map[string]any{
+					"doc":      doc,
+					"refs":     refs,
+					"backrefs": backrefs,
+				})
+			}
+
+			fmt.Printf("Document: %s (%s)\n\n", doc.Title, doc.ID)
+
+			if len(refs) == 0 {
+				fmt.Println("References (outbound): none")
+			} else {
+				fmt.Printf("References (outbound): %d\n", len(refs))
+				for _, r := range refs {
+					fmt.Printf("  → %-22s %s\n", r.ID, r.Title)
+					if r.Description != "" {
+						fmt.Printf("    %s\n", r.Description)
+					}
+				}
+			}
+			fmt.Println()
+			if len(backrefs) == 0 {
+				fmt.Println("Referenced by (inbound): none")
+			} else {
+				fmt.Printf("Referenced by (inbound): %d\n", len(backrefs))
+				for _, r := range backrefs {
+					fmt.Printf("  ← %-22s %s\n", r.ID, r.Title)
+					if r.Description != "" {
+						fmt.Printf("    %s\n", r.Description)
+					}
+				}
+			}
 			return nil
 		},
 	}

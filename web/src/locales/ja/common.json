@@ -340,6 +340,11 @@
     "exitFullscreen": "全画面終了",
     "searchResults": "検索結果",
     "collapseSidebar": "サイドバーを閉じる",
+    "references": "参照",
+    "referencedBy": "参照元",
+    "addRef": "参照を追加",
+    "removeRef": "参照を削除",
+    "noRefs": "なし",
     "expandSidebar": "サイドバーを開く"
   },
   "api": {

@@ -340,6 +340,11 @@
     "exitFullscreen": "Exit Fullscreen",
     "searchResults": "Search results",
     "collapseSidebar": "Collapse sidebar",
+    "references": "References",
+    "referencedBy": "Referenced by",
+    "addRef": "Add reference",
+    "removeRef": "Remove reference",
+    "noRefs": "None",
     "expandSidebar": "Expand sidebar"
   },
   "api": {

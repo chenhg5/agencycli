@@ -41,9 +41,10 @@ function useLocaleDate() {
 
 type DocEntry = {
   id: string; title: string; filePath: string; index: string
-  createdBy: string; tags?: string[]; description?: string
+  createdBy: string; tags?: string[]; description?: string; refs?: string[]
   createdAt: string; updatedAt: string
 }
+type DocRefs = { refs: DocEntry[]; backrefs: DocEntry[] }
 type TreeNode = { name: string; children?: TreeNode[]; docs?: DocEntry[] }
 
 const btn = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors'
@@ -291,6 +292,7 @@ export default function DocsPage() {
             onBack={goBackToList}
             onRemove={() => removeDoc(selectedDoc.id)}
             onUpdated={load}
+            onOpenDoc={openDoc}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(v => !v)}
             onTagClick={tag => { selectTag(tag); goBackToList() }}
@@ -663,8 +665,9 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onToggleSidebar, onTagClick }: {
+function DocViewer({ doc, content, onBack, onRemove, onUpdated, onOpenDoc, sidebarOpen, onToggleSidebar, onTagClick }: {
   doc: DocEntry; content: string; onBack: () => void; onRemove: () => void; onUpdated: () => void
+  onOpenDoc?: (d: DocEntry) => void
   sidebarOpen: boolean; onToggleSidebar: () => void; onTagClick?: (tag: string) => void
 }) {
   const { t } = useTranslation()
@@ -675,8 +678,36 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
   const [editDesc, setEditDesc] = useState(doc.description ?? '')
   const [editIndex, setEditIndex] = useState(doc.index)
   const [editTags, setEditTags] = useState((doc.tags ?? []).join(', '))
+  const [refs, setRefs] = useState<DocRefs | null>(null)
+  const [addingRef, setAddingRef] = useState(false)
+  const [refInput, setRefInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const tocItems = useMemo(() => parseHeadings(content), [content])
+
+  const loadRefs = useCallback(async () => {
+    const data = await apiFetch<DocRefs>(`/api/v1/docs/${doc.id}/refs`)
+    setRefs(data)
+  }, [doc.id])
+
+  useEffect(() => { void loadRefs() }, [loadRefs])
+
+  async function addRef() {
+    const id = refInput.trim()
+    if (!id) return
+    await apiFetch(`/api/v1/docs/${doc.id}/refs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refId: id }),
+    })
+    setRefInput('')
+    setAddingRef(false)
+    void loadRefs()
+  }
+
+  async function removeRef(refId: string) {
+    await apiFetch(`/api/v1/docs/${doc.id}/refs/${encodeURIComponent(refId)}`, { method: 'DELETE' })
+    void loadRefs()
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -844,6 +875,100 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
             >
               {stripFrontmatter(content)}
             </ReactMarkdown>
+
+            {/* References panel */}
+            {(refs && (refs.refs.length > 0 || refs.backrefs.length > 0 || !editing)) && (
+              <div className="mt-10 border-t border-neutral-200 dark:border-zinc-700/60 pt-6 space-y-5">
+                {/* Outbound refs */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-neutral-600 dark:text-zinc-400 flex items-center gap-1.5">
+                      <span className="text-base">→</span> {t('docs.references')}
+                      {refs && refs.refs.length > 0 && (
+                        <span className="text-xs text-neutral-400 font-normal">({refs.refs.length})</span>
+                      )}
+                    </h3>
+                    <button
+                      onClick={() => setAddingRef(v => !v)}
+                      className="text-xs text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1"
+                    >
+                      <Plus className="size-3" /> {t('docs.addRef')}
+                    </button>
+                  </div>
+                  {addingRef && (
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        value={refInput}
+                        onChange={e => setRefInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') void addRef() }}
+                        placeholder="doc-id..."
+                        className="flex-1 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+                        autoFocus
+                      />
+                      <button onClick={() => void addRef()} className={btnPrimary}>{t('docs.save')}</button>
+                      <button onClick={() => { setAddingRef(false); setRefInput('') }} className={btnGhost}>{t('docs.cancel')}</button>
+                    </div>
+                  )}
+                  {refs && refs.refs.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {refs.refs.map(r => (
+                        <div key={r.id} className="group flex items-start gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+                          <FileText className="mt-0.5 size-4 shrink-0 text-sky-400" />
+                          <div className="flex-1 min-w-0">
+                            <button
+                              onClick={() => onOpenDoc?.(r)}
+                              className="text-sm font-medium text-sky-700 dark:text-sky-400 hover:underline truncate block"
+                            >
+                              {r.title}
+                            </button>
+                            {r.description && (
+                              <p className="text-xs text-neutral-400 dark:text-zinc-500 truncate">{r.description}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => void removeRef(r.id)}
+                            className="opacity-0 group-hover:opacity-100 text-neutral-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-opacity"
+                            title={t('docs.removeRef')}
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    !addingRef && <p className="text-xs text-neutral-400 dark:text-zinc-500">{t('docs.noRefs')}</p>
+                  )}
+                </div>
+
+                {/* Back-references */}
+                {refs && refs.backrefs.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-600 dark:text-zinc-400 flex items-center gap-1.5 mb-2">
+                      <span className="text-base">←</span> {t('docs.referencedBy')}
+                      <span className="text-xs text-neutral-400 font-normal">({refs.backrefs.length})</span>
+                    </h3>
+                    <div className="space-y-1.5">
+                      {refs.backrefs.map(r => (
+                        <div key={r.id} className="flex items-start gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+                          <FileText className="mt-0.5 size-4 shrink-0 text-violet-400" />
+                          <div className="flex-1 min-w-0">
+                            <button
+                              onClick={() => onOpenDoc?.(r)}
+                              className="text-sm font-medium text-violet-700 dark:text-violet-400 hover:underline truncate block"
+                            >
+                              {r.title}
+                            </button>
+                            {r.description && (
+                              <p className="text-xs text-neutral-400 dark:text-zinc-500 truncate">{r.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </article>
           {tocItems.length > 1 && (
             <aside className="hidden xl:block w-56 shrink-0 py-8 pr-6">
