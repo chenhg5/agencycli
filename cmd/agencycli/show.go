@@ -25,11 +25,14 @@ func newShowCmd() *cobra.Command {
 // ── show team ─────────────────────────────────────────────────────────────────
 
 func newShowTeamCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "team <path>",
-		Short:   "Show team details and its prompt",
-		Example: `  agencycli show team engineering/backend`,
-		Args:    cobra.ExactArgs(1),
+	var format string
+
+	cmd := &cobra.Command{
+		Use:   "team <path>",
+		Short: "Show team details and its prompt",
+		Example: `  agencycli show team engineering/backend
+  agencycli show team engineering --format json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			teamPath := args[0]
 			root, err := resolveRoot()
@@ -42,6 +45,25 @@ func newShowTeamCmd() *cobra.Command {
 				return err
 			}
 			prompt, _ := s.TeamPrompt(teamPath)
+
+			if resolveFormat(format) == "json" {
+				type teamOut struct {
+					Path        string   `json:"path"`
+					Description string   `json:"description"`
+					Parent      string   `json:"parent,omitempty"`
+					Goals       []string `json:"goals,omitempty"`
+					Skills      []string `json:"skills,omitempty"`
+					Prompt      string   `json:"prompt,omitempty"`
+				}
+				return printJSON(teamOut{
+					Path:        teamPath,
+					Description: t.Description,
+					Parent:      t.Parent,
+					Goals:       t.Goals,
+					Skills:      t.Skills,
+					Prompt:      prompt,
+				})
+			}
 
 			fmt.Printf("Team: %s\n", teamPath)
 			if t.Description != "" {
@@ -65,16 +87,21 @@ func newShowTeamCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
+	return cmd
 }
 
 // ── show project ──────────────────────────────────────────────────────────────
 
 func newShowProjectCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:     "project <name>",
-		Short:   "Show project details and its prompt",
-		Example: `  agencycli show project my-api`,
-		Args:    cobra.ExactArgs(1),
+	var format string
+
+	cmd := &cobra.Command{
+		Use:   "project <name>",
+		Short: "Show project details and its prompt",
+		Example: `  agencycli show project my-api
+  agencycli show project my-api --format json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			root, err := resolveRoot()
@@ -87,6 +114,37 @@ func newShowProjectCmd() *cobra.Command {
 				return err
 			}
 			prompt, _ := s.ProjectPrompt(name)
+			agents, _ := s.ListAgents(name)
+
+			if resolveFormat(format) == "json" {
+				type agentSummary struct {
+					Name  string `json:"name"`
+					Model string `json:"model"`
+					Team  string `json:"team"`
+				}
+				type projectOut struct {
+					Name        string         `json:"name"`
+					Description string         `json:"description,omitempty"`
+					Repo        string         `json:"repo,omitempty"`
+					Agents      []agentSummary `json:"agents"`
+					Prompt      string         `json:"prompt,omitempty"`
+				}
+				out := projectOut{
+					Name:        name,
+					Description: p.Description,
+					Repo:        p.Repo,
+					Agents:      []agentSummary{},
+					Prompt:      prompt,
+				}
+				for _, a := range agents {
+					out.Agents = append(out.Agents, agentSummary{
+						Name:  a.Name,
+						Model: string(a.Meta.Model),
+						Team:  a.Meta.Team,
+					})
+				}
+				return printJSON(out)
+			}
 
 			fmt.Printf("Project: %s\n", name)
 			if p.Description != "" {
@@ -95,8 +153,6 @@ func newShowProjectCmd() *cobra.Command {
 			if p.Repo != "" {
 				fmt.Printf("  Repo:        %s\n", p.Repo)
 			}
-
-			agents, _ := s.ListAgents(name)
 			if len(agents) > 0 {
 				fmt.Printf("  Agents:\n")
 				for _, a := range agents {
@@ -104,25 +160,29 @@ func newShowProjectCmd() *cobra.Command {
 						a.Name, a.Meta.Model, a.Meta.Team)
 				}
 			}
-
 			if prompt != "" {
 				fmt.Printf("\n--- prompt.md ---\n%s\n", prompt)
 			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
+	return cmd
 }
 
 // ── show agent ────────────────────────────────────────────────────────────────
 
 func newShowAgentCmd() *cobra.Command {
 	var raw bool
+	var format string
 
 	cmd := &cobra.Command{
-		Use:     "agent <project> <name>",
-		Short:   "Show merged context for a hired agent",
-		Example: `  agencycli show agent my-api dev`,
-		Args:    cobra.ExactArgs(2),
+		Use:   "agent <project> <name>",
+		Short: "Show merged context for a hired agent",
+		Example: `  agencycli show agent my-api dev
+  agencycli show agent my-api dev --format json
+  agencycli show agent my-api dev --raw`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			project, agentName := args[0], args[1]
 			root, err := resolveRoot()
@@ -136,6 +196,51 @@ func newShowAgentCmd() *cobra.Command {
 				return err
 			}
 
+			builder := ctxbuild.NewBuilder(s)
+			mc, err := builder.Build(project, meta.Team, meta.Role)
+			if err != nil {
+				return err
+			}
+
+			if resolveFormat(format) == "json" && !raw {
+				type layerSummary struct {
+					Source string `json:"source"`
+					Lines  int    `json:"lines"`
+				}
+				type agentOut struct {
+					Project  string         `json:"project"`
+					Name     string         `json:"name"`
+					Model    string         `json:"model"`
+					Team     string         `json:"team"`
+					Role     string         `json:"role,omitempty"`
+					HiredAt  string         `json:"hired_at"`
+					Dir      string         `json:"dir"`
+					Layers   []layerSummary `json:"context_layers"`
+					Skills   []string       `json:"skills"`
+				}
+				out := agentOut{
+					Project:  project,
+					Name:     agentName,
+					Model:    string(meta.Model),
+					Team:     meta.Team,
+					Role:     meta.Role,
+					HiredAt:  meta.HiredAt.Format("2006-01-02T15:04:05Z"),
+					Dir:      s.AgentDir(project, agentName),
+					Layers:   []layerSummary{},
+					Skills:   []string{},
+				}
+				for _, l := range mc.Layers {
+					out.Layers = append(out.Layers, layerSummary{
+						Source: l.Source,
+						Lines:  strings.Count(l.Content, "\n") + 1,
+					})
+				}
+				for _, sk := range mc.Skills {
+					out.Skills = append(out.Skills, sk.Name)
+				}
+				return printJSON(out)
+			}
+
 			fmt.Printf("Agent:     %s/%s\n", project, agentName)
 			fmt.Printf("Model:     %s\n", meta.Model)
 			fmt.Printf("Team:      %s\n", meta.Team)
@@ -143,11 +248,6 @@ func newShowAgentCmd() *cobra.Command {
 			fmt.Printf("Agent dir: %s\n", s.AgentDir(project, agentName))
 
 			if raw {
-				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Team, meta.Role)
-				if err != nil {
-					return err
-				}
 				fmt.Printf("\n%s\n", separator("MERGED CONTEXT"))
 				for _, l := range mc.Layers {
 					fmt.Printf("\n## [%s]\n\n%s\n", l.Source, strings.TrimSpace(l.Content))
@@ -159,11 +259,6 @@ func newShowAgentCmd() *cobra.Command {
 					}
 				}
 			} else {
-				builder := ctxbuild.NewBuilder(s)
-				mc, err := builder.Build(project, meta.Team, meta.Role)
-				if err != nil {
-					return err
-				}
 				fmt.Printf("\nContext layers:\n")
 				total := 0
 				for i, l := range mc.Layers {
@@ -182,7 +277,8 @@ func newShowAgentCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&raw, "raw", false, "Print the full merged context content")
+	cmd.Flags().BoolVar(&raw, "raw", false, "print the full merged context content")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 

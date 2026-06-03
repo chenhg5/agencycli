@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/errs"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/chenhg5/agencycli/internal/taskstore"
 	"github.com/chenhg5/agencycli/internal/telemetry"
@@ -41,37 +43,49 @@ func newTaskCmd() *cobra.Command {
 
 func newTaskAddCmd() *cobra.Command {
 	var (
-		project     string
-		agentName   string
-		title       string
-		description string
-		taskType    string
-		priority    int
-		prompt      string
-		promptFile  string
-		dependsOn   []string
-		assignee    string
-		createdBy   string
-		labels      []string
-		parentID    string
-		dueDate     string
+		project        string
+		agentName      string
+		title          string
+		description    string
+		taskType       string
+		priority       int
+		prompt         string
+		promptFile     string
+		dependsOn      []string
+		assignee       string
+		createdBy      string
+		labels         []string
+		parentID       string
+		dueDate        string
+		idempotencyKey string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a new task for an agent",
-		Example: `  # PM adds a bug task for dev-claude
+		Example: `  # Add a bug task (agent retries safely via idempotency key)
   agencycli task add \
     --project cc-connect --agent dev-claude \
     --title "Fix login redirect on mobile" \
     --type bug --priority 1 \
-    --prompt "The login redirect is broken on mobile. Fix it and open a PR."
+    --idempotency-key "fix-login-redirect-2026-06" \
+    --prompt "The login redirect is broken on mobile. Fix it and open a PR." \
+    --created-by human
 
-  # Assign to human inbox
+  # Add a feature task
   agencycli task add \
-    --project cc-connect --agent pm-agent \
-    --title "Scope AI search feature" --assignee human \
-    --prompt "Issue #101 requests AI search. Is this in scope for Q2?"`,
+    --project cc-connect --agent pm \
+    --title "Scope AI search feature" \
+    --type feature --priority 2 \
+    --prompt "Issue #101 requests AI search. Scope and estimate the work." \
+    --created-by human
+
+  # Route directly to human inbox for review
+  agencycli task add \
+    --project cc-connect --agent pm \
+    --title "Approve Q2 roadmap" --assignee human \
+    --prompt "Review and approve the Q2 roadmap doc at docs/roadmap-q2.md" \
+    --created-by cc-connect/pm`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -121,20 +135,21 @@ func newTaskAddCmd() *cobra.Command {
 
 			now := time.Now().UTC()
 			t := &entity.Task{
-				ID:          entity.NewTaskID(),
-				Title:       title,
-				Description: description,
-				Type:        entity.TaskType(taskType),
-				Priority:    priority,
-				Assignee:    assignee,
-				CreatedBy:   createdBy,
-				Status:      entity.TaskStatusPending,
-				Prompt:      promptText,
-				DependsOn:   dependsOn,
-				Labels:      labels,
-				ParentID:    parentID,
-				CreatedAt:   now,
-				UpdatedAt:   now,
+				ID:             entity.NewTaskID(),
+				Title:          title,
+				Description:    description,
+				Type:           entity.TaskType(taskType),
+				Priority:       priority,
+				Assignee:       assignee,
+				CreatedBy:      createdBy,
+				Status:         entity.TaskStatusPending,
+				Prompt:         promptText,
+				DependsOn:      dependsOn,
+				Labels:         labels,
+				ParentID:       parentID,
+				IdempotencyKey: idempotencyKey,
+				CreatedAt:      now,
+				UpdatedAt:      now,
 			}
 			if dueDate != "" {
 				if dd, err := time.Parse("2006-01-02", dueDate); err == nil {
@@ -149,8 +164,14 @@ func newTaskAddCmd() *cobra.Command {
 			// If assignee is "human", create the task under the source agent
 			// but also route it directly to the inbox.
 			if assignee == "human" {
-				if err := ts.AddTask(project, agentName, t); err != nil {
-					return err
+				addErr := ts.AddTask(project, agentName, t)
+				if addErr != nil {
+					var conflict *errs.ConflictError
+					if errors.As(addErr, &conflict) {
+						fmt.Printf("Task %s already exists (idempotency key match) — skipping\n", t.ID)
+						return nil
+					}
+					return addErr
 				}
 				item := &entity.InboxItem{
 					TaskID:  t.ID,
@@ -166,8 +187,14 @@ func newTaskAddCmd() *cobra.Command {
 				return nil
 			}
 
-			if err := ts.AddTask(project, agentName, t); err != nil {
-				return err
+			addErr := ts.AddTask(project, agentName, t)
+			if addErr != nil {
+				var conflict *errs.ConflictError
+				if errors.As(addErr, &conflict) {
+					fmt.Printf("Task %s already exists (idempotency key match) — skipping\n", t.ID)
+					return nil
+				}
+				return addErr
 			}
 			fmt.Printf("✓ Task %s created  [%s / %s]\n", t.ID, project, agentName)
 			return nil
@@ -178,8 +205,9 @@ func newTaskAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
 	cmd.Flags().StringVar(&title, "title", "", "task title")
 	cmd.Flags().StringVar(&description, "description", "", "human-readable description")
-	cmd.Flags().StringVar(&taskType, "type", "chore", "task type (feature|bug|review|triage|test|research|chore)")
+	cmd.Flags().StringVar(&taskType, "type", "chore", "task type: feature|bug|review|triage|test|research|chore")
 	cmd.Flags().IntVar(&priority, "priority", 2, "priority: 0=critical 1=high 2=normal 3=low")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "unique key to prevent duplicate tasks on agent retry")
 	cmd.Flags().StringVar(&prompt, "prompt", "", "task prompt text")
 	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "read task prompt from file")
 	cmd.Flags().StringArrayVar(&dependsOn, "depends-on", nil, "task IDs this task depends on")
@@ -206,7 +234,8 @@ func newTaskListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List tasks for an agent",
 		Example: `  agencycli task list --project cc-connect --agent qa-reviewer
-  agencycli task list --project cc-connect --agent qa-reviewer --status pending --format table
+  agencycli task list --project cc-connect --agent qa-reviewer --format table
+  agencycli task list --project cc-connect --agent qa-reviewer --status pending
   agencycli task list --project cc-connect --agent qa-reviewer --archived`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -251,7 +280,7 @@ func newTaskListCmd() *cobra.Command {
 				return ti.CreatedAt.Before(tj.CreatedAt)
 			})
 
-			if format == "json" || format == "" {
+			if resolveFormat(format) == "json" {
 				if tasks == nil {
 					tasks = []*entity.Task{}
 				}
@@ -280,7 +309,7 @@ func newTaskListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
 	cmd.Flags().StringVar(&status, "status", "", "filter by status")
 	cmd.Flags().BoolVar(&archived, "archived", false, "show archived (terminal) tasks")
-	cmd.Flags().StringVar(&format, "format", "json", "output format: json or table")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 
@@ -290,12 +319,15 @@ func newTaskShowCmd() *cobra.Command {
 	var (
 		project   string
 		agentName string
+		format    string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "show <task-id>",
 		Short: "Show full detail of a task",
-		Args:  cobra.ExactArgs(1),
+		Example: `  agencycli task show t-abc123 --project cc-connect --agent pm
+  agencycli task show t-abc123 --project cc-connect --agent pm --format json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -309,6 +341,10 @@ func newTaskShowCmd() *cobra.Command {
 			t, err := ts.GetTask(project, agentName, args[0])
 			if err != nil {
 				return err
+			}
+
+			if resolveFormat(format) == "json" {
+				return printJSON(t)
 			}
 
 			fmt.Printf("ID       : %s\n", t.ID)
@@ -360,6 +396,7 @@ func newTaskShowCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&project, "project", "", "project name")
 	cmd.Flags().StringVar(&agentName, "agent", "", "agent name")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 
@@ -1228,10 +1265,14 @@ func newTaskCommentAddCmd() *cobra.Command {
 }
 
 func newTaskCommentListCmd() *cobra.Command {
+	var format string
+
 	cmd := &cobra.Command{
 		Use:   "list <task-id>",
 		Short: "List comments on a task",
-		Args:  cobra.ExactArgs(1),
+		Example: `  agencycli task comment list t-abc123
+  agencycli task comment list t-abc123 --format json`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -1249,6 +1290,14 @@ func newTaskCommentListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if resolveFormat(format) == "json" {
+				if comments == nil {
+					comments = []*entity.TaskComment{}
+				}
+				return printJSON(comments)
+			}
+
 			if len(comments) == 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "No comments.")
 				return nil
@@ -1260,6 +1309,7 @@ func newTaskCommentListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 

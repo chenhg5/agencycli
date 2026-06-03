@@ -44,6 +44,7 @@ func buildHireCmd(use string) *cobra.Command {
 		agentName   string
 		extraPrompt string
 		force       bool
+		ifNotExists bool
 
 		// Sandbox flags
 		sandboxProvider    string
@@ -124,12 +125,18 @@ To switch an existing agent to another runtime (e.g. claudecode → codex), use
 			}
 
 			agentDir := s.AgentDir(project, agentName)
-			if _, err := os.Stat(agentDir); err == nil && !force {
-				return fmt.Errorf(
-					"agent %q already exists at %s\n"+
-						"Use --force to regenerate it",
-					agentName, agentDir,
-				)
+			if _, err := os.Stat(agentDir); err == nil {
+				if ifNotExists {
+					fmt.Printf("agent %q already exists — skipping (--if-not-exists)\n", agentName)
+					return nil
+				}
+				if !force {
+					return fmt.Errorf(
+						"agent %q already exists at %s\n"+
+							"Use --force to regenerate it, or --if-not-exists to skip silently",
+						agentName, agentDir,
+					)
+				}
 			}
 
 			// Human agents need no context files or sandbox — just create the dir and save meta.
@@ -286,7 +293,8 @@ To switch an existing agent to another runtime (e.g. claudecode → codex), use
 	cmd.Flags().StringVar(&model, "model", "", fmt.Sprintf("Agent model (%s)", joinModels(entity.KnownModels)))
 	cmd.Flags().StringVar(&agentName, "name", "", "Name for this agent (used as directory name)")
 	cmd.Flags().StringVar(&extraPrompt, "extra-prompt", "", "Path to an additional Markdown file to append to the context")
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing agent directory")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing agent directory")
+	cmd.Flags().BoolVar(&ifNotExists, "if-not-exists", false, "skip silently if the agent already exists (idempotent)")
 
 	cmd.Flags().StringVar(&sandboxProvider, "sandbox", "", "Sandbox provider: docker (default: none, runs on host)")
 	cmd.Flags().StringVar(&sandboxImage, "sandbox-image", "", "Docker image override (default: ghcr.io/agencycli/sandbox-<model>:latest)")

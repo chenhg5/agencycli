@@ -137,7 +137,7 @@ Use --all to show all messages including read ones.`,
 				return err
 			}
 
-			if jsonOut {
+			if jsonOut || !isTerminal(os.Stdout) {
 				if msgs == nil {
 					msgs = []*entity.Message{}
 				}
@@ -649,7 +649,7 @@ Use --archived to show archived messages.`,
 				msgs = filtered
 			}
 
-			if jsonOut {
+			if jsonOut || !isTerminal(os.Stdout) {
 				if msgs == nil {
 					msgs = []*entity.Message{}
 				}

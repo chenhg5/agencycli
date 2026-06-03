@@ -669,6 +669,10 @@ func (r *Runner) recordAgentRun(
 	absLogPath, cmdSummary, prompt string,
 	stdout []byte,
 ) {
+	// Keep the Claude sessions-index.json up-to-date so `claude /resume`
+	// can list sessions created by non-interactive (pipeline) runs.
+	agentDir := filepath.Join(r.root, "projects", project, "agents", agent)
+	go updateClaudeSessionIndex(agentDir, sessionID)
 	rec := telemetry.Record{
 		Kind:           kind,
 		StartedAt:      started,

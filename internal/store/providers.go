@@ -149,6 +149,14 @@ func (ps *ProviderStore) ResolveEnv(id string) (map[string]string, error) {
 	case "anthropic":
 		if p.APIKey != "" {
 			env["ANTHROPIC_API_KEY"] = p.APIKey
+			// Clear the host's ANTHROPIC_AUTH_TOKEN so it does not leak into
+			// Docker containers and conflict with the provider's API key.
+			// ANTHROPIC_AUTH_TOKEN (an OAuth bearer token) takes precedence over
+			// ANTHROPIC_API_KEY in Claude Code; custom API providers (e.g. proxies)
+			// only accept the X-API-Key header, so a stale host token causes 401.
+			if _, already := env["ANTHROPIC_AUTH_TOKEN"]; !already {
+				env["ANTHROPIC_AUTH_TOKEN"] = ""
+			}
 		}
 		if p.BaseURL != "" {
 			env["ANTHROPIC_BASE_URL"] = p.BaseURL

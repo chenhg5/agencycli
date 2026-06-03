@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/chenhg5/agencycli/internal/errs"
 	"github.com/chenhg5/agencycli/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -30,22 +32,24 @@ Typical workflow:
   cd MyAgency
 
   agencycli create team --name "engineering"
-  agencycli create team --name "engineering/backend" --desc "Go/gRPC services"
-
   agencycli create project --name "my-api" --repo "../my-api"
 
-  agencycli hire   --project "my-api" --team "engineering/backend" \
-                   --model "claudecode" --name "dev"
-  # or equivalently:
-  agencycli assign --project "my-api" --team "engineering/backend" \
-                   --model "cursor" --name "cursor-dev"
+  agencycli agent hire --project "my-api" --team "engineering" \
+                       --model "claudecode" --name "dev"
+  agencycli task add   --project "my-api" --agent "dev" \
+                       --title "Implement feature X" --prompt "..." \
+                       --created-by human
+  agencycli agent run  --project "my-api" --agent "dev"
 
-  cd projects/my-api/agents/dev
-  claude
+Agent-friendly tips:
+  - All list/show commands output JSON by default (--format table for humans)
+  - agencycli schema [command]  — discover any command's flags as JSON
+  - Exit codes: 0=ok  1=error  2=bad-args  3=not-found  5=conflict
+  - run --dry-run  outputs JSON preview instead of executing
 
 You can run any command from outside the workspace by passing --dir:
 
-  agencycli --dir /path/to/MyAgency list teams`,
+  agencycli --dir /path/to/MyAgency list agents`,
 }
 
 func init() {
@@ -89,6 +93,7 @@ func init() {
 		newMilestoneCmd(),
 		newEnvVarCmd(),
 		newProviderCmd(),
+		newSchemaCmd(),
 	)
 }
 
@@ -105,6 +110,29 @@ func main() {
 	checkUpdateAsync()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(exitCodeFor(err))
 	}
+}
+
+// exitCodeFor maps sentinel error types to meaningful exit codes:
+//
+//	0   success
+//	1   general error (default)
+//	2   usage / bad arguments
+//	3   resource not found
+//	5   conflict / already exists
+func exitCodeFor(err error) int {
+	var notFound *errs.NotFoundError
+	if errors.As(err, &notFound) {
+		return 3
+	}
+	var conflict *errs.ConflictError
+	if errors.As(err, &conflict) {
+		return 5
+	}
+	var usage *errs.UsageError
+	if errors.As(err, &usage) {
+		return 2
+	}
+	return 1
 }

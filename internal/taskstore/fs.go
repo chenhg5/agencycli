@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/errs"
 	"gopkg.in/yaml.v3"
 )
 
@@ -69,6 +70,17 @@ func (s *FSStore) AddTask(project, agent string, t *entity.Task) error {
 	if err != nil {
 		return err
 	}
+	// Idempotency: if the caller supplied a key and an active task with that
+	// key already exists, set t.ID to the existing task's ID and return nil
+	// so the caller can surface it without creating a duplicate.
+	if t.IdempotencyKey != "" {
+		for _, existing := range tasks {
+			if existing.IdempotencyKey == t.IdempotencyKey {
+				t.ID = existing.ID
+				return errs.Conflict("task", t.IdempotencyKey)
+			}
+		}
+	}
 	tasks = append(tasks, t)
 	return s.saveTasks(project, agent, tasks)
 }
@@ -93,7 +105,7 @@ func (s *FSStore) GetTask(project, agent, id string) (*entity.Task, error) {
 			return t, nil
 		}
 	}
-	return nil, fmt.Errorf("task %q not found", id)
+	return nil, errs.NotFound("task", id)
 }
 
 func (s *FSStore) UpdateTask(project, agent string, t *entity.Task) error {
@@ -527,7 +539,7 @@ func (s *FSStore) FindTaskByID(id string) (string, string, *entity.Task, error) 
 			}
 		}
 	}
-	return "", "", nil, fmt.Errorf("task %q not found in any project/agent", id)
+	return "", "", nil, errs.NotFound("task", id)
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────

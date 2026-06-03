@@ -518,6 +518,11 @@ type Task struct {
 	// RunLogPath is set by the runner after execution.
 	RunLogPath string `yaml:"run_log_path,omitempty"`
 
+	// IdempotencyKey is an optional caller-supplied key that prevents duplicate
+	// task creation on agent retries. If a task with the same key already exists
+	// for the same agent, AddTask returns that task's ID instead of creating a new one.
+	IdempotencyKey string `yaml:"idempotency_key,omitempty"`
+
 	Vars map[string]string `yaml:"vars,omitempty"`
 }
 

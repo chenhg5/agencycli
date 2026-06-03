@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"text/tabwriter"
 
+	"github.com/chenhg5/agencycli/internal/entity"
 	"github.com/chenhg5/agencycli/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -23,10 +26,14 @@ func newListCmd() *cobra.Command {
 }
 
 func newListTeamsCmd() *cobra.Command {
-	return &cobra.Command{
+	var format string
+
+	cmd := &cobra.Command{
 		Use:     "teams",
 		Aliases: []string{"team"},
 		Short:   "List all teams",
+		Example: `  agencycli list teams
+  agencycli list teams --format table`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -37,32 +44,40 @@ func newListTeamsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if resolveFormat(format) == "json" {
+				if entries == nil {
+					entries = []*store.TeamEntry{}
+				}
+				return printJSON(entries)
+			}
+
 			if len(entries) == 0 {
 				fmt.Println("No teams found. Run: agencycli create team --name <name>")
 				return nil
 			}
-			fmt.Println("Teams:")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "PATH\tDESCRIPTION\tSKILLS")
 			for _, e := range entries {
-				desc := ""
-				if e.Team.Description != "" {
-					desc = "  — " + e.Team.Description
-				}
-				skills := ""
-				if len(e.Team.Skills) > 0 {
-					skills = fmt.Sprintf(" [skills: %s]", strings.Join(e.Team.Skills, ", "))
-				}
-				fmt.Printf("  %-36s%s%s\n", e.Path, desc, skills)
+				fmt.Fprintf(w, "%s\t%s\t%s\n", e.Path, e.Team.Description, strings.Join(e.Team.Skills, ", "))
 			}
+			w.Flush()
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
+	return cmd
 }
 
 func newListProjectsCmd() *cobra.Command {
-	return &cobra.Command{
+	var format string
+
+	cmd := &cobra.Command{
 		Use:     "projects",
 		Aliases: []string{"project"},
 		Short:   "List all projects",
+		Example: `  agencycli list projects
+  agencycli list projects --format table`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -73,30 +88,42 @@ func newListProjectsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if resolveFormat(format) == "json" {
+				if projects == nil {
+					projects = []*entity.Project{}
+				}
+				return printJSON(projects)
+			}
+
 			if len(projects) == 0 {
 				fmt.Println("No projects found. Run: agencycli create project --name <name>")
 				return nil
 			}
-			fmt.Println("Projects:")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "NAME\tDESCRIPTION\tREPO")
 			for _, p := range projects {
-				repo := ""
-				if p.Repo != "" {
-					repo = "  repo: " + p.Repo
-				}
-				fmt.Printf("  %-24s  %s%s\n", p.Name, p.Description, repo)
+				fmt.Fprintf(w, "%s\t%s\t%s\n", p.Name, p.Description, p.Repo)
 			}
+			w.Flush()
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
+	return cmd
 }
 
 func newListAgentsCmd() *cobra.Command {
 	var project string
+	var format string
 
 	cmd := &cobra.Command{
 		Use:     "agents",
 		Aliases: []string{"agent"},
 		Short:   "List hired agents",
+		Example: `  agencycli list agents
+  agencycli list agents --project cc-connect
+  agencycli list agents --format table`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -108,43 +135,74 @@ func newListAgentsCmd() *cobra.Command {
 			if project != "" {
 				projectNames = []string{project}
 			} else {
-				projects, err := s.ListProjects()
+				allProjects, err := s.ListProjects()
 				if err != nil {
 					return err
 				}
-				for _, p := range projects {
+				for _, p := range allProjects {
 					projectNames = append(projectNames, p.Name)
 				}
 			}
 
-			found := 0
+			type agentRow struct {
+				Project string `json:"project"`
+				Name    string `json:"name"`
+				Model   string `json:"model"`
+				Team    string `json:"team"`
+				Dir     string `json:"dir"`
+			}
+			var rows []agentRow
 			for _, pName := range projectNames {
 				agents, err := s.ListAgents(pName)
 				if err != nil {
 					continue
 				}
 				for _, a := range agents {
-					fmt.Printf("  %-16s  %-24s  model:%-12s  team:%s\n",
-						pName, a.Name, a.Meta.Model, a.Meta.Team)
-					found++
+					rows = append(rows, agentRow{
+						Project: pName,
+						Name:    a.Name,
+						Model:   string(a.Meta.Model),
+						Team:    a.Meta.Team,
+						Dir:     s.AgentDir(pName, a.Name),
+					})
 				}
 			}
-			if found == 0 {
-				fmt.Println("No agents found. Run: agencycli hire --help")
+
+			if resolveFormat(format) == "json" {
+				if rows == nil {
+					rows = []agentRow{}
+				}
+				return printJSON(rows)
 			}
+
+			if len(rows) == 0 {
+				fmt.Println("No agents found. Run: agencycli hire --help")
+				return nil
+			}
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "PROJECT\tNAME\tMODEL\tTEAM")
+			for _, r := range rows {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Project, r.Name, r.Model, r.Team)
+			}
+			w.Flush()
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&project, "project", "", "Limit to a specific project")
+	cmd.Flags().StringVar(&project, "project", "", "limit to a specific project")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 
 func newListSkillsCmd() *cobra.Command {
-	return &cobra.Command{
+	var format string
+
+	cmd := &cobra.Command{
 		Use:     "skills",
 		Aliases: []string{"skill"},
 		Short:   "List available skills",
+		Example: `  agencycli list skills
+  agencycli list skills --format table`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -155,15 +213,27 @@ func newListSkillsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			if resolveFormat(format) == "json" {
+				if skills == nil {
+					skills = []*entity.Skill{}
+				}
+				return printJSON(skills)
+			}
+
 			if len(skills) == 0 {
 				fmt.Println("No skills found.")
 				return nil
 			}
-			fmt.Println("Skills:")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(w, "NAME\tDESCRIPTION")
 			for _, sk := range skills {
-				fmt.Printf("  %-20s  %s\n", sk.Name, sk.Description)
+				fmt.Fprintf(w, "%s\t%s\n", sk.Name, sk.Description)
 			}
+			w.Flush()
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
+	return cmd
 }

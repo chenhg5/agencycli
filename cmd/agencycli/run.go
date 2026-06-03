@@ -35,8 +35,11 @@ This is a one-shot manual trigger. For recurring automated runs, use
   # Run a specific task
   agencycli run --project cc-connect --agent qa-reviewer --task t-20260316-abc123
 
-  # Dry run: print what would be executed
-  agencycli run --project cc-connect --agent qa-reviewer --dry-run`,
+  # Dry run: outputs JSON describing what would execute (exit 0)
+  agencycli run --project cc-connect --agent qa-reviewer --dry-run
+
+  # Equivalent noun-verb form (same flags)
+  agencycli agent run --project cc-connect --agent qa-reviewer`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
 			if err != nil {
@@ -68,12 +71,17 @@ This is a one-shot manual trigger. For recurring automated runs, use
 			}
 
 			if dryRun {
-				fmt.Printf("Dry run — would execute:\n")
-				fmt.Printf("  Project : %s\n", project)
-				fmt.Printf("  Agent   : %s\n", agentName)
-				fmt.Printf("  Task    : %s  %s\n", task.ID, task.Title)
-				fmt.Printf("  Status  : %s\n", task.Status)
-				return nil
+				return printJSON(map[string]interface{}{
+					"dry_run": true,
+					"project": project,
+					"agent":   agentName,
+					"task": map[string]interface{}{
+						"id":       task.ID,
+						"title":    task.Title,
+						"status":   string(task.Status),
+						"priority": task.Priority,
+					},
+				})
 			}
 
 			hb, err := ts.GetHeartbeat(project, agentName)

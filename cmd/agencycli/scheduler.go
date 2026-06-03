@@ -1954,16 +1954,16 @@ func newSchedulerCronListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(crons) == 0 && format == "table" {
-				fmt.Printf("No crons configured for %s/%s\n", project, agent)
-				return nil
-			}
-
-			if format == "json" || format == "" {
+			if resolveFormat(format) == "json" {
 				if crons == nil {
 					crons = []*entity.Cron{}
 				}
 				return printJSON(crons)
+			}
+
+			if len(crons) == 0 {
+				fmt.Printf("No crons configured for %s/%s\n", project, agent)
+				return nil
 			}
 
 			// --format table
@@ -1984,7 +1984,7 @@ func newSchedulerCronListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&format, "format", "json", "output format: json or table")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json or table (default: json)")
 	return cmd
 }
 

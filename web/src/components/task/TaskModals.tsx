@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { FileText, MessageSquare, Pencil, Send, Trash2, X } from 'lucide-react'
+import { ClipboardCopy, FileText, MessageSquare, Pencil, Send, Trash2, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { apiDelete, apiPost, apiPut } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
@@ -38,6 +38,7 @@ type RunRow = {
   taskId?: string; taskTitle?: string; logPath?: string
   inputTokens?: number; outputTokens?: number; cacheReadTokens?: number
   costUSD?: number; errorMsg?: string; command?: string
+  sessionId?: string
 }
 
 type LogData = { content: string; truncated: boolean }
@@ -250,6 +251,14 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
                   <span className="ml-1 text-neutral-400">(${matchingRun.costUSD.toFixed(4)})</span>
                 </InfoCell>
               )}
+              {matchingRun.sessionId && (
+                <InfoCell label={t('runs.sessionLabel')}>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={matchingRun.sessionId}>{matchingRun.sessionId.slice(0, 8)}…</span>
+                    <CopyRunResumeCmd model={matchingRun.model} sessionId={matchingRun.sessionId} agent={matchingRun.agent} project={matchingRun.project} />
+                  </div>
+                </InfoCell>
+              )}
             </>
           )}
         </div>
@@ -458,4 +467,37 @@ function TaskCommentsSection({ project, agent, taskId }: { project: string; agen
 
 function fmtNum(n: number): string {
   return n.toLocaleString()
+}
+
+function buildRunResumeCmd(model: string | undefined, sessionId: string, agent: string, project: string): string {
+  const m = (model ?? '').toLowerCase()
+  if (m.includes('claude')) return `claude --resume ${sessionId}`
+  if (m.includes('codex'))  return `codex exec resume ${sessionId}`
+  if (m.includes('gemini')) return `gemini --resume ${sessionId}`
+  if (m.includes('cursor')) return `agent --resume ${sessionId}`
+  return `# session: ${sessionId}  (agent: ${agent}, project: ${project})`
+}
+
+function CopyRunResumeCmd({ model, sessionId, agent, project }: { model?: string; sessionId: string; agent: string; project: string }) {
+  const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+  function doCopy() {
+    const cmd = buildRunResumeCmd(model, sessionId, agent, project)
+    void navigator.clipboard.writeText(cmd).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <button
+      type="button"
+      onClick={doCopy}
+      title={t('schedule.copyResumeCmd')}
+      className="shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+    >
+      {copied
+        ? <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓</span>
+        : <ClipboardCopy className="size-3.5" strokeWidth={2} />}
+    </button>
+  )
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/errs"
 	"gopkg.in/yaml.v3"
 )
 
@@ -112,7 +113,7 @@ func (s *fsStore) Team(path string) (*entity.Team, error) {
 	var t entity.Team
 	if err := readYAML(yamlPath, &t); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("store: team %q not found", path)
+			return nil, errs.NotFound("team", path)
 		}
 		return nil, fmt.Errorf("store: read team %q: %w", path, err)
 	}
@@ -254,7 +255,7 @@ func (s *fsStore) Project(name string) (*entity.Project, error) {
 	var p entity.Project
 	if err := readYAML(path, &p); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("store: project %q not found", name)
+			return nil, errs.NotFound("project", name)
 		}
 		return nil, fmt.Errorf("store: read project %q: %w", name, err)
 	}
@@ -335,7 +336,7 @@ func (s *fsStore) Skill(name string) (*entity.Skill, error) {
 	sk, _, err := parseSkillMD(skillMD)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("store: skill %q not found", name)
+			return nil, errs.NotFound("skill", name)
 		}
 		return nil, fmt.Errorf("store: read skill %q: %w", name, err)
 	}
@@ -419,7 +420,7 @@ func (s *fsStore) AgentMeta(project, name string) (*entity.AgentMeta, error) {
 	var m entity.AgentMeta
 	if err := readYAML(path, &m); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("store: agent %q/%q not found", project, name)
+			return nil, errs.NotFound("agent", project+"/"+name)
 		}
 		return nil, fmt.Errorf("store: read agent meta %q/%q: %w", project, name, err)
 	}
