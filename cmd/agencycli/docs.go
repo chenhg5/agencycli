@@ -20,24 +20,19 @@ func newDocsCmd() *cobra.Command {
 		Use:     "docs",
 		Aliases: []string{"doc", "kb"},
 		Short:   "Manage the knowledge base",
-		Long: `Manage the knowledge base: source documents, synthesized wiki pages, and activity log.
+		Long: `Manage the knowledge base — documents agents can read, reference, and contribute to.
 
-The knowledge base has three layers (following the Karpathy LLM-wiki pattern):
+Each document has a title, description, tags, and a virtual directory path (--index).
+Agents can add their own synthesised notes as documents alongside raw sources.
 
-  Raw sources  — documents you add via "docs add" or "docs ingest"; never modified
-  Wiki         — LLM-generated markdown summaries in .agencycli/wiki/ (agent-owned)
-  index.md     — auto-maintained catalog of wiki pages + sources for fast agent lookup
-  log.md       — append-only activity timeline (ingest/query/lint events)
-
-Typical agent workflow:
-  agencycli docs ingest --path report.md --title "Q1 Report" --created-by human
-  # → creates wiki stub, updates index.md and log.md; agent fills in the stub
-  agencycli docs query "what are the main risks?"
-  # → prints index.md + relevant wiki pages as context for the agent to answer`,
+Common agent operations:
+  agencycli docs query "authentication"     # find relevant docs and print their content
+  agencycli docs search "JWT" --content     # keyword search inside file contents
+  agencycli docs add --path ./notes.md ...  # register a new document
+  agencycli docs lint                       # find docs missing descriptions`,
 	}
 	cmd.AddCommand(
 		newDocsAddCmd(),
-		newDocsIngestCmd(),
 		newDocsListCmd(),
 		newDocsTreeCmd(),
 		newDocsShowCmd(),
@@ -47,7 +42,6 @@ Typical agent workflow:
 		newDocsSearchCmd(),
 		newDocsQueryCmd(),
 		newDocsLintCmd(),
-		newDocsWikiCmd(),
 	)
 	return cmd
 }
@@ -438,140 +432,27 @@ func newDocsSearchCmd() *cobra.Command {
 	return cmd
 }
 
-// ── docs ingest ───────────────────────────────────────────────────────────────
-
-func newDocsIngestCmd() *cobra.Command {
-	var (
-		filePath    string
-		title       string
-		index       string
-		createdBy   string
-		tags        []string
-		description string
-		noWiki      bool
-	)
-	cmd := &cobra.Command{
-		Use:   "ingest",
-		Short: "Register a source document and create a wiki stub for the agent to fill in",
-		Long: `Register a source document in the index and create a wiki stub page in
-.agencycli/wiki/. The stub contains template sections (Summary, Key Points,
-Related Pages, Notes) that the agent should read the source and fill in.
-
-index.md and log.md are updated automatically.
-
-The agent's workflow after running this command:
-  1. Read the source file at the path shown
-  2. Read the wiki stub at the path shown
-  3. Fill in the stub sections based on the source
-  4. Run "agencycli docs wiki rebuild-index" after major additions`,
-		Example: `  agencycli docs ingest --path ./docs/adr-001.md --title "ADR-001: Auth Strategy" \
-    --index "architecture/decisions" --created-by human
-  agencycli docs ingest --path report.pdf --title "Q1 Report" \
-    --tag finance --tag q1-2026 --created-by human`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			if filePath == "" {
-				return fmt.Errorf("--path is required")
-			}
-			absPath, err := filepath.Abs(filePath)
-			if err != nil {
-				return err
-			}
-			if _, err := os.Stat(absPath); err != nil {
-				return fmt.Errorf("file not found: %s", absPath)
-			}
-			if title == "" {
-				title = strings.TrimSuffix(filepath.Base(absPath), filepath.Ext(absPath))
-			}
-			if createdBy == "" {
-				return fmt.Errorf("--created-by is required (e.g. human, project/agent)")
-			}
-			index = strings.Trim(index, "/")
-
-			ds := store.NewDocsStore(root)
-			entry := &store.DocEntry{
-				Title:       title,
-				FilePath:    absPath,
-				Index:       index,
-				CreatedBy:   createdBy,
-				Tags:        tags,
-				Description: description,
-			}
-			if err := ds.Add(entry); err != nil {
-				return err
-			}
-
-			// Create wiki stub
-			slug := store.DocSlug(title)
-			stubPath := ds.WikiPagePath(slug)
-			var wikiMsg string
-			if noWiki {
-				wikiMsg = "(wiki stub skipped — use --no-wiki flag was set)"
-			} else if _, err := os.Stat(stubPath); err == nil {
-				wikiMsg = fmt.Sprintf("wiki stub already exists: %s", stubPath)
-			} else {
-				stub := store.WikiStub(entry)
-				if err := ds.WriteWikiPage(slug, stub); err != nil {
-					fmt.Fprintf(os.Stderr, "warning: could not write wiki stub: %v\n", err)
-					wikiMsg = "(wiki stub creation failed)"
-				} else {
-					wikiMsg = stubPath
-				}
-			}
-
-			// Update index.md and log.md
-			_ = ds.RebuildWikiIndex()
-			_ = ds.AppendWikiLog("ingest", title, fmt.Sprintf("  source: %s\n  doc-id: %s", absPath, entry.ID))
-
-			fmt.Printf("✓ Ingested: %s [%s]\n", entry.ID, index)
-			fmt.Printf("  Title     : %s\n", title)
-			fmt.Printf("  Source    : %s\n", absPath)
-			fmt.Printf("  Wiki stub : %s\n", wikiMsg)
-			fmt.Printf("  Index     : %s\n", ds.WikiIndexPath())
-			fmt.Printf("  Log       : %s\n", ds.WikiLogPath())
-			fmt.Println()
-			fmt.Println("Next step: read the source file and fill in the wiki stub sections.")
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&filePath, "path", "", "source file path (required)")
-	cmd.Flags().StringVar(&title, "title", "", "document title (default: filename)")
-	cmd.Flags().StringVar(&index, "index", "", "virtual directory path (e.g. project/articles)")
-	cmd.Flags().StringVar(&createdBy, "created-by", "", "who added this (required)")
-	cmd.Flags().StringArrayVar(&tags, "tag", nil, "tags (repeatable)")
-	cmd.Flags().StringVar(&description, "description", "", "short description (shown in index.md)")
-	cmd.Flags().BoolVar(&noWiki, "no-wiki", false, "skip creating a wiki stub page")
-	return cmd
-}
-
 // ── docs query ────────────────────────────────────────────────────────────────
 
 func newDocsQueryCmd() *cobra.Command {
 	var (
-		maxPages int
-		noLog    bool
+		maxResults  int
+		withContent bool
+		asJSON      bool
 	)
 	cmd := &cobra.Command{
 		Use:   "query <question>",
-		Short: "Print wiki context for answering a question (for agents to read and synthesize)",
-		Long: `Prints a context document that an agent should read before answering a question.
-The output includes:
-  1. The full index.md (catalog of all wiki pages and sources)
-  2. The contents of any wiki pages whose title/summary matches the question
-  3. A reminder of the question
+		Short: "Find relevant documents and print their content for an agent to read",
+		Long: `Scores all documents against the question by matching keywords in titles,
+descriptions, tags, index paths, and (with --content) file contents.
+Prints the most relevant documents' full content so the agent can synthesize
+an answer without having to navigate the knowledge base manually.
 
-The agent reads this output, synthesizes an answer, and optionally files the
-answer back as a new wiki page using "docs wiki write".
-
-Example agent loop:
-  context=$(agencycli docs query "what is the auth strategy?")
-  # agent reads $context, writes answer, saves to wiki if valuable`,
-		Example: `  agencycli docs query "what is the authentication strategy?"
-  agencycli docs query "Q1 revenue" --max-pages 5
-  agencycli docs query "deployment process" --no-log`,
+Agents can save valuable synthesised answers back as documents:
+  agencycli docs add --path ./notes/auth-answer.md --title "..." --created-by project/agent`,
+		Example: `  agencycli docs query "authentication strategy"
+  agencycli docs query "JWT refresh token" --content    # also search inside files
+  agencycli docs query "deployment" --max 3 --json`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, err := resolveRoot()
@@ -581,82 +462,45 @@ Example agent loop:
 			question := strings.Join(args, " ")
 			ds := store.NewDocsStore(root)
 
-			var out strings.Builder
-			out.WriteString("# Knowledge Base Context\n\n")
-			out.WriteString(fmt.Sprintf("**Question:** %s\n\n", question))
-			out.WriteString("---\n\n")
-
-			// 1. Include index.md
-			if indexContent, err := os.ReadFile(ds.WikiIndexPath()); err == nil {
-				out.WriteString("## index.md\n\n")
-				out.WriteString(string(indexContent))
-				out.WriteString("\n---\n\n")
-			} else {
-				out.WriteString("*(index.md not found — run `agencycli docs wiki rebuild-index` to generate it)*\n\n")
+			results, err := ds.QueryDocs(question, withContent, maxResults)
+			if err != nil {
+				return err
 			}
 
-			// 2. Find relevant wiki pages
-			pages, err := ds.ListWikiPages()
-			if err == nil && len(pages) > 0 {
-				q := strings.ToLower(question)
-				words := strings.Fields(q)
-				type scored struct {
-					page  *store.WikiPage
-					score int
-				}
-				var ranked []scored
-				for _, p := range pages {
-					score := 0
-					haystack := strings.ToLower(p.Title + " " + p.Summary + " " + p.Slug)
-					for _, w := range words {
-						if len(w) > 2 && strings.Contains(haystack, w) {
-							score++
-						}
-					}
-					if score > 0 {
-						ranked = append(ranked, scored{p, score})
-					}
-				}
-				// Sort by score descending
-				for i := 0; i < len(ranked)-1; i++ {
-					for j := i + 1; j < len(ranked); j++ {
-						if ranked[j].score > ranked[i].score {
-							ranked[i], ranked[j] = ranked[j], ranked[i]
-						}
-					}
-				}
-				if maxPages > 0 && len(ranked) > maxPages {
-					ranked = ranked[:maxPages]
-				}
-				if len(ranked) > 0 {
-					out.WriteString("## Relevant Wiki Pages\n\n")
-					for _, r := range ranked {
-						content, err := ds.ReadWikiPage(r.page.Slug)
-						if err != nil {
-							continue
-						}
-						out.WriteString(fmt.Sprintf("### %s (`%s`)\n\n", r.page.Title, r.page.Slug))
-						out.WriteString(content)
-						out.WriteString("\n\n---\n\n")
-					}
-				}
+			if asJSON {
+				return printJSON(results)
 			}
 
-			out.WriteString("## Your Task\n\n")
-			out.WriteString(fmt.Sprintf("Answer the question: **%s**\n\n", question))
-			out.WriteString("If the answer is valuable for future reference, save it as a wiki page:\n")
-			out.WriteString("  agencycli docs wiki write <slug> --title \"<title>\" --content-file <file>\n")
+			if len(results) == 0 {
+				fmt.Println("No matching documents found.")
+				fmt.Println("Try --content to search inside file contents, or broaden your query.")
+				return nil
+			}
 
-			fmt.Print(out.String())
-
-			if !noLog {
-				_ = ds.AppendWikiLog("query", question, "")
+			fmt.Printf("# Query: %s\n\n", question)
+			fmt.Printf("%d relevant document(s) found:\n\n", len(results))
+			for i, r := range results {
+				fmt.Printf("---\n\n")
+				fmt.Printf("## [%d] %s\n", i+1, r.Title)
+				fmt.Printf("**ID:** %s  **Path:** %s  **Index:** %s\n", r.ID, r.FilePath, r.Index)
+				if r.Description != "" {
+					fmt.Printf("**Description:** %s\n", r.Description)
+				}
+				fmt.Println()
+				content, err := ds.ReadContent(r.FilePath)
+				if err != nil {
+					fmt.Printf("*(could not read file: %v)*\n", err)
+				} else {
+					fmt.Println(content)
+				}
+				fmt.Println()
 			}
 			return nil
 		},
 	}
-	cmd.Flags().IntVar(&maxPages, "max-pages", 10, "maximum number of wiki pages to include")
-	cmd.Flags().BoolVar(&noLog, "no-log", false, "do not append this query to log.md")
+	cmd.Flags().IntVar(&maxResults, "max", 5, "maximum number of documents to return")
+	cmd.Flags().BoolVar(&withContent, "content", false, "also search inside file contents")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output metadata only as JSON (no file content)")
 	return cmd
 }
 
@@ -666,14 +510,10 @@ func newDocsLintCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "lint",
-		Short: "Health-check the knowledge base wiki for issues",
-		Long: `Scans the wiki for common maintenance issues:
-  - Wiki pages not linked from index.md (orphans)
-  - Source documents with no wiki summary page
-  - Empty wiki stubs (< 50 bytes)
-  - Source documents without a description
-
-Run this periodically or after bulk ingests to keep the wiki healthy.`,
+		Short: "Find documents missing descriptions",
+		Long: `Scans the knowledge base and reports documents without descriptions.
+A good description tells agents what a document contains without reading it —
+making "docs query" and "docs list" far more useful.`,
 		Example: `  agencycli docs lint
   agencycli docs lint --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -682,215 +522,27 @@ Run this periodically or after bulk ingests to keep the wiki healthy.`,
 				return err
 			}
 			ds := store.NewDocsStore(root)
-			result, err := ds.LintWiki()
+			result, err := ds.Lint()
 			if err != nil {
 				return err
 			}
 			if asJSON {
 				return printJSON(result)
 			}
-
-			healthy := true
-			fmt.Printf("Knowledge Base Health Check\n")
-			fmt.Printf("  Sources    : %d\n", result.TotalDocs)
-			fmt.Printf("  Wiki pages : %d\n\n", result.TotalWikiPages)
-
-			printIssues := func(label string, items []string) {
-				if len(items) == 0 {
-					return
-				}
-				healthy = false
-				fmt.Printf("⚠ %s (%d):\n", label, len(items))
-				for _, s := range items {
-					fmt.Printf("    - %s\n", s)
-				}
-				fmt.Println()
-			}
-			printIssues("Orphan wiki pages (not in index.md)", result.OrphanWikiPages)
-			printIssues("Source docs without a wiki page", result.DocsWithoutWiki)
-			printIssues("Empty wiki stubs (< 50 bytes)", result.EmptyWikiPages)
-			printIssues("Source docs without description", result.DocsWithoutDesc)
-
-			if healthy {
-				fmt.Println("✓ No issues found.")
-			}
-			_ = ds.AppendWikiLog("lint", fmt.Sprintf("orphans=%d, no-wiki=%d, empty=%d, no-desc=%d",
-				len(result.OrphanWikiPages), len(result.DocsWithoutWiki),
-				len(result.EmptyWikiPages), len(result.DocsWithoutDesc)), "")
-			return nil
-		},
-	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "output as JSON")
-	return cmd
-}
-
-// ── docs wiki ─────────────────────────────────────────────────────────────────
-
-func newDocsWikiCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "wiki",
-		Short: "Manage wiki pages (LLM-generated summaries)",
-		Long: `Wiki pages are LLM-generated markdown files stored in .agencycli/wiki/.
-They are the synthesized knowledge layer — agents write and maintain them.
-Humans can read and edit them too, but the LLM should own the content.`,
-	}
-	cmd.AddCommand(
-		newDocsWikiListCmd(),
-		newDocsWikiShowCmd(),
-		newDocsWikiWriteCmd(),
-		newDocsWikiRebuildIndexCmd(),
-	)
-	return cmd
-}
-
-func newDocsWikiListCmd() *cobra.Command {
-	var asJSON bool
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List all wiki pages",
-		Example: `  agencycli docs wiki list
-  agencycli docs wiki list --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			ds := store.NewDocsStore(root)
-			pages, err := ds.ListWikiPages()
-			if err != nil {
-				return err
-			}
-			if asJSON {
-				return printJSON(pages)
-			}
-			if len(pages) == 0 {
-				fmt.Println("No wiki pages. Use 'docs ingest' or 'docs wiki write' to create some.")
+			fmt.Printf("Knowledge Base: %d document(s)\n\n", result.TotalDocs)
+			if len(result.DocsWithoutDesc) == 0 {
+				fmt.Println("✓ All documents have descriptions.")
 				return nil
 			}
-			for _, p := range pages {
-				summary := truncStr(p.Summary, 50)
-				if summary == "" {
-					summary = "(empty)"
-				}
-				fmt.Printf("%-30s %s\n", p.Slug, summary)
+			fmt.Printf("⚠ %d document(s) missing description:\n", len(result.DocsWithoutDesc))
+			for _, s := range result.DocsWithoutDesc {
+				fmt.Printf("    %s\n", s)
 			}
-			fmt.Printf("\n%d wiki page(s) in %s\n", len(pages), ds.WikiDir())
+			fmt.Println("\nFix: agencycli docs update <id> --description \"what this document contains\"")
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output as JSON")
-	return cmd
-}
-
-func newDocsWikiShowCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "show <slug>",
-		Short: "Print a wiki page",
-		Args:  cobra.ExactArgs(1),
-		Example: `  agencycli docs wiki show auth-strategy
-  agencycli docs wiki show q1-report`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			ds := store.NewDocsStore(root)
-			content, err := ds.ReadWikiPage(args[0])
-			if err != nil {
-				return fmt.Errorf("wiki page %q not found (use 'docs wiki list' to see available pages)", args[0])
-			}
-			fmt.Print(content)
-			return nil
-		},
-	}
-	return cmd
-}
-
-func newDocsWikiWriteCmd() *cobra.Command {
-	var (
-		title       string
-		contentFile string
-		content     string
-		append_     bool
-	)
-	cmd := &cobra.Command{
-		Use:   "write <slug>",
-		Short: "Write or update a wiki page",
-		Long: `Write content to a wiki page. The agent typically uses this after running
-"docs query" to file a valuable answer back into the wiki for future reference.
-
-After writing, run "docs wiki rebuild-index" to update index.md.`,
-		Example: `  agencycli docs wiki write auth-strategy --title "Auth Strategy" --content-file /tmp/answer.md
-  agencycli docs wiki write q1-summary --content "# Q1 Summary\n\nRevenue was..."
-  agencycli docs wiki write auth-strategy --content-file /tmp/notes.md --append`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			slug := args[0]
-			ds := store.NewDocsStore(root)
-
-			var body string
-			if contentFile != "" {
-				data, err := os.ReadFile(contentFile)
-				if err != nil {
-					return fmt.Errorf("reading content file: %w", err)
-				}
-				body = string(data)
-			} else if content != "" {
-				body = content
-			} else {
-				return fmt.Errorf("either --content or --content-file is required")
-			}
-
-			if append_ {
-				existing, _ := ds.ReadWikiPage(slug)
-				body = existing + "\n" + body
-			}
-
-			if title != "" && !strings.HasPrefix(strings.TrimSpace(body), "# ") {
-				body = "# " + title + "\n\n" + body
-			}
-
-			if err := ds.WriteWikiPage(slug, body); err != nil {
-				return err
-			}
-			_ = ds.AppendWikiLog("write", slug, "  agent wrote wiki page")
-			_ = ds.RebuildWikiIndex()
-
-			fmt.Printf("✓ Wiki page written: %s\n", ds.WikiPagePath(slug))
-			fmt.Printf("  Index updated: %s\n", ds.WikiIndexPath())
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&title, "title", "", "page title (prepended as H1 if content has none)")
-	cmd.Flags().StringVar(&contentFile, "content-file", "", "read content from this file")
-	cmd.Flags().StringVar(&content, "content", "", "page content (use --content-file for longer content)")
-	cmd.Flags().BoolVar(&append_, "append", false, "append to existing content instead of replacing")
-	return cmd
-}
-
-func newDocsWikiRebuildIndexCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "rebuild-index",
-		Short: "Rebuild index.md from current wiki pages and source documents",
-		Example: `  agencycli docs wiki rebuild-index`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, err := resolveRoot()
-			if err != nil {
-				return err
-			}
-			ds := store.NewDocsStore(root)
-			if err := ds.RebuildWikiIndex(); err != nil {
-				return err
-			}
-			fmt.Printf("✓ Rebuilt: %s\n", ds.WikiIndexPath())
-			return nil
-		},
-	}
 	return cmd
 }
 
