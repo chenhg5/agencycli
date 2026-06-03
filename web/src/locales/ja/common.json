@@ -321,6 +321,7 @@
     "search": "ドキュメント検索...",
     "addDoc": "ドキュメント追加",
     "noDocuments": "ドキュメントなし",
+    "folders": "フォルダ",
     "allDocuments": "全ドキュメント",
     "virtualDir": "仮想ディレクトリ",
     "createdBy": "作成者",

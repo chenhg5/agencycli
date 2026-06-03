@@ -321,6 +321,7 @@
     "search": "搜索文档...",
     "addDoc": "添加文档",
     "noDocuments": "暂无文档",
+    "folders": "目录",
     "allDocuments": "全部文档",
     "virtualDir": "虚拟目录",
     "createdBy": "创建人",

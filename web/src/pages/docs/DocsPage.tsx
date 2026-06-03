@@ -62,6 +62,7 @@ export default function DocsPage() {
   const [tree, setTree] = useState<TreeNode | null>(null)
   const [allDocs, setAllDocs] = useState<DocEntry[]>([])
   const [selectedIndex, setSelectedIndex] = useState<string | null>(null)
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<DocEntry | null>(null)
   const [docContent, setDocContent] = useState('')
   const [searchQ, setSearchQ] = useState('')
@@ -69,6 +70,24 @@ export default function DocsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const initialRouteHandled = useRef(false)
   const lastMainSidebarPreference = useRef<boolean | null>(null)
+
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const d of allDocs) {
+      for (const tag of d.tags ?? []) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1)
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  }, [allDocs])
+
+  function selectTag(tag: string | null) {
+    setSelectedTag(tag)
+    setSelectedIndex(null)
+    setSelectedDoc(null)
+    setSearchQ('')
+  }
 
   const load = useCallback(async () => {
     const [t, d] = await Promise.all([
@@ -144,6 +163,7 @@ export default function DocsPage() {
     if (q) {
       setSelectedDoc(null)
       setSelectedIndex(null)
+      setSelectedTag(null)
     }
   }
 
@@ -154,6 +174,9 @@ export default function DocsPage() {
     if (!q && selectedIndex !== null) {
       docs = docs.filter(d => d.index === selectedIndex || d.index.startsWith(selectedIndex + '/'))
     }
+    if (!q && selectedTag !== null) {
+      docs = docs.filter(d => (d.tags ?? []).includes(selectedTag))
+    }
     if (q) {
       docs = docs.filter(d =>
         d.title.toLowerCase().includes(q) ||
@@ -163,7 +186,7 @@ export default function DocsPage() {
       )
     }
     return docs.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [allDocs, selectedIndex, searchQ])
+  }, [allDocs, selectedIndex, selectedTag, searchQ])
 
   function goBackToList() {
     setSelectedDoc(null)
@@ -197,26 +220,65 @@ export default function DocsPage() {
               <PanelLeftClose className="size-4" />
             </button>
           </div>
-          <nav className="p-2 flex-1 overflow-y-auto">
-            <button
-              onClick={() => { setSelectedIndex(null); setSelectedDoc(null); setSearchQ(''); navigate('/docs', { replace: true }) }}
-              className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
-                selectedIndex === null && !selectedDoc && !searchQ
-                  ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
-                  : 'text-neutral-600 hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <BookOpen className="size-4" />
-              {t('docs.allDocuments')}
-              <span className="ml-auto text-xs text-neutral-400 dark:text-zinc-500">{allDocs.length}</span>
-            </button>
-            {tree && tree.children?.map(node => (
-              <TreeItem
-                key={node.name} node={node} depth={0} parentPath=""
-                selectedIndex={selectedIndex}
-                onSelect={idx => { setSelectedIndex(idx); setSelectedDoc(null); setSearchQ(''); navigate(`/docs/${idx}`, { replace: true }) }}
-              />
-            ))}
+          <nav className="p-2 flex-1 overflow-y-auto space-y-4">
+            {/* All docs */}
+            <div>
+              <button
+                onClick={() => { setSelectedIndex(null); setSelectedTag(null); setSelectedDoc(null); setSearchQ(''); navigate('/docs', { replace: true }) }}
+                className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+                  selectedIndex === null && selectedTag === null && !selectedDoc && !searchQ
+                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                    : 'text-neutral-600 hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <BookOpen className="size-4" />
+                {t('docs.allDocuments')}
+                <span className="ml-auto text-xs text-neutral-400 dark:text-zinc-500">{allDocs.length}</span>
+              </button>
+            </div>
+
+            {/* Directory tree */}
+            {tree && tree.children && tree.children.length > 0 && (
+              <div>
+                <p className="px-2.5 mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
+                  {t('docs.folders')}
+                </p>
+                {tree.children.map(node => (
+                  <TreeItem
+                    key={node.name} node={node} depth={0} parentPath=""
+                    selectedIndex={selectedIndex}
+                    onSelect={idx => { setSelectedIndex(idx); setSelectedTag(null); setSelectedDoc(null); setSearchQ(''); navigate(`/docs/${idx}`, { replace: true }) }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Tag cloud */}
+            {allTags.length > 0 && (
+              <div>
+                <p className="px-2.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
+                  {t('docs.tags')}
+                </p>
+                <div className="px-2 flex flex-wrap gap-1.5">
+                  {allTags.map(([tag, count]) => (
+                    <button
+                      key={tag}
+                      onClick={() => selectTag(selectedTag === tag ? null : tag)}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                        selectedTag === tag
+                          ? 'bg-sky-500 text-white'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                      }`}
+                    >
+                      {tag}
+                      <span className={`text-[10px] ${selectedTag === tag ? 'text-sky-100' : 'text-neutral-400 dark:text-zinc-500'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
         </div>
       )}
@@ -231,6 +293,7 @@ export default function DocsPage() {
             onUpdated={load}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(v => !v)}
+            onTagClick={tag => { selectTag(tag); goBackToList() }}
           />
         ) : (
           <div className="p-6 max-w-6xl mx-auto">
@@ -246,10 +309,15 @@ export default function DocsPage() {
                 <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">
                   {searchQ
                     ? `${t('docs.searchResults')} "${searchQ}"`
-                    : selectedIndex ? selectedIndex.split('/').pop() : t('docs.title')}
+                    : selectedTag
+                      ? <span className="flex items-center gap-1.5"><Tag className="size-4 text-sky-500" />{selectedTag}</span>
+                      : selectedIndex ? selectedIndex.split('/').pop() : t('docs.title')}
                 </h1>
-                {searchQ && (
-                  <button onClick={() => setSearchQ('')} className="rounded-full p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300">
+                {(searchQ || selectedTag) && (
+                  <button
+                    onClick={() => { setSearchQ(''); setSelectedTag(null) }}
+                    className="rounded-full p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-zinc-300"
+                  >
                     <X className="size-4" />
                   </button>
                 )}
@@ -258,8 +326,8 @@ export default function DocsPage() {
                 <Plus className="size-4" /> {t('docs.addDoc')}
               </button>
             </div>
-            {selectedIndex && !searchQ && (
-              <button onClick={() => { setSelectedIndex(null); navigate('/docs', { replace: true }) }} className={`${btnGhost} mb-4`}>
+            {(selectedIndex || selectedTag) && !searchQ && (
+              <button onClick={() => { setSelectedIndex(null); setSelectedTag(null); navigate('/docs', { replace: true }) }} className={`${btnGhost} mb-4`}>
                 <ArrowLeft className="size-3.5" /> {t('docs.allDocuments')}
               </button>
             )}
@@ -284,7 +352,17 @@ export default function DocsPage() {
                         <span className="flex items-center gap-1"><User className="size-3" />{d.createdBy}</span>
                         <span className="flex items-center gap-1"><Calendar className="size-3" />{fmtDate(d.createdAt)}</span>
                         {d.tags?.map(tag => (
-                          <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 dark:bg-zinc-800">{tag}</span>
+                          <button
+                            key={tag}
+                            onClick={e => { e.stopPropagation(); selectTag(tag) }}
+                            className={`rounded-full px-2 py-0.5 transition-colors hover:bg-sky-100 hover:text-sky-700 dark:hover:bg-sky-900/30 dark:hover:text-sky-300 ${
+                              selectedTag === tag
+                                ? 'bg-sky-500 text-white'
+                                : 'bg-neutral-100 dark:bg-zinc-800'
+                            }`}
+                          >
+                            {tag}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -585,9 +663,9 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onToggleSidebar }: {
+function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onToggleSidebar, onTagClick }: {
   doc: DocEntry; content: string; onBack: () => void; onRemove: () => void; onUpdated: () => void
-  sidebarOpen: boolean; onToggleSidebar: () => void
+  sidebarOpen: boolean; onToggleSidebar: () => void; onTagClick?: (tag: string) => void
 }) {
   const { t } = useTranslation()
   const fmtDate = useLocaleDate()
@@ -722,7 +800,13 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, sidebarOpen, onT
           <span className="flex items-center gap-1">
             <Tag className="size-3.5" />
             {doc.tags.map(tag => (
-              <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 dark:bg-zinc-800">{tag}</span>
+              <button
+                key={tag}
+                onClick={() => onTagClick?.(tag)}
+                className="rounded-full bg-neutral-100 px-2 py-0.5 transition-colors hover:bg-sky-100 hover:text-sky-700 dark:bg-zinc-800 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
+              >
+                {tag}
+              </button>
             ))}
           </span>
         )}

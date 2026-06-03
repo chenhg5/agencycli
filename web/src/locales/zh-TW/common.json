@@ -321,6 +321,7 @@
     "search": "搜尋文件...",
     "addDoc": "新增文件",
     "noDocuments": "暫無文件",
+    "folders": "目錄",
     "allDocuments": "全部文件",
     "virtualDir": "虛擬目錄",
     "createdBy": "建立者",
