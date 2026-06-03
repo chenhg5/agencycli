@@ -457,24 +457,33 @@ $EDITOR projects/my-api/prompt.md
 Hiring an agent merges the full context chain and writes the agent's working directory:
 
 ```bash
-agencycli hire \
+# Noun-verb form (recommended — more discoverable)
+agencycli agent hire \
   --project my-api \
   --team    engineering \
   --role    developer \
   --model   claudecode \
   --name    dev
+
+# Top-level verb form also works (backward compatible)
+agencycli hire --project my-api --team engineering --role developer \
+               --model claudecode --name dev
 ```
 
 For sandboxed execution inside Docker:
 
 ```bash
-agencycli hire \
-  --project my-api \
-  --team    engineering \
-  --role    developer \
-  --model   claudecode \
-  --name    dev \
+agencycli agent hire \
+  --project my-api --team engineering --role developer \
+  --model claudecode --name dev \
   --sandbox docker
+```
+
+Use `--if-not-exists` when scripting to make hire idempotent (safe to run multiple times):
+
+```bash
+agencycli agent hire --project my-api --team engineering --role developer \
+                     --model claudecode --name dev --if-not-exists
 ```
 
 Supported `--model` values: `claudecode`, `codex`, `gemini`, `cursor`, `qoder`, `opencode`, `iflow`, `generic-cli`.
@@ -482,12 +491,15 @@ Supported `--model` values: `claudecode`, `codex`, `gemini`, `cursor`, `qoder`, 
 The hired agent's working directory is at `projects/my-api/agents/dev/`. Inside you'll find the merged context file (e.g. `CLAUDE.md`), deployed skill files, and any `setup.dirs` that were created.
 
 ```bash
-# List all agents across all projects
+# List all agents across all projects (JSON by default, table in terminal)
 agencycli list agents
+agencycli list agents --format table     # human-readable table
+agencycli list agents --format json      # always JSON
 
-# See a specific agent's full merged context
+# See a specific agent's context summary
 agencycli show agent my-api dev
-agencycli show agent my-api dev --raw   # raw context file contents
+agencycli show agent my-api dev --format json   # structured JSON output
+agencycli show agent my-api dev --raw           # raw merged context file contents
 ```
 
 ---
@@ -629,11 +641,22 @@ agencycli task add \
   --type bug --priority 1 --created-by human \
   --prompt "The OAuth redirect fails on mobile Safari. Reproduce, fix, and open a PR."
 
+# Use --idempotency-key to prevent duplicate tasks when a script is re-run
+agencycli task add \
+  --project my-api --agent dev \
+  --title "Fix login redirect on mobile Safari" \
+  --type bug --priority 1 --created-by human \
+  --idempotency-key "fix-login-redirect-safari-2026-06" \
+  --prompt "The OAuth redirect fails on mobile Safari. Reproduce, fix, and open a PR."
+
 # Run an agent manually (bypasses scheduler)
-agencycli run --project my-api --agent dev
+agencycli agent run --project my-api --agent dev
+
+# Dry-run: preview what task would execute, without running it (outputs JSON)
+agencycli agent run --project my-api --agent dev --dry-run
 
 # One-shot prompt (no task queue, no heartbeat)
-agencycli exec --project my-api --agent dev \
+agencycli agent exec --project my-api --agent dev \
   --prompt "List all open GitHub issues and output a priority-sorted summary"
 ```
 
@@ -765,8 +788,9 @@ agencycli sync --force                        # force regenerate everything
                                           repo URL, branch conventions, architectural notes
 
 ─── Hire ───────────────────────────────────────────────────────────────────────
-[ ] agencycli hire --project my-app --team engineering --role developer --model claudecode --name dev
-[ ] agencycli show agent my-app dev --raw   ← verify merged context looks correct
+[ ] agencycli agent hire --project my-app --team engineering --role developer --model claudecode --name dev
+[ ] agencycli agent hire ... --if-not-exists   ← use in scripts for idempotent hire
+[ ] agencycli show agent my-app dev --format json   ← verify merged context
 
 ─── Heartbeat ──────────────────────────────────────────────────────────────────
 [ ] agencycli scheduler heartbeat --project my-app --agent dev --enable --interval 30m
@@ -782,4 +806,27 @@ agencycli sync --force                        # force regenerate everything
 ─── Web console (optional) ─────────────────────────────────────────────────────
 [ ] agencycli start                    ← opens http://127.0.0.1:27892
 [ ] agencycli start --addr 0.0.0.0:8080 --api-key <token>  ← remote access
+```
+
+---
+
+## Agent-friendly CLI reference
+
+agencycli is designed to be operated by AI agents. Key conventions agents should know:
+
+| Concern | Convention |
+|---------|-----------|
+| **Output format** | All list/show commands output JSON by default when piped; `--format table` for humans |
+| **Exit codes** | 0=success  1=error  2=bad-arguments  3=not-found  5=already-exists |
+| **Noun-verb commands** | Prefer `agencycli agent hire/fire/sync/run/exec` over bare verbs |
+| **Idempotent hire** | `agencycli agent hire ... --if-not-exists` — safe to re-run |
+| **Idempotent task add** | `--idempotency-key <key>` — prevents duplicate tasks on retry |
+| **Dry-run** | `agencycli agent run --dry-run` outputs JSON preview, never executes |
+| **Self-discovery** | `agencycli schema [command]` — full command tree or flags as JSON |
+
+```bash
+# Discover any command's flags without reading --help text
+agencycli schema task add
+agencycli schema inbox send
+agencycli schema              # full tree
 ```
