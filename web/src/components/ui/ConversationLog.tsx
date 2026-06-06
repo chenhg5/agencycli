@@ -16,6 +16,10 @@ type StreamEvent = {
   subtype?: string
   session_id?: string
   text?: string
+  attempt?: number
+  max_retries?: number
+  error_status?: string
+  error?: string
   message?: {
     role?: string
     content?: ContentBlock[] | string

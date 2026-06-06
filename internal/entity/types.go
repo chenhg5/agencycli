@@ -684,11 +684,12 @@ type HeartbeatConfig struct {
 	// Example: "@.agencycli/context/wakeup.md" reads the prompt from <agent-dir>/.agencycli/context/wakeup.md.
 	WakeupPrompt string `yaml:"wakeup_prompt,omitempty"`
 
-	// WakeupCondition is an optional shell command evaluated before each wakeup.
+	// WakeupCondition is an optional shell command evaluated before each periodic wakeup.
 	// The scheduler runs it with `sh -c` from the agent's working directory.
-	// Exit 0  → condition met, proceed with wakeup.
-	// Non-zero → condition not met, skip this cycle, sleep the full interval,
-	//            then re-evaluate on the next tick.
+	// When combined with WakeupPreset, the gates are OR-ed: any selected gate
+	// passing proceeds with the wakeup. If no gate is configured, wakeup proceeds.
+	// Exit 0  → script gate met.
+	// Non-zero → script gate not met.
 	//
 	// The env vars AGENCY_DIR, PROJECT, and AGENT_NAME are injected so that
 	// agencycli commands can be used inside the condition script.
@@ -704,8 +705,9 @@ type HeartbeatConfig struct {
 	//   wakeup_condition: "agencycli --dir $AGENCY_DIR inbox messages --unread-only | grep -q ."
 	WakeupCondition string `yaml:"wakeup_condition,omitempty"`
 
-	// WakeupPreset is a built-in condition evaluated before each wakeup,
-	// checked before WakeupCondition. Supported values:
+	// WakeupPreset is a built-in gate evaluated before each periodic wakeup.
+	// When WakeupCondition is also configured, either gate can pass the wakeup.
+	// Supported values:
 	//   ""                      — no preset, always wake (default)
 	//   "require_tasks"         — skip if no pending tasks
 	//   "require_messages"      — skip if no unread messages

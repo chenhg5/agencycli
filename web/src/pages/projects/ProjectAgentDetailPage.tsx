@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -11,7 +11,7 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
-import { apiFetch, apiPost, apiPut, apiDelete } from '../../lib/api'
+import { apiFetch, apiPost, apiPut, apiDelete, apiPatch } from '../../lib/api'
 import { Pagination } from '../../components/ui/Pagination'
 import { IMConnectionPanel } from '../../components/project/IMConnectionPanel'
 
@@ -31,6 +31,27 @@ const MODEL_COLORS: Record<string, string> = {
   'generic-cli': 'bg-neutral-200 text-neutral-700 dark:bg-zinc-700 dark:text-zinc-300',
   'http-agent':  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   human:         'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+}
+
+const AVATAR_BACKGROUNDS = ['b6e3f4', 'c0aede', 'd1d4f9', 'ffd5dc', 'ffdfbf']
+
+function avatarHash(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function dicebearAvatar(seed: string): string {
+  const bg = AVATAR_BACKGROUNDS[avatarHash(seed) % AVATAR_BACKGROUNDS.length]
+  return `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${bg}`
+}
+
+function avatarChoices(project: string, agent: string, nonce: number): string[] {
+  const base = `${project}-${agent || 'agent'}`
+  return Array.from({ length: 8 }, (_, i) => dicebearAvatar(`${base}-${nonce}-${i + 1}`))
 }
 
 type SessionInfo = { sessionId?: string; sessionStartedAt?: string; sessionScope?: string }
@@ -455,6 +476,7 @@ function ModelSelector({ project, agentName, currentModel, currentHttpAgent, onC
 export default function ProjectAgentDetailPage() {
   const { t } = useTranslation()
   const fmt = useFormatDateTime()
+  const navigate = useNavigate()
   const { projectId, agentName } = useParams<{ projectId: string; agentName: string }>()
 
   const ctxPath = projectId && agentName
@@ -465,6 +487,18 @@ export default function ProjectAgentDetailPage() {
 
   const [syncing, setSyncing] = useState(false)
   const [syncOutput, setSyncOutput] = useState<string | null>(null)
+  const [editingIdentity, setEditingIdentity] = useState(false)
+  const [identityName, setIdentityName] = useState(agentName ?? '')
+  const [identityAvatar, setIdentityAvatar] = useState('')
+  const [avatarNonce, setAvatarNonce] = useState(() => Date.now())
+  const [savingIdentity, setSavingIdentity] = useState(false)
+  const [identityError, setIdentityError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (ctxState.status !== 'ok') return
+    setIdentityName(agentName ?? '')
+    setIdentityAvatar(ctxState.data.avatar ?? '')
+  }, [agentName, ctxState.status, ctxState.status === 'ok' ? ctxState.data.avatar : undefined])
 
   const doSync = useCallback(async () => {
     if (!projectId || !agentName) return
@@ -480,6 +514,34 @@ export default function ProjectAgentDetailPage() {
       setSyncing(false)
     }
   }, [projectId, agentName])
+
+  const saveIdentity = useCallback(async () => {
+    if (!projectId || !agentName) return
+    setSavingIdentity(true)
+    setIdentityError(null)
+    try {
+      const res = await apiPatch<{ ok: boolean; name: string; avatar: string }>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}`,
+        { name: identityName.trim(), avatar: identityAvatar.trim() },
+      )
+      setEditingIdentity(false)
+      if (res.name && res.name !== agentName) {
+        navigate(`/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(res.name)}`, { replace: true })
+        return
+      }
+      setIdentityAvatar(res.avatar ?? '')
+      setCtxReload((k) => k + 1)
+    } catch (e) {
+      setIdentityError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSavingIdentity(false)
+    }
+  }, [projectId, agentName, identityName, identityAvatar, navigate])
+
+  const identityAvatarChoices = useMemo(
+    () => avatarChoices(projectId ?? '', identityName || agentName || 'agent', avatarNonce),
+    [projectId, identityName, agentName, avatarNonce],
+  )
 
   if (!projectId || !agentName) return null
 
@@ -503,7 +565,76 @@ export default function ProjectAgentDetailPage() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-neutral-900 dark:text-zinc-100">{agentName}</h1>
+            {editingIdentity ? (
+              <div className="max-w-2xl space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={identityName}
+                    onChange={(e) => setIdentityName(e.target.value)}
+                    className="h-8 w-56 rounded-md border border-neutral-200 bg-white px-2.5 font-mono text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                    placeholder="agent-name"
+                  />
+                  <input
+                    value={identityAvatar}
+                    onChange={(e) => setIdentityAvatar(e.target.value)}
+                    className="h-8 min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2.5 text-sm text-neutral-900 outline-none focus:border-sky-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                    placeholder={t('agentIdentity.avatarPlaceholder')}
+                  />
+                  <button type="button" onClick={() => void saveIdentity()} disabled={savingIdentity}
+                    className="rounded-md bg-sky-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50">
+                    {savingIdentity ? t('forms.saving') : t('forms.save')}
+                  </button>
+                  <button type="button" onClick={() => { setEditingIdentity(false); setIdentityError(null); setIdentityName(agentName); setIdentityAvatar(avatar ?? '') }} disabled={savingIdentity}
+                    className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">
+                    {t('forms.cancel')}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {identityAvatarChoices.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => setIdentityAvatar(url)}
+                      className={cn(
+                        'rounded-lg border p-0.5 transition-colors',
+                        identityAvatar === url
+                          ? 'border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-900/20'
+                          : 'border-neutral-200 hover:border-neutral-300 dark:border-zinc-700 dark:hover:border-zinc-600',
+                      )}
+                      title={t('agentIdentity.chooseAvatar')}
+                    >
+                      <img src={url} alt="" className="size-8 rounded-md bg-neutral-100 object-cover dark:bg-zinc-800" />
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAvatarNonce(Date.now())}
+                    className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {t('agentIdentity.randomAvatars')}
+                  </button>
+                  {identityAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setIdentityAvatar('')}
+                      className="rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {t('agentIdentity.clearAvatar')}
+                    </button>
+                  )}
+                </div>
+                {identityError && <p className="text-xs text-red-600 dark:text-red-400">{identityError}</p>}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-xl font-semibold text-neutral-900 dark:text-zinc-100">{agentName}</h1>
+                {ctxState.status === 'ok' && (
+                  <button type="button" onClick={() => setEditingIdentity(true)} className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300" title="Edit name/avatar">
+                    <Pencil className="size-3.5" strokeWidth={1.8} />
+                  </button>
+                )}
+              </div>
+            )}
             <div className="mt-1 flex items-center gap-3">
               {ctxState.status === 'ok' && (
                 <>

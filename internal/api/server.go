@@ -39,23 +39,23 @@ type execProcess struct {
 
 // Server serves JSON for one workspace root.
 type Server struct {
-	root         string
-	apiKey       string
-	version      string
-	st           store.Store
-	ts           taskstore.Store
-	users        *UserStore
-	sched        *SchedulerManager
-	triggers     *triggerManager
-	ccStore      *store.CCConnectStore
-	okrStore     *store.OKRStore
-	msStore      *store.MilestoneStore
+	root              string
+	apiKey            string
+	version           string
+	st                store.Store
+	ts                taskstore.Store
+	users             *UserStore
+	sched             *SchedulerManager
+	triggers          *triggerManager
+	ccStore           *store.CCConnectStore
+	okrStore          *store.OKRStore
+	msStore           *store.MilestoneStore
 	updateCheck       UpdateChecker
 	daemonStatus      DaemonStatusFunc
 	assistantMu       sync.Mutex
 	assistantSessions map[string]*assistantSession
-	execMu       sync.Mutex
-	execProcs    map[string]*execProcess // key = "project/agent"
+	execMu            sync.Mutex
+	execProcs         map[string]*execProcess // key = "project/agent"
 }
 
 // NewServer builds an API server for the given workspace root.
@@ -132,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/projects/{name}/tasks", s.handleProjectTasks)
 	mux.HandleFunc("GET /api/v1/projects/{name}/messages", s.handleProjectMessages)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents", s.handleProjectAgents)
+	mux.HandleFunc("PATCH /api/v1/projects/{name}/agents/{agent}", s.handlePatchAgent)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/context", s.handleGetAgentContext)
 	mux.HandleFunc("GET /api/v1/projects/{name}/agents/{agent}/chat/history", s.handleAgentChatHistory)
 	mux.HandleFunc("POST /api/v1/projects/{name}/agents/{agent}/chat", s.handleAgentChat)
@@ -594,6 +595,98 @@ func (s *Server) handleProjectAgents(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
+func (s *Server) handlePatchAgent(w http.ResponseWriter, r *http.Request) {
+	project := r.PathValue("name")
+	agent := r.PathValue("agent")
+	if !s.checkProjectAccess(w, r, project) {
+		return
+	}
+	meta, err := s.st.AgentMeta(project, agent)
+	if err != nil {
+		if isNotFoundErr(err) {
+			s.jsonError(w, http.StatusNotFound, "agent not found")
+			return
+		}
+		s.serverError(w, err)
+		return
+	}
+	var body struct {
+		Name   string `json:"name"`
+		Avatar string `json:"avatar"`
+	}
+	if err := s.readJSON(w, r, &body); err != nil {
+		s.jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	newName := strings.TrimSpace(body.Name)
+	if newName == "" {
+		newName = agent
+	}
+	if !validAgentName(newName) {
+		s.jsonError(w, http.StatusBadRequest, "invalid agent name")
+		return
+	}
+
+	if newName != agent {
+		hb, _ := s.ts.GetHeartbeat(project, agent)
+		if hb != nil && hb.LastWakeupStatus == "running" && hb.PID > 0 && processAlive(hb.PID) {
+			s.jsonError(w, http.StatusConflict, "cannot rename a running agent")
+			return
+		}
+		oldDir := s.st.AgentDir(project, agent)
+		newDir := s.st.AgentDir(project, newName)
+		if _, err := os.Stat(newDir); err == nil {
+			s.jsonError(w, http.StatusConflict, "target agent already exists")
+			return
+		} else if !os.IsNotExist(err) {
+			s.serverError(w, err)
+			return
+		}
+		if err := os.Rename(oldDir, newDir); err != nil {
+			s.serverError(w, err)
+			return
+		}
+		meta.Name = newName
+		meta.Project = project
+		if err := s.st.SaveAgentMeta(project, newName, meta); err != nil {
+			s.serverError(w, err)
+			return
+		}
+		if cfg, err := s.ts.GetProjectConfig(project); err == nil && cfg != nil {
+			changed := false
+			for i := range cfg.Agents {
+				if cfg.Agents[i].Name == agent {
+					cfg.Agents[i].Name = newName
+					changed = true
+				}
+			}
+			if changed {
+				_ = s.ts.SaveProjectConfig(project, cfg)
+			}
+		}
+	}
+
+	meta.Avatar = strings.TrimSpace(body.Avatar)
+	if err := s.st.SaveAgentMeta(project, newName, meta); err != nil {
+		s.serverError(w, err)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "name": newName, "avatar": meta.Avatar})
+}
+
+func validAgentName(name string) bool {
+	if name == "" || strings.HasPrefix(name, ".") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 type taskRow struct {
 	ID          string    `json:"id"`
 	Project     string    `json:"project"`
@@ -628,7 +721,7 @@ func taskToRow(t *entity.Task, project, agent string, archived bool) taskRow {
 		Description: t.Description, Prompt: t.Prompt,
 		Priority: t.Priority, Status: string(t.Status),
 		StatusGroup: string(t.Status.Group()),
-		Archived: archived, Summary: t.Summary,
+		Archived:    archived, Summary: t.Summary,
 		Labels: labels, ParentID: t.ParentID, Position: t.Position,
 		CreatedBy: t.CreatedBy,
 		CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
@@ -659,7 +752,7 @@ func (s *Server) handleProjectTasks(w http.ResponseWriter, r *http.Request) {
 	qLabel := r.URL.Query().Get("label")
 	qParent := r.URL.Query().Get("parent_id")
 	qGroup := r.URL.Query().Get("status_group") // backlog, active, done
-	qScope := r.URL.Query().Get("scope")         // "active" (default), "archived", "all"
+	qScope := r.URL.Query().Get("scope")        // "active" (default), "archived", "all"
 	if qScope == "" {
 		qScope = "all"
 	}

@@ -468,14 +468,14 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			if !isInActiveWindowAt(projectedNext, hb) {
 				insideNow := isInActiveWindow(hb)
 				if !insideNow {
-				// We are currently outside the window: sleep until it opens.
-				nextWake := nextWindowStart(hb)
-				if nextWake > 0 {
-					nextOpenUTC := time.Now().Add(nextWake).UTC()
-					hb.NextWakeupAt = &nextOpenUTC
-					_ = ts.SaveHeartbeat(project, agentName, hb)
-					agentLog("%s outside active window — sleeping %s until window opens at %s",
-						colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
+					// We are currently outside the window: sleep until it opens.
+					nextWake := nextWindowStart(hb)
+					if nextWake > 0 {
+						nextOpenUTC := time.Now().Add(nextWake).UTC()
+						hb.NextWakeupAt = &nextOpenUTC
+						_ = ts.SaveHeartbeat(project, agentName, hb)
+						agentLog("%s outside active window — sleeping %s until window opens at %s",
+							colorDim+"○", nextWake.Round(time.Minute), hb.ActiveHours)
 						select {
 						case <-ctx.Done():
 							return
@@ -497,40 +497,40 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			// (less than 1 second after window capping). Sleep until the window
 			// opens instead so the cycle check handles it correctly without
 			// hammering the agent with back-to-back wakes.
-		if waitDur < time.Second {
-			nextOpen := nextWindowStart(hb)
-			if nextOpen > 0 {
-				nextOpenUTC := time.Now().Add(nextOpen).UTC()
-				hb.NextWakeupAt = &nextOpenUTC
-			} else {
-				hb.NextWakeupAt = nil
+			if waitDur < time.Second {
+				nextOpen := nextWindowStart(hb)
+				if nextOpen > 0 {
+					nextOpenUTC := time.Now().Add(nextOpen).UTC()
+					hb.NextWakeupAt = &nextOpenUTC
+				} else {
+					hb.NextWakeupAt = nil
+				}
+				_ = ts.SaveHeartbeat(project, agentName, hb)
+				if hb.LastWakeup == nil {
+					agentLog("%s first wakeup deferred — waiting for active window at %s",
+						colorDim+"○", hb.ActiveHours)
+				} else {
+					agentLog("%s next wakeup deferred — waiting for active window at %s",
+						colorDim+"○", hb.ActiveHours)
+				}
+				continue
 			}
+
+			nextAt := nextAtStr(projectedNext)
+			nextUTC := projectedNext.UTC()
+			hb.NextWakeupAt = &nextUTC
 			_ = ts.SaveHeartbeat(project, agentName, hb)
 			if hb.LastWakeup == nil {
-				agentLog("%s first wakeup deferred — waiting for active window at %s",
-					colorDim+"○", hb.ActiveHours)
+				agentLog("%s sleeping %s before first wakeup — next at %s",
+					colorDim+"○", waitDur.Round(time.Second), nextAt)
 			} else {
-				agentLog("%s next wakeup deferred — waiting for active window at %s",
-					colorDim+"○", hb.ActiveHours)
+				agentLog("%s sleeping %s — next at %s",
+					colorDim+"○", waitDur.Round(time.Second), nextAt)
 			}
-			continue
-		}
-
-		nextAt := nextAtStr(projectedNext)
-		nextUTC := projectedNext.UTC()
-		hb.NextWakeupAt = &nextUTC
-		_ = ts.SaveHeartbeat(project, agentName, hb)
-		if hb.LastWakeup == nil {
-			agentLog("%s sleeping %s before first wakeup — next at %s",
-				colorDim+"○", waitDur.Round(time.Second), nextAt)
-		} else {
-			agentLog("%s sleeping %s — next at %s",
-				colorDim+"○", waitDur.Round(time.Second), nextAt)
-		}
-		sleepWithCronCheck(ctx, waitDur, root, project, agentName, ts, s, agentLog)
-		if ctx.Err() != nil {
-			return
-		}
+			sleepWithCronCheck(ctx, waitDur, root, project, agentName, ts, s, agentLog)
+			if ctx.Err() != nil {
+				return
+			}
 		}
 
 		// Re-check context after sleep.
@@ -545,13 +545,13 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 				nextOpenUTC := time.Now().Add(nextWake).UTC()
 				hb.NextWakeupAt = &nextOpenUTC
 				_ = ts.SaveHeartbeat(project, agentName, hb)
-			agentLog("%s outside active window — sleeping %s until window opens",
-				colorDim+"○", nextWake.Round(time.Minute))
-			sleepWithCronCheck(ctx, nextWake, root, project, agentName, ts, s, agentLog)
-			if ctx.Err() != nil {
-				return
-			}
-			continue
+				agentLog("%s outside active window — sleeping %s until window opens",
+					colorDim+"○", nextWake.Round(time.Minute))
+				sleepWithCronCheck(ctx, nextWake, root, project, agentName, ts, s, agentLog)
+				if ctx.Err() != nil {
+					return
+				}
+				continue
 			}
 		}
 
@@ -563,47 +563,55 @@ func runHeartbeatLoop(ctx context.Context, root, project, agentName string,
 			continue
 		}
 
-		// Evaluate built-in preset condition before shell-based condition.
-		if hb.WakeupPreset != "" {
-			met, reason := checkWakeupPreset(hb.WakeupPreset, ts, project, agentName)
-			if !met {
-			agentLog("%s preset condition not met (%s: %s) — skipping cycle, next check in %s",
-				colorYellow+"⏸", hb.WakeupPreset, reason, interval.Round(time.Second))
-			sleepWithCronCheck(ctx, interval, root, project, agentName, ts, s, agentLog)
-			if ctx.Err() != nil {
-				return
-			}
-			continue
-			}
-		}
+		// Evaluate wakeup gates. Multiple configured gates are OR-ed: if any
+		// selected gate passes, the periodic wakeup proceeds. With no gate
+		// configured, the wakeup proceeds by default.
+		if hb.WakeupPreset != "" || hb.WakeupCondition != "" {
+			conditionMet := false
+			reasons := make([]string, 0, 2)
 
-		// Evaluate wakeup condition (if configured).
-		if hb.WakeupCondition != "" {
-			met, output := checkWakeupCondition(
-				hb.WakeupCondition,
-				agentDir(root, project, agentName),
-				root, project, agentName,
-			)
-			condTime := time.Now().UTC()
-			hb.LastConditionAt = &condTime
-			if met {
-				hb.LastConditionStatus = "met"
-				_ = ts.SaveHeartbeat(project, agentName, hb)
-			} else {
-				hb.LastConditionStatus = "not_met"
-				_ = ts.SaveHeartbeat(project, agentName, hb)
-				if output != "" {
-				agentLog("%s condition not met (%s) — skipping cycle, next check in %s",
-					colorYellow+"⏸", truncate(output, 80), interval.Round(time.Second))
-			} else {
-				agentLog("%s condition not met — skipping cycle, next check in %s",
-					colorYellow+"⏸", interval.Round(time.Second))
+			if hb.WakeupPreset != "" {
+				met, reason := checkWakeupPreset(hb.WakeupPreset, ts, project, agentName)
+				if met {
+					conditionMet = true
+				} else if reason != "" {
+					reasons = append(reasons, reason)
+				}
 			}
-			sleepWithCronCheck(ctx, interval, root, project, agentName, ts, s, agentLog)
-			if ctx.Err() != nil {
-				return
+
+			if !conditionMet && hb.WakeupCondition != "" {
+				met, output := checkWakeupCondition(
+					hb.WakeupCondition,
+					agentDir(root, project, agentName),
+					root, project, agentName,
+				)
+				condTime := time.Now().UTC()
+				hb.LastConditionAt = &condTime
+				if met {
+					conditionMet = true
+					hb.LastConditionStatus = "met"
+				} else {
+					hb.LastConditionStatus = "not_met"
+					if output != "" {
+						reasons = append(reasons, truncate(output, 80))
+					}
+				}
+				_ = ts.SaveHeartbeat(project, agentName, hb)
 			}
-			continue
+
+			if !conditionMet {
+				if len(reasons) > 0 {
+					agentLog("%s wakeup conditions not met (%s) — skipping cycle, next check in %s",
+						colorYellow+"⏸", strings.Join(reasons, "; "), interval.Round(time.Second))
+				} else {
+					agentLog("%s wakeup conditions not met — skipping cycle, next check in %s",
+						colorYellow+"⏸", interval.Round(time.Second))
+				}
+				sleepWithCronCheck(ctx, interval, root, project, agentName, ts, s, agentLog)
+				if ctx.Err() != nil {
+					return
+				}
+				continue
 			}
 		}
 
@@ -927,10 +935,10 @@ func agentDir(root, project, agentName string) string {
 
 // wakeupI18n holds the auto-generated strings injected around the wakeup prompt.
 type wakeupI18n struct {
-	InboxHeader      string // section heading for unread-message block
-	InboxIntro       string // sentence before the message list
-	InboxReplyHint   string // hint line showing how to reply
-	DefaultTrigger   string // used when wakeup_prompt is empty and no file reference
+	InboxHeader       string // section heading for unread-message block
+	InboxIntro        string // sentence before the message list
+	InboxReplyHint    string // hint line showing how to reply
+	DefaultTrigger    string // used when wakeup_prompt is empty and no file reference
 	WakeupFileTrigger string // used when wakeup_prompt references a file (already in CLAUDE.md)
 }
 
@@ -1349,6 +1357,7 @@ func parseDayName(s string) (time.Weekday, error) {
 //
 // Allowed patterns:
 //   - Commands: gh, agencycli, git, grep, jq, test, [, [[
+//   - Workspace scripts under $AGENCY_DIR/scripts/wakeup-conditions/*.sh
 //   - Safe env vars: $AGENCY_DIR, $PROJECT, $AGENT_NAME
 //   - Single pipe for chaining: cmd1 | cmd2
 //
@@ -1366,15 +1375,15 @@ func validateWakeupCondition(condition string) error {
 	// Block dangerous shell metacharacters that enable command injection.
 	// Note: > and < are allowed because they're used in jq expressions like 'length > 0'.
 	dangerousPatterns := []string{
-		";",     // command separator
-		"&&",    // AND operator
-		"||",    // OR operator
-		"$(",    // command substitution
-		"`",     // backtick command substitution
-		">>",    // append redirection
-		"&",     // background execution
-		"\n",    // newline (could hide commands)
-		"\r",    // carriage return
+		";",  // command separator
+		"&&", // AND operator
+		"||", // OR operator
+		"$(", // command substitution
+		"`",  // backtick command substitution
+		">>", // append redirection
+		"&",  // background execution
+		"\n", // newline (could hide commands)
+		"\r", // carriage return
 	}
 
 	// Check for dangerous patterns
@@ -1410,7 +1419,7 @@ func validateWakeupCondition(condition string) error {
 		"false",     // always fail
 	}
 
-// Validate ALL commands in pipe chain (split by |)
+	// Validate ALL commands in pipe chain (split by |)
 	pipeSegments := strings.Split(condition, "|")
 	for i, segment := range pipeSegments {
 		segment = strings.TrimSpace(segment)
@@ -1432,12 +1441,15 @@ func validateWakeupCondition(condition string) error {
 				break
 			}
 		}
+		if !isAllowed && isAllowedWakeupConditionScript(cmdName) {
+			isAllowed = true
+		}
 		if !isAllowed {
 			position := "first"
 			if i > 0 {
 				position = fmt.Sprintf("after pipe at position %d", i+1)
 			}
-			return fmt.Errorf("wakeup condition %s must use an allowed command (gh, agencycli, git, grep, jq, test, true, false), got: %s", position, cmdName)
+			return fmt.Errorf("wakeup condition %s must use an allowed command (gh, agencycli, git, grep, jq, test, true, false) or a workspace wakeup script under $AGENCY_DIR/scripts/wakeup-conditions/*.sh, got: %s", position, cmdName)
 		}
 	}
 
@@ -1469,6 +1481,19 @@ func validateWakeupCondition(condition string) error {
 	}
 
 	return nil
+}
+
+func isAllowedWakeupConditionScript(cmdName string) bool {
+	for _, prefix := range []string{
+		"$AGENCY_DIR/scripts/wakeup-conditions/",
+		"${AGENCY_DIR}/scripts/wakeup-conditions/",
+	} {
+		if strings.HasPrefix(cmdName, prefix) {
+			rest := strings.TrimPrefix(cmdName, prefix)
+			return rest != "" && strings.HasSuffix(rest, ".sh") && !strings.Contains(rest, "..") && !strings.ContainsAny(rest, "\\\"'")
+		}
+	}
+	return false
 }
 
 // checkWakeupCondition runs the condition shell command and returns whether

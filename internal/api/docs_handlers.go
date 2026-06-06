@@ -281,6 +281,12 @@ func (s *Server) handleDocsGetRefs(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, err)
 		return
 	}
+	if refs == nil {
+		refs = []*store.DocEntry{}
+	}
+	if backrefs == nil {
+		backrefs = []*store.DocEntry{}
+	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"refs":     refs,
 		"backrefs": backrefs,

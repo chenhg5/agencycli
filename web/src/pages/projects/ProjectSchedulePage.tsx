@@ -209,14 +209,15 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
   return (
     <>
       <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-zinc-700/60">
-        <table className="min-w-[800px] w-full">
+        <table className="min-w-[1040px] w-full">
           <thead>
             <tr className="border-b border-neutral-200/80 bg-neutral-50/80 dark:border-zinc-700/60 dark:bg-zinc-900/40">
               <th className={thCls}>Agent</th>
               <th className={thCls}>{t('schedule.statusLabel')}</th>
               <th className={thCls}>{t('schedule.interval')}</th>
               <th className={thCls}>{t('schedule.activeHours')}</th>
-              <th className={thCls}>{t('schedule.wakeupPreset')}</th>
+              <th className={thCls}>{t('schedule.wakeupCondition')}</th>
+              <th className={thCls}>{t('schedule.triggers')}</th>
               <th className={thCls}>{t('schedule.lastWakeup')}</th>
               <th className={thCls}>{t('schedule.wakeupCountLabel')}</th>
               <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
@@ -229,18 +230,15 @@ function HeartbeatTab({ agents, projectId, onChanged }: { agents: AgentSchedule[
                 <tr key={ag.name} className="group bg-white transition-colors hover:bg-neutral-50/80 dark:bg-zinc-900/20 dark:hover:bg-zinc-800/30">
                   <td className={cn(tdCls, 'font-mono font-medium')}><Link to={`/projects/${projectId}/members/${ag.name}`} className="text-sky-700 hover:underline dark:text-sky-400">{ag.name}</Link></td>
                   <td className={tdCls}>
-                    {hb.enabled && !hb.paused && <StatusBadge color="emerald">{t('schedule.hbActive')}</StatusBadge>}
-                    {hb.enabled && hb.paused && <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>}
-                    {!hb.enabled && <StatusBadge color="neutral">{t('schedule.off')}</StatusBadge>}
+                    {heartbeatStatusBadge(hb, t)}
                   </td>
                   <td className={cn(tdCls, 'font-mono')}>{hb.interval || '—'}</td>
                   <td className={tdCls}>{hb.activeHours || '—'}</td>
                   <td className={tdCls}>
-                    {hb.wakeupPreset ? (
-                      <StatusBadge color={hb.wakeupPreset === 'require_tasks' ? 'sky' : hb.wakeupPreset === 'require_messages' ? 'amber' : 'violet'}>
-                        {t(`schedule.preset${hb.wakeupPreset === 'require_tasks' ? 'RequireTasks' : hb.wakeupPreset === 'require_messages' ? 'RequireMessages' : 'RequireAny'}`)}
-                      </StatusBadge>
-                    ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
+                    <WakeupConditionSummary hb={hb} />
+                  </td>
+                  <td className={tdCls}>
+                    <TriggerSummary triggers={hb.triggers} />
                   </td>
                   <td className={tdCls}>
                     {hb.lastWakeup ? (
@@ -353,6 +351,8 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
 
   // Wakeup preset
   const [wakeupPreset, setWakeupPreset] = useState(hb.wakeupPreset ?? '')
+  const [wakeupCondition, setWakeupCondition] = useState(hb.wakeupCondition ?? '')
+  const [useScriptCondition, setUseScriptCondition] = useState(Boolean(hb.wakeupCondition))
 
   // Triggers
   const TRIGGER_TYPES = ['message', 'task'] as const
@@ -373,6 +373,10 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
   async function save() {
     setErr(null); setBusy(true)
     try {
+      if (useScriptCondition && !wakeupCondition.trim()) {
+        setErr(t('schedule.scriptConditionRequired'))
+        return
+      }
       const intervalStr = ivNum > 0 ? `${ivNum}${ivUnit}` : ''
       const jitterStr = jtNum > 0 ? `${jtNum}${jtUnit}` : ''
       const activeHoursStr = ahStart && ahEnd ? `${ahStart}-${ahEnd}` : ''
@@ -385,6 +389,7 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
         maxTasksPerCycle: maxTasks,
         maxCycleDuration: maxDurStr,
         wakeupPreset: wakeupPreset,
+        wakeupCondition: useScriptCondition ? wakeupCondition.trim() : '',
         triggers: triggers,
         sessionScope: sessionScope,
         sessionId: sessionId !== (hb.sessionId ?? '') ? sessionId : undefined,
@@ -398,6 +403,21 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
   const chipActive = 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300'
   const chipInactive = 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500 dark:hover:border-zinc-600'
   const shortcutCls = 'cursor-pointer text-[11px] text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300'
+
+  const presetHasTasks = wakeupPreset === 'require_tasks' || wakeupPreset === 'require_any'
+  const presetHasMessages = wakeupPreset === 'require_messages' || wakeupPreset === 'require_any'
+  const setPresetConditions = (next: { tasks: boolean; messages: boolean }) => {
+    if (next.tasks && next.messages) setWakeupPreset('require_any')
+    else if (next.tasks) setWakeupPreset('require_tasks')
+    else if (next.messages) setWakeupPreset('require_messages')
+    else setWakeupPreset('')
+  }
+  const toggleScriptCondition = () => {
+    setUseScriptCondition((prev) => {
+      if (prev) setWakeupCondition('')
+      return !prev
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => !busy && onClose()}>
@@ -454,14 +474,31 @@ function EditHeartbeatModal({ projectId, agentName, hb, onClose, onSaved }: { pr
             </div>
           </Field>
 
-          {/* Wakeup preset */}
-          <Field label={t('schedule.wakeupPreset')}>
-            <select value={wakeupPreset} onChange={(e) => setWakeupPreset(e.target.value)} className={fieldCls}>
-              <option value="">{t('schedule.presetNone')}</option>
-              <option value="require_tasks">{t('schedule.presetRequireTasks')}</option>
-              <option value="require_messages">{t('schedule.presetRequireMessages')}</option>
-              <option value="require_any">{t('schedule.presetRequireAny')}</option>
-            </select>
+          {/* Wakeup condition */}
+          <Field label={t('schedule.wakeupCondition')}>
+            <div className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 dark:border-zinc-700/60 dark:bg-zinc-800/30">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setPresetConditions({ tasks: !presetHasTasks, messages: presetHasMessages })} className={cn(chipCls, presetHasTasks ? chipActive : chipInactive)}>
+                  {t('schedule.conditionTaskPass')}
+                </button>
+                <button type="button" onClick={() => setPresetConditions({ tasks: presetHasTasks, messages: !presetHasMessages })} className={cn(chipCls, presetHasMessages ? chipActive : chipInactive)}>
+                  {t('schedule.conditionMessagePass')}
+                </button>
+                <button type="button" onClick={toggleScriptCondition} className={cn(chipCls, useScriptCondition ? chipActive : chipInactive)}>
+                  {t('schedule.conditionScriptPass')}
+                </button>
+              </div>
+              {useScriptCondition && (
+                <textarea
+                  value={wakeupCondition}
+                  onChange={(e) => setWakeupCondition(e.target.value)}
+                  rows={3}
+                  placeholder={t('schedule.wakeupConditionPlaceholder')}
+                  className={cn(fieldCls, 'min-h-20 font-mono text-xs')}
+                />
+              )}
+              <p className="text-xs text-neutral-400 dark:text-zinc-500">{t('schedule.wakeupConditionHint')}</p>
+            </div>
           </Field>
 
           {/* Triggers */}
@@ -928,7 +965,10 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
   const [scopeUpdating, setScopeUpdating] = useState<string | null>(null)
   const [viewingLog, setViewingLog] = useState<string | null>(null)
 
-  const activeAgents = agents.filter((ag) => ag.heartbeat.enabled)
+  const runtimeAgents = agents.filter((ag) => {
+    const hb = ag.heartbeat
+    return hb.enabled || hasTriggers(hb) || hb.lastWakeupStatus === 'running'
+  })
 
   async function doWakeup(agentName: string) {
     setWaking(agentName)
@@ -963,11 +1003,11 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
     finally { setScopeUpdating(null) }
   }
 
-  if (activeAgents.length === 0) {
+  if (runtimeAgents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Zap className="mb-3 size-8 text-neutral-300 dark:text-zinc-500" strokeWidth={1.5} />
-        <p className="text-sm text-neutral-500 dark:text-zinc-500">{t('schedule.noActiveAgents')}</p>
+        <p className="text-sm text-neutral-500 dark:text-zinc-500">{t('schedule.noRuntimeAgents')}</p>
       </div>
     )
   }
@@ -988,11 +1028,12 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
               <th className={thCls}>{t('session.sessionLabel')}</th>
               <th className={thCls}>{t('session.scopeLabel')}</th>
               <th className={thCls}>{t('schedule.conditionLabel')}</th>
+              <th className={thCls}>{t('schedule.triggers')}</th>
               <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-zinc-800/40">
-            {activeAgents.map((ag) => {
+            {runtimeAgents.map((ag) => {
               const hb = ag.heartbeat
               const isRunningNow = hb.lastWakeupStatus === 'running'
               const hasSession = !!hb.sessionId
@@ -1003,6 +1044,7 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                     {(() => {
                       if (isRunningNow) return <StatusBadge color="sky">{t('schedule.running')}</StatusBadge>
                       if (hb.paused) return <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>
+                      if (!hb.enabled && hasTriggers(hb)) return <StatusBadge color="violet">{t('schedule.triggerOnly')}</StatusBadge>
                       if (hb.lastWakeupStatus === 'failed') return <StatusBadge color="red">{t('schedule.failed')}</StatusBadge>
                       if (hb.lastWakeupStatus === 'aborted') return <StatusBadge color="orange">{t('schedule.aborted')}</StatusBadge>
                       if (hb.lastWakeupStatus === 'done' || hb.nextWakeupAt) {
@@ -1066,22 +1108,10 @@ function RuntimeTab({ agents, projectId }: { agents: AgentSchedule[]; projectId:
                     </select>
                   </td>
                   <td className={tdCls}>
-                    <div className="flex flex-col gap-1">
-                      {hb.wakeupCondition ? (
-                        hb.lastConditionStatus === 'met' ? <StatusBadge color="emerald">Met</StatusBadge>
-                        : hb.lastConditionStatus === 'not_met' ? <StatusBadge color="amber">Not met</StatusBadge>
-                        : <StatusBadge color="neutral">—</StatusBadge>
-                      ) : !hb.triggers?.length ? <span className="text-neutral-400 dark:text-zinc-500">—</span> : null}
-                      {hb.triggers && hb.triggers.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {hb.triggers.map(tr => (
-                            <span key={tr} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/20 dark:text-violet-400">
-                              <Zap className="size-2.5" />{t(`schedule.trigger_${tr}`)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <WakeupRuntimeCondition hb={hb} />
+                  </td>
+                  <td className={tdCls}>
+                    <TriggerSummary triggers={hb.triggers} />
                   </td>
                   <td className={cn(tdCls, tdSticky)}>
                     <div className="flex items-center justify-center gap-1">
@@ -1211,6 +1241,64 @@ function CopySessionCmd({ model, sessionId, agentDir }: { model?: string; sessio
 }
 
 /* ─── shared UI ─── */
+
+function hasTriggers(hb: HeartbeatRow): boolean {
+  return (hb.triggers?.length ?? 0) > 0
+}
+
+function wakeupPresetLabelKeys(preset?: string): string[] {
+  if (preset === 'require_tasks') return ['schedule.conditionTaskPass']
+  if (preset === 'require_messages') return ['schedule.conditionMessagePass']
+  if (preset === 'require_any') return ['schedule.conditionTaskPass', 'schedule.conditionMessagePass']
+  return []
+}
+
+function triggerSummaryKey(triggers?: string[]): string | null {
+  if (!triggers?.length) return null
+  const hasTask = triggers.includes('task')
+  const hasMessage = triggers.includes('message')
+  if (hasTask && hasMessage) return 'schedule.triggerTaskAndMessage'
+  if (hasTask) return 'schedule.triggerTaskOnly'
+  if (hasMessage) return 'schedule.triggerMessageOnly'
+  return 'schedule.eventTrigger'
+}
+
+function heartbeatStatusBadge(hb: HeartbeatRow, t: (key: string) => string) {
+  if (hb.enabled && !hb.paused) return <StatusBadge color="emerald">{t('schedule.hbActive')}</StatusBadge>
+  if (hb.enabled && hb.paused) return <StatusBadge color="amber">{t('schedule.paused')}</StatusBadge>
+  if (!hb.enabled && hasTriggers(hb)) return <StatusBadge color="violet">{t('schedule.triggerOnly')}</StatusBadge>
+  return <StatusBadge color="neutral">{t('schedule.off')}</StatusBadge>
+}
+
+function WakeupConditionSummary({ hb }: { hb: HeartbeatRow }) {
+  const { t } = useTranslation()
+  const presetKeys = wakeupPresetLabelKeys(hb.wakeupPreset)
+  const conditionParts = [
+    ...presetKeys.map((key) => ({ key, color: 'sky' as const })),
+    ...(hb.wakeupCondition ? [{ key: 'schedule.conditionScriptPass', color: 'sky' as const }] : []),
+  ]
+  const parts = conditionParts
+
+  if (parts.length > 0) {
+    return (
+      <div className="flex flex-wrap justify-center gap-1">
+        {parts.map((part) => <StatusBadge key={part.key} color={part.color}>{t(part.key)}</StatusBadge>)}
+      </div>
+    )
+  }
+  return <span className="text-neutral-400 dark:text-zinc-500">—</span>
+}
+
+function TriggerSummary({ triggers }: { triggers?: string[] }) {
+  const { t } = useTranslation()
+  const triggerKey = triggerSummaryKey(triggers)
+  if (!triggerKey) return <span className="text-neutral-400 dark:text-zinc-500">—</span>
+  return <StatusBadge color="violet">{t(triggerKey)}</StatusBadge>
+}
+
+function WakeupRuntimeCondition({ hb }: { hb: HeartbeatRow }) {
+  return <WakeupConditionSummary hb={hb} />
+}
 
 function StatusBadge({ color, children }: { color: 'emerald' | 'amber' | 'neutral' | 'sky' | 'red' | 'violet' | 'orange'; children: React.ReactNode }) {
   const cls: Record<string, string> = {

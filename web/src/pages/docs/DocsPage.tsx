@@ -69,6 +69,7 @@ export default function DocsPage() {
   const [searchQ, setSearchQ] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [tagsOpen, setTagsOpen] = useState(false)
   const initialRouteHandled = useRef(false)
   const lastMainSidebarPreference = useRef<boolean | null>(null)
 
@@ -256,28 +257,50 @@ export default function DocsPage() {
 
             {/* Tag cloud */}
             {allTags.length > 0 && (
-              <div>
-                <p className="px-2.5 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">
-                  {t('docs.tags')}
-                </p>
-                <div className="px-2 flex flex-wrap gap-1.5">
-                  {allTags.map(([tag, count]) => (
-                    <button
-                      key={tag}
-                      onClick={() => selectTag(selectedTag === tag ? null : tag)}
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                        selectedTag === tag
-                          ? 'bg-sky-500 text-white'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                      }`}
-                    >
-                      {tag}
-                      <span className={`text-[10px] ${selectedTag === tag ? 'text-sky-100' : 'text-neutral-400 dark:text-zinc-500'}`}>
-                        {count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              <div className="border-t border-neutral-200/70 pt-3 dark:border-zinc-800/80">
+                <button
+                  type="button"
+                  onClick={() => setTagsOpen(v => !v)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  <Tag className="size-4 shrink-0 text-neutral-400 dark:text-zinc-500" />
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {selectedTag ? selectedTag : t('docs.tags')}
+                  </span>
+                  {selectedTag && (
+                    <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                      {allTags.find(([tag]) => tag === selectedTag)?.[1] ?? ''}
+                    </span>
+                  )}
+                  {tagsOpen ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
+                </button>
+                {tagsOpen && (
+                  <div className="mt-1 max-h-52 overflow-y-auto px-1.5 py-1">
+                    {selectedTag && (
+                      <button
+                        type="button"
+                        onClick={() => selectTag(null)}
+                        className="mb-1 flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                      >
+                        {t('docs.allDocuments')}
+                      </button>
+                    )}
+                    {allTags.map(([tag, count]) => (
+                      <button
+                        key={tag}
+                        onClick={() => selectTag(selectedTag === tag ? null : tag)}
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                          selectedTag === tag
+                            ? 'bg-sky-500/10 font-medium text-sky-700 dark:text-sky-300'
+                            : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{tag}</span>
+                        <span className="shrink-0 text-[10px] text-neutral-400 dark:text-zinc-600">{count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </nav>
@@ -877,14 +900,14 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, onOpenDoc, sideb
             </ReactMarkdown>
 
             {/* References panel */}
-            {(refs && (refs.refs.length > 0 || refs.backrefs.length > 0 || !editing)) && (
+            {(refs && ((refs.refs?.length ?? 0) > 0 || (refs.backrefs?.length ?? 0) > 0 || !editing)) && (
               <div className="mt-10 border-t border-neutral-200 dark:border-zinc-700/60 pt-6 space-y-5">
                 {/* Outbound refs */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-semibold text-neutral-600 dark:text-zinc-400 flex items-center gap-1.5">
                       <span className="text-base">→</span> {t('docs.references')}
-                      {refs && refs.refs.length > 0 && (
+                      {refs && (refs.refs?.length ?? 0) > 0 && (
                         <span className="text-xs text-neutral-400 font-normal">({refs.refs.length})</span>
                       )}
                     </h3>
@@ -909,7 +932,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, onOpenDoc, sideb
                       <button onClick={() => { setAddingRef(false); setRefInput('') }} className={btnGhost}>{t('docs.cancel')}</button>
                     </div>
                   )}
-                  {refs && refs.refs.length > 0 ? (
+                  {refs && (refs.refs?.length ?? 0) > 0 ? (
                     <div className="space-y-1.5">
                       {refs.refs.map(r => (
                         <div key={r.id} className="group flex items-start gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
@@ -941,7 +964,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, onOpenDoc, sideb
                 </div>
 
                 {/* Back-references */}
-                {refs && refs.backrefs.length > 0 && (
+                {refs && (refs.backrefs?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-600 dark:text-zinc-400 flex items-center gap-1.5 mb-2">
                       <span className="text-base">←</span> {t('docs.referencedBy')}

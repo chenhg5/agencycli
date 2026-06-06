@@ -115,26 +115,26 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		return map[string]any{"enabled": false}
 	}
 	out := map[string]any{
-		"enabled":               h.Enabled,
-		"interval":              h.Interval,
-		"paused":                h.Paused,
-		"activeHours":           h.ActiveHours,
-		"activeDays":            h.ActiveDays,
-		"sessionScope":          string(h.SessionScope),
-		"wakeupPrompt":          h.WakeupPrompt,
-		"wakeupCondition":       h.WakeupCondition,
-		"wakeupPreset":          h.WakeupPreset,
-		"jitter":                h.Jitter,
-		"maxTasksPerCycle":      h.MaxTasksPerCycle,
-		"maxCycleDuration":      h.MaxCycleDuration,
-		"triggers":              h.Triggers,
-		"pid":                   h.PID,
-		"lastWakeupStatus":      h.LastWakeupStatus,
-		"sessionId":             h.SessionID,
-		"lastConditionStatus":   h.LastConditionStatus,
-		"wakeupCount":           h.WakeupCount,
-		"wakeupCountToday":      h.WakeupCountToday,
-		"lastCycleDuration":     h.LastCycleDuration,
+		"enabled":             h.Enabled,
+		"interval":            h.Interval,
+		"paused":              h.Paused,
+		"activeHours":         h.ActiveHours,
+		"activeDays":          h.ActiveDays,
+		"sessionScope":        string(h.SessionScope),
+		"wakeupPrompt":        h.WakeupPrompt,
+		"wakeupCondition":     h.WakeupCondition,
+		"wakeupPreset":        h.WakeupPreset,
+		"jitter":              h.Jitter,
+		"maxTasksPerCycle":    h.MaxTasksPerCycle,
+		"maxCycleDuration":    h.MaxCycleDuration,
+		"triggers":            h.Triggers,
+		"pid":                 h.PID,
+		"lastWakeupStatus":    h.LastWakeupStatus,
+		"sessionId":           h.SessionID,
+		"lastConditionStatus": h.LastConditionStatus,
+		"wakeupCount":         h.WakeupCount,
+		"wakeupCountToday":    h.WakeupCountToday,
+		"lastCycleDuration":   h.LastCycleDuration,
 	}
 	if h.LastWakeup != nil {
 		out["lastWakeup"] = h.LastWakeup.UTC().Format(time.RFC3339Nano)
@@ -224,22 +224,20 @@ func (s *Server) parseProjectAgent(w http.ResponseWriter, r *http.Request) (proj
 }
 
 type patchHeartbeatBody struct {
-	Enabled          *bool   `json:"enabled,omitempty"`
-	Interval         *string `json:"interval,omitempty"`
-	Jitter           *string `json:"jitter,omitempty"`
-	Paused           *bool   `json:"paused,omitempty"`
-	ActiveHours      *string `json:"activeHours,omitempty"`
-	ActiveDays       *string `json:"activeDays,omitempty"`
-	SessionScope     *string `json:"sessionScope,omitempty"`
-	SessionID        *string `json:"sessionId,omitempty"`
-	WakeupPrompt     *string `json:"wakeupPrompt,omitempty"`
-	// WakeupCondition is intentionally excluded from API PATCH for security.
-	// Setting this field via API would allow command injection since it's
-	// executed with sh -c. Use CLI 'scheduler configure --wakeup-condition' instead.
-	WakeupPreset     *string              `json:"wakeupPreset,omitempty"`
+	Enabled          *bool                 `json:"enabled,omitempty"`
+	Interval         *string               `json:"interval,omitempty"`
+	Jitter           *string               `json:"jitter,omitempty"`
+	Paused           *bool                 `json:"paused,omitempty"`
+	ActiveHours      *string               `json:"activeHours,omitempty"`
+	ActiveDays       *string               `json:"activeDays,omitempty"`
+	SessionScope     *string               `json:"sessionScope,omitempty"`
+	SessionID        *string               `json:"sessionId,omitempty"`
+	WakeupPrompt     *string               `json:"wakeupPrompt,omitempty"`
+	WakeupCondition  *string               `json:"wakeupCondition,omitempty"`
+	WakeupPreset     *string               `json:"wakeupPreset,omitempty"`
 	Triggers         *[]entity.TriggerType `json:"triggers"` // null = not sent, [] = clear
-	MaxTasksPerCycle *int                 `json:"maxTasksPerCycle,omitempty"`
-	MaxCycleDuration *string              `json:"maxCycleDuration,omitempty"`
+	MaxTasksPerCycle *int                  `json:"maxTasksPerCycle,omitempty"`
+	MaxCycleDuration *string               `json:"maxCycleDuration,omitempty"`
 }
 
 func (s *Server) handleGetHeartbeat(w http.ResponseWriter, r *http.Request) {
@@ -322,9 +320,14 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 	if body.WakeupPrompt != nil {
 		hb.WakeupPrompt = *body.WakeupPrompt
 	}
-	// WakeupCondition is NOT accepted via API for security reasons.
-	// It's executed with sh -c, so allowing arbitrary input would be a
-	// command injection vulnerability. Use CLI 'scheduler configure' instead.
+	if body.WakeupCondition != nil {
+		cond := strings.TrimSpace(*body.WakeupCondition)
+		if err := validateAPIWakeupCondition(cond); err != nil {
+			s.jsonError(w, http.StatusBadRequest, "invalid wakeupCondition: "+err.Error())
+			return
+		}
+		hb.WakeupCondition = cond
+	}
 	if body.WakeupPreset != nil {
 		hb.WakeupPreset = strings.TrimSpace(*body.WakeupPreset)
 	}
@@ -372,6 +375,60 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+}
+
+func validateAPIWakeupCondition(condition string) error {
+	if condition == "" {
+		return nil
+	}
+	for _, blocked := range []string{";", "&&", "||", "$(", "`", ">>", "&", "\n", "\r"} {
+		if strings.Contains(condition, blocked) {
+			return fmt.Errorf("contains blocked pattern %q", blocked)
+		}
+	}
+	stripped := condition
+	for {
+		start := strings.Index(stripped, "'")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(stripped[start+1:], "'")
+		if end < 0 {
+			break
+		}
+		stripped = stripped[:start] + stripped[start+end+2:]
+	}
+	if strings.Contains(stripped, ">/") || strings.Contains(stripped, "</") || strings.Contains(stripped, "> /") || strings.Contains(stripped, "< /") {
+		return fmt.Errorf("file redirection is not allowed")
+	}
+
+	allowed := map[string]bool{"gh": true, "agencycli": true, "git": true, "grep": true, "jq": true, "test": true, "[": true, "[[": true, "true": true, "false": true}
+	for i, segment := range strings.Split(condition, "|") {
+		fields := strings.Fields(strings.TrimSpace(segment))
+		if len(fields) == 0 {
+			return fmt.Errorf("empty pipe segment at position %d", i+1)
+		}
+		cmdName := fields[0]
+		if !allowed[cmdName] && !isAllowedAPIWakeupScript(cmdName) {
+			return fmt.Errorf("command %q is not allowed", cmdName)
+		}
+	}
+	for _, token := range strings.Fields(condition) {
+		if strings.HasPrefix(token, "$GI") && !strings.HasPrefix(token, "$GITHUB_") {
+			return fmt.Errorf("unsafe environment variable %q", token)
+		}
+	}
+	return nil
+}
+
+func isAllowedAPIWakeupScript(cmdName string) bool {
+	for _, prefix := range []string{"$AGENCY_DIR/scripts/wakeup-conditions/", "${AGENCY_DIR}/scripts/wakeup-conditions/"} {
+		if strings.HasPrefix(cmdName, prefix) {
+			rest := strings.TrimPrefix(cmdName, prefix)
+			return rest != "" && strings.HasSuffix(rest, ".sh") && !strings.Contains(rest, "..") && !strings.ContainsAny(rest, "\\\"'")
+		}
+	}
+	return false
 }
 
 func (s *Server) handleAgentLiveLog(w http.ResponseWriter, r *http.Request) {
