@@ -85,6 +85,10 @@ func (f *claudeCodeFormatter) Format(mc *ctxbuild.MergedContext, outDir string) 
 func (f *claudeCodeFormatter) writeSkills(skills []ctxbuild.SkillDef, outDir string) error {
 	for _, sk := range skills {
 		skillDir := filepath.Join(outDir, ".claude", "skills", sk.Name)
+		// Remove stale bundled files (e.g. old bin/ copies) before redeploy.
+		if err := os.RemoveAll(skillDir); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("claudecode: reset skill dir %q: %w", sk.Name, err)
+		}
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return fmt.Errorf("claudecode: create skill dir %q: %w", sk.Name, err)
 		}

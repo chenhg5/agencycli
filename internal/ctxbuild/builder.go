@@ -173,7 +173,19 @@ func LayerHashes(mc *MergedContext) map[string]string {
 func loadSkillFiles(skillDir string) []SkillFile {
 	var files []SkillFile
 	_ = filepath.WalkDir(skillDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if d.Name() == "bin" {
+				return filepath.SkipDir
+			}
+			// Skip Go toolchain subtrees; binaries live in <agency>/tools/bin/.
+			if path != skillDir {
+				if _, statErr := os.Stat(filepath.Join(path, "go.mod")); statErr == nil {
+					return filepath.SkipDir
+				}
+			}
 			return nil
 		}
 		rel, err := filepath.Rel(skillDir, path)

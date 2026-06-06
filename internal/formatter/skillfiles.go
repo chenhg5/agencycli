@@ -55,6 +55,7 @@ func resolveSkillsToDir(skills []ctxbuild.SkillDef, outDir string) []ctxbuild.Sk
 	result := make([]ctxbuild.SkillDef, len(skills))
 	for i, sk := range skills {
 		dest := filepath.Join(outDir, ".agencycli-skills", sk.Name)
+		_ = os.RemoveAll(dest)
 		absDir, err := deploySkillFiles(sk, dest)
 		if err != nil {
 			absDir = dest // fallback: still resolve even if copy failed

@@ -70,6 +70,9 @@ func (f *geminiFormatter) Format(mc *ctxbuild.MergedContext, outDir string) erro
 	// Skills → .gemini/skills/<name>/SKILL.md (+ any bundled files)
 	for _, sk := range mc.Skills {
 		skillDir := filepath.Join(outDir, ".gemini", "skills", sk.Name)
+		if err := os.RemoveAll(skillDir); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("gemini: reset skill dir %q: %w", sk.Name, err)
+		}
 		if err := os.MkdirAll(skillDir, 0o755); err != nil {
 			return fmt.Errorf("gemini: create skill dir %q: %w", sk.Name, err)
 		}
