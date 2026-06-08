@@ -43,6 +43,14 @@ type RunRow = {
 
 type LogData = { content: string; truncated: boolean }
 
+// Restore real line breaks for descriptions whose upstream author stored literal
+// "\n" / "\r\n" / "\t" sequences (typically agent-generated text that survived a
+// JSON round-trip). Without this, ReactMarkdown renders the backslash sequences
+// verbatim instead of as paragraph / line breaks.
+function unescapeBreaks(s: string): string {
+  return s.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+}
+
 export const STATUS_KEYS = ['pending', 'in_progress', 'awaiting_confirmation', 'blocked', 'done_success', 'done_failed', 'cancelled'] as const
 
 export const statusColor: Record<string, string> = {
@@ -263,36 +271,37 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           )}
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {task.description && (
-          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+          <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('tasks.description')}</span>
             <div className="mt-1.5 text-sm text-neutral-700 dark:text-zinc-300">
-              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown></div>
+              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{unescapeBreaks(task.description)}</ReactMarkdown></div>
             </div>
           </div>
         )}
 
         {task.prompt && (
-          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+          <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-zinc-500">{t('forms.prompt')}</span>
-            <div className="mt-1.5 overflow-y-auto rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-zinc-800/50 dark:text-zinc-300">
-              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.prompt}</ReactMarkdown></div>
+            <div className="mt-1.5 rounded-lg bg-neutral-50 p-3 text-sm text-neutral-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{unescapeBreaks(task.prompt)}</ReactMarkdown></div>
             </div>
           </div>
         )}
 
         {task.summary && (
-          <div className="shrink-0 border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
+          <div className="border-b border-neutral-100 px-5 py-3 dark:border-zinc-700/40">
             <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">{t('tasks.summary')}</span>
-            <div className="mt-1.5 overflow-y-auto rounded-lg bg-emerald-50 p-3 text-sm text-neutral-700 dark:bg-emerald-900/20 dark:text-zinc-300">
-              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{task.summary}</ReactMarkdown></div>
+            <div className="mt-1.5 rounded-lg bg-emerald-50 p-3 text-sm text-neutral-700 dark:bg-emerald-900/20 dark:text-zinc-300">
+              <div className="prose prose-sm max-w-none dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{unescapeBreaks(task.summary)}</ReactMarkdown></div>
             </div>
           </div>
         )}
 
         <TaskCommentsSection project={task.project} agent={task.agent} taskId={task.id} />
 
-        <div className="flex-1 overflow-y-auto">
+        <div>
           {matchingRun ? (
             <>
               <div className="flex items-center gap-1.5 px-5 pt-3 pb-2">
@@ -319,6 +328,7 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           ) : (
             <p className="py-8 text-center text-sm text-neutral-400 dark:text-zinc-500">{t('tasks.noRunRecord')}</p>
           )}
+        </div>
         </div>
       </div>
     </div>
