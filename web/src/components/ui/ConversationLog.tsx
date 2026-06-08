@@ -162,7 +162,14 @@ function extractCursorToolResult(tc: Record<string, unknown>): { content: string
 function isCodexLog(lines: string[]): boolean {
   // agencycli prepends its own run headers before the Codex transcript, so do
   // not reject logs just because they contain "=== agencycli exec".
+  // However, if the log contains stream-json output (lines starting with '{'),
+  // it is NOT a Codex log — it is claude-cli stream-json or similar.
   const trimmed = lines.map((l) => l.trim())
+
+  // If there are JSON event lines, this is a stream-json log, not Codex.
+  const hasJsonLines = trimmed.some(l => l.startsWith('{') && l.includes('"type"'))
+  if (hasJsonLines) return false
+
   return trimmed.some(l => l.includes('OpenAI Codex') || /^model:\s/.test(l)) ||
     (trimmed.includes('user') && trimmed.includes('codex'))
 }
@@ -368,16 +375,21 @@ function parseLog(content: string): ConversationItem[] {
     if (thinkingBuf) flushThinking()
 
     if (ev.type === 'system') {
+      // thinking_tokens events are internal token-counting pings — skip entirely.
+      if (ev.subtype === 'thinking_tokens') continue
       if (ev.subtype === 'api_retry') {
         items.push({
           kind: 'system',
           text: `api_retry (attempt ${ev.attempt}/${ev.max_retries}) — ${ev.error_status} ${ev.error}`,
         })
-      } else {
-        const info = ev.subtype === 'init' && ev.session_id
-          ? `Session: ${ev.session_id}`
-          : ev.subtype || 'system'
-        items.push({ kind: 'system', text: info })
+      } else if (ev.subtype === 'init') {
+        if (ev.session_id) items.push({ kind: 'system', text: `Session: ${ev.session_id}` })
+      } else if (ev.subtype) {
+        // Only surface subtypes that are meaningful to users; silently drop others.
+        const verbose = ['tool_init', 'tool_execution', 'tool_result', 'compact']
+        if (!verbose.includes(ev.subtype)) {
+          items.push({ kind: 'system', text: ev.subtype })
+        }
       }
       continue
     }
@@ -453,11 +465,17 @@ function parseLog(content: string): ConversationItem[] {
     if (ev.type === 'assistant') {
       const c = ev.message?.content
       if (Array.isArray(c)) {
-        const blocks = c as ContentBlock[]
-        const textBlocks = blocks.filter((b) => b.type === 'text')
-        const toolUseBlocks = blocks.filter((b) => b.type === 'tool_use')
-        const toolResultBlocks = blocks.filter((b) => b.type === 'tool_result')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const blocks = c as Array<ContentBlock & { type: string; thinking?: string; signature?: string }>
+        const textBlocks = blocks.filter((b) => b.type === 'text') as Array<{ type: 'text'; text: string }>
+        const toolUseBlocks = blocks.filter((b) => b.type === 'tool_use') as ContentBlock[]
+        const toolResultBlocks = blocks.filter((b) => b.type === 'tool_result') as ContentBlock[]
+        // thinking blocks (extended thinking) — show as collapsible
+        const thinkingBlocks = blocks.filter((b) => b.type === 'thinking' && b.thinking)
 
+        for (const tb of thinkingBlocks) {
+          if (tb.thinking) items.push({ kind: 'thinking', text: tb.thinking })
+        }
         if (textBlocks.length > 0 || toolUseBlocks.length > 0) {
           pushAssistantBlocks(items, [...textBlocks, ...toolUseBlocks])
         }

@@ -59,7 +59,7 @@ function readAgentChatDraft(projectId?: string, agentName?: string) {
 export default function ProjectAgentChatPage() {
   const { t } = useTranslation()
   const { projectId, agentName } = useParams<{ projectId: string; agentName: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const initialSessionId = searchParams.get('sessionId') ?? ''
   const [sessionId, setSessionId] = useState(initialSessionId)
   const [content, setContent] = useState('')
@@ -84,6 +84,18 @@ export default function ProjectAgentChatPage() {
   const abortRef = useRef<AbortController | null>(null)
   const draftKey = agentChatDraftKey(projectId, agentName)
 
+  // Sync sessionId state + URL query param together so page refresh preserves the session.
+  const updateSessionId = useCallback((sid: string) => {
+    setSessionId(sid)
+    setSessionDraft(sid)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (sid) next.set('sessionId', sid)
+      else next.delete('sessionId')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
   const historyPath = useCallback((sid: string) => {
     if (!projectId || !agentName) return null
     const base = `/api/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(agentName)}/chat/history`
@@ -97,8 +109,7 @@ export default function ProjectAgentChatPage() {
     setError(null)
     try {
       const data = await apiFetch<HistoryResp>(path)
-      setSessionId(data.sessionId ?? sid)
-      setSessionDraft(data.sessionId ?? sid)
+      updateSessionId(data.sessionId ?? sid)
       setContent(data.content ?? '')
       setHistoryTruncated(Boolean(data.truncated))
     } catch (e) {
@@ -252,7 +263,7 @@ export default function ProjectAgentChatPage() {
           try {
             const evt = JSON.parse(data)
             if (evt.type === 'chat_done') {
-              if (evt.session_id) setSessionId(evt.session_id)
+              if (evt.session_id) updateSessionId(evt.session_id)
               continue
             }
             if (evt.type === 'chat_error') {
@@ -261,7 +272,7 @@ export default function ProjectAgentChatPage() {
               setContent((prev) => appendLog(prev, `=== Error: ${msg} ===`))
               continue
             }
-            if (evt.session_id) setSessionId(evt.session_id)
+            if (evt.session_id) updateSessionId(evt.session_id)
           } catch {
             // Non-JSON status lines are still useful in the raw log.
           }
@@ -309,8 +320,7 @@ export default function ProjectAgentChatPage() {
 
   function startFresh() {
     abortRef.current?.abort()
-    setSessionId('')
-    setSessionDraft('')
+    updateSessionId('')
     setContent('')
     setError(null)
     setFreshNext(true)
@@ -323,7 +333,7 @@ export default function ProjectAgentChatPage() {
     const next = sessionDraft.trim()
     setSessionEditorOpen(false)
     setFreshNext(false)
-    setSessionId(next)
+    updateSessionId(next)
     void loadHistory(next)
   }
 

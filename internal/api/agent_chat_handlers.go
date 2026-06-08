@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -103,6 +104,7 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 			break
 		}
 	}
+	log.Printf("[chat-history] %s/%s: query sessionID=%q → %d candidate runs (total rows=%d)", project, agent, sessionID, len(filtered), len(rows))
 	for i, j := 0, len(filtered)-1; i < j; i, j = i+1, j-1 {
 		filtered[i], filtered[j] = filtered[j], filtered[i]
 	}
@@ -176,6 +178,8 @@ func (s *Server) readAgentSessionHistory(project, agent, sessionID string) (stri
 			LogPath:   seg.logPath,
 		})
 	}
+	log.Printf("[chat-history] %s/%s: returning %d runs, resolvedSession=%q, totalBytes=%d, truncated=%v",
+		project, agent, len(outRuns), sessionID, sb.Len(), truncated)
 	return sb.String(), outRuns, sessionID, truncated, nil
 }
 
@@ -284,8 +288,13 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		agentModel = meta.Model
 	}
 	clientGone := false
+	lineCount := 0
 	for line := range lines {
+		lineCount++
 		if sid := extractAgentChatSessionID(line); sid != "" {
+			if detectedSessionID == "" {
+				log.Printf("[chat] %s/%s: detected session_id=%s", project, agent, sid)
+			}
 			detectedSessionID = sid
 		}
 		if clientGone {
@@ -293,11 +302,13 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 		payload := chatSSELine(line, agentModel)
 		if _, err := fmt.Fprintf(w, "data: %s\n\n", payload); err != nil {
+			log.Printf("[chat] %s/%s: client gone after %d lines (write err: %v)", project, agent, lineCount, err)
 			clientGone = true
 			continue
 		}
 		flusher.Flush()
 	}
+	log.Printf("[chat] %s/%s: streamed %d lines, session=%q clientGone=%v", project, agent, lineCount, detectedSessionID, clientGone)
 
 	waitErr := cmd.Wait()
 
