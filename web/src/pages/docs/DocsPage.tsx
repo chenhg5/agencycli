@@ -509,21 +509,29 @@ function CodeBlock({ className, children, ...props }: React.HTMLAttributes<HTMLE
 
 /* ─── Custom markdown components for Notion-like rendering ─────────────────── */
 
-const mdComponents: Components = {
+function createMdComponents(): Components {
+  const slugCount: Record<string, number> = {}
+  function uniqueSlug(text: string): string {
+    const base = slugify(text)
+    const count = slugCount[base] ?? 0
+    slugCount[base] = count + 1
+    return count === 0 ? base : `${base}-${count}`
+  }
+  return {
   h1: ({ children }) => {
-    const id = slugify(extractText(children))
+    const id = uniqueSlug(extractText(children))
     return <h1 id={id} className="mt-10 mb-4 text-[2em] font-bold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 first:mt-0">{children}</h1>
   },
   h2: ({ children }) => {
-    const id = slugify(extractText(children))
+    const id = uniqueSlug(extractText(children))
     return <h2 id={id} className="mt-8 mb-3 text-[1.5em] font-semibold leading-tight tracking-tight text-neutral-900 dark:text-zinc-50 border-b border-neutral-200 pb-2 dark:border-zinc-700/60">{children}</h2>
   },
   h3: ({ children }) => {
-    const id = slugify(extractText(children))
+    const id = uniqueSlug(extractText(children))
     return <h3 id={id} className="mt-6 mb-2 text-[1.25em] font-semibold leading-snug text-neutral-900 dark:text-zinc-50">{children}</h3>
   },
   h4: ({ children }) => {
-    const id = slugify(extractText(children))
+    const id = uniqueSlug(extractText(children))
     return <h4 id={id} className="mt-5 mb-2 text-[1.1em] font-semibold text-neutral-800 dark:text-zinc-100">{children}</h4>
   },
   p: ({ children }) => (
@@ -591,6 +599,7 @@ const mdComponents: Components = {
   ),
   strong: ({ children }) => <strong className="font-semibold text-neutral-900 dark:text-zinc-100">{children}</strong>,
   em: ({ children }) => <em className="italic text-neutral-600 dark:text-zinc-400">{children}</em>,
+  }
 }
 
 /* ─── Table of contents ────────────────────────────────────────────────────── */
@@ -600,6 +609,7 @@ type TocItem = { level: number; text: string; id: string }
 function parseHeadings(md: string): TocItem[] {
   const stripped = stripFrontmatter(md)
   const items: TocItem[] = []
+  const slugCount: Record<string, number> = {}
   let inCode = false
   for (const line of stripped.split('\n')) {
     if (line.trimStart().startsWith('```')) { inCode = !inCode; continue }
@@ -609,7 +619,11 @@ function parseHeadings(md: string): TocItem[] {
     const level = m[1].length
     const text = m[2].replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`#]/g, '').trim()
     if (!text) continue
-    items.push({ level, text, id: slugify(text) })
+    const base = slugify(text)
+    const count = slugCount[base] ?? 0
+    slugCount[base] = count + 1
+    const id = count === 0 ? base : `${base}-${count}`
+    items.push({ level, text, id })
   }
   return items
 }
@@ -706,6 +720,7 @@ function DocViewer({ doc, content, onBack, onRemove, onUpdated, onOpenDoc, sideb
   const [refInput, setRefInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const tocItems = useMemo(() => parseHeadings(content), [content])
+  const mdComponents = useMemo(() => createMdComponents(), [content])
 
   const loadRefs = useCallback(async () => {
     const data = await apiFetch<DocRefs>(`/api/v1/docs/${doc.id}/refs`)
