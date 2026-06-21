@@ -31,7 +31,7 @@ type HeartbeatRow = {
 
 type CronRow = {
   id: string; title: string; schedule: string; enabled: boolean; prompt: string
-  lastRun?: string; lastRunStatus?: string; runCount?: number
+  lastRun?: string; lastRunStatus?: string; runCount?: number; nextRun?: string
   sessionScope?: string; sessionId?: string; sessionStartedAt?: string
   jitter?: string
 }
@@ -637,6 +637,7 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
                 <th className={thCls}>{t('schedule.statusLabel')}</th>
                 <th className={thCls}>{t('session.scopeLabel')}</th>
                 <th className={thCls}>{t('session.sessionLabel')}</th>
+                <th className={thCls}>{t('schedule.nextRun')}</th>
                 <th className={thCls}>{t('schedule.lastRun')}</th>
                 <th className={thCls}>{t('schedule.runCountLabel')}</th>
                 <th className={cn(thCls, thSticky)}>{t('messages.actions')}</th>
@@ -663,6 +664,9 @@ function CronTab({ agents, projectId, onChanged }: { agents: AgentSchedule[]; pr
                         <CopySessionCmd model={model} sessionId={c.sessionId} agentDir={agentDir} />
                       </div>
                     ) : <span className="text-neutral-400 dark:text-zinc-500">—</span>}
+                  </td>
+                  <td className={tdCls}>
+                    {c.nextRun ? <span className="font-mono text-sky-700 dark:text-sky-400">{fmt(c.nextRun)}</span> : '—'}
                   </td>
                   <td className={tdCls}>{c.lastRun ? fmt(c.lastRun) : '—'}</td>
                   <td className={cn(tdCls, 'tabular-nums')}>{c.runCount ?? 0}</td>

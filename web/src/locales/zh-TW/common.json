@@ -504,6 +504,7 @@
     "cronJobs": "個定時任務",
     "cronSchedule": "時間表",
     "lastRun": "上次執行",
+    "nextRun": "下次執行",
     "runCountLabel": "執行次數",
     "noCrons": "暫無定時任務。",
     "cronOn": "開",

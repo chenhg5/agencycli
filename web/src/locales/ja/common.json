@@ -504,6 +504,7 @@
     "cronJobs": "件のCronジョブ",
     "cronSchedule": "スケジュール",
     "lastRun": "前回の実行",
+    "nextRun": "次回の実行",
     "runCountLabel": "実行回数",
     "noCrons": "Cronジョブはまだありません。",
     "cronOn": "オン",

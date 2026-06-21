@@ -175,6 +175,12 @@ func cronToJSON(c *entity.Cron) map[string]any {
 		out["lastRun"] = c.LastRun.UTC().Format(time.RFC3339Nano)
 	}
 	out["lastRunStatus"] = c.LastRunStatus
+	if c.Enabled && c.Schedule != "" {
+		if sched, err := standardCronParser.Parse(c.Schedule); err == nil {
+			next := sched.Next(time.Now())
+			out["nextRun"] = next.UTC().Format(time.RFC3339Nano)
+		}
+	}
 	return out
 }
 

@@ -504,6 +504,7 @@
     "cronJobs": "cron jobs",
     "cronSchedule": "Schedule",
     "lastRun": "Last run",
+    "nextRun": "Next run",
     "runCountLabel": "Runs",
     "noCrons": "No cron jobs configured yet.",
     "cronOn": "On",
