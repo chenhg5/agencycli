@@ -128,6 +128,7 @@ func heartbeatToJSON(h *entity.HeartbeatConfig) map[string]any {
 		"maxTasksPerCycle":    h.MaxTasksPerCycle,
 		"maxCycleDuration":    h.MaxCycleDuration,
 		"triggers":            h.Triggers,
+		"triggerDebounce":     h.TriggerDebounce,
 		"pid":                 h.PID,
 		"lastWakeupStatus":    h.LastWakeupStatus,
 		"sessionId":           h.SessionID,
@@ -242,6 +243,7 @@ type patchHeartbeatBody struct {
 	WakeupCondition  *string               `json:"wakeupCondition,omitempty"`
 	WakeupPreset     *string               `json:"wakeupPreset,omitempty"`
 	Triggers         *[]entity.TriggerType `json:"triggers"` // null = not sent, [] = clear
+	TriggerDebounce  *string               `json:"triggerDebounce,omitempty"`
 	MaxTasksPerCycle *int                  `json:"maxTasksPerCycle,omitempty"`
 	MaxCycleDuration *string               `json:"maxCycleDuration,omitempty"`
 }
@@ -346,6 +348,15 @@ func (s *Server) handlePatchHeartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		hb.Triggers = valid
+	}
+	if body.TriggerDebounce != nil {
+		if t := strings.TrimSpace(*body.TriggerDebounce); t != "" {
+			if _, err := time.ParseDuration(t); err != nil {
+				s.jsonError(w, http.StatusBadRequest, "invalid triggerDebounce duration")
+				return
+			}
+		}
+		hb.TriggerDebounce = strings.TrimSpace(*body.TriggerDebounce)
 	}
 	if body.MaxTasksPerCycle != nil {
 		hb.MaxTasksPerCycle = *body.MaxTasksPerCycle

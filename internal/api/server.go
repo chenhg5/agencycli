@@ -63,6 +63,8 @@ type Server struct {
 func NewServer(root, apiKey string) *Server {
 	sched := newSchedulerManager(root)
 	ts := taskstore.New(root)
+	tm := newTriggerManager(root, sched.binPath, ts)
+	tm.StartPoller()
 	return &Server{
 		root:      root,
 		apiKey:    strings.TrimSpace(apiKey),
@@ -70,7 +72,7 @@ func NewServer(root, apiKey string) *Server {
 		ts:        ts,
 		users:     newUserStore(root),
 		sched:     sched,
-		triggers:  newTriggerManager(root, sched.binPath, ts),
+		triggers:  tm,
 		ccStore:   store.NewCCConnectStore(root),
 		okrStore:  store.NewOKRStore(root),
 		msStore:   store.NewMilestoneStore(root),
@@ -87,8 +89,11 @@ func (s *Server) SetUpdateChecker(fn UpdateChecker) { s.updateCheck = fn }
 // SetDaemonStatus sets the function used to get daemon status.
 func (s *Server) SetDaemonStatus(fn DaemonStatusFunc) { s.daemonStatus = fn }
 
-// Shutdown stops all managed scheduler processes.
-func (s *Server) Shutdown() { s.sched.Cleanup() }
+// Shutdown stops all managed scheduler processes and the trigger poller.
+func (s *Server) Shutdown() {
+	s.triggers.StopPoller()
+	s.sched.Cleanup()
+}
 
 // Handler returns the root HTTP handler (includes optional auth).
 func (s *Server) Handler() http.Handler {

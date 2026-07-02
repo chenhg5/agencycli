@@ -1650,6 +1650,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 		wakeupPromptFile string
 		wakeupCondition  string
 		triggerStr       string
+		triggerDebounce  string
 	)
 
 	cmd := &cobra.Command{
@@ -1800,6 +1801,15 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 				hb.Triggers = triggers
 				changed = true
 			}
+			if cmd.Flags().Changed("trigger-debounce") {
+				if triggerDebounce != "" {
+					if _, err := time.ParseDuration(triggerDebounce); err != nil {
+						return fmt.Errorf("invalid --trigger-debounce %q: %w", triggerDebounce, err)
+					}
+				}
+				hb.TriggerDebounce = triggerDebounce
+				changed = true
+			}
 
 			if changed {
 				if err := ts.SaveHeartbeat(project, agentName, hb); err != nil {
@@ -1863,6 +1873,11 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 					tt[i] = string(t)
 				}
 				fmt.Printf("  Triggers: %s\n", strings.Join(tt, ", "))
+				if hb.TriggerDebounce != "" {
+					fmt.Printf("  Trigger debounce: %s\n", hb.TriggerDebounce)
+				} else {
+					fmt.Printf("  Trigger debounce: 5m (default)\n")
+				}
 			}
 			if hb.LastWakeup != nil {
 				fmt.Printf("  Last    : %s  (%s)\n",
@@ -1887,6 +1902,7 @@ func newSchedulerHeartbeatConfigureCmd() *cobra.Command {
 	cmd.Flags().StringVar(&wakeupPromptFile, "wakeup-prompt-file", "", "path to a markdown file used as the default wakeup routine when queue is empty")
 	cmd.Flags().StringVar(&wakeupCondition, "wakeup-condition", "", `shell command evaluated before each wakeup; exit 0 = proceed, non-zero = skip cycle (e.g. "gh issue list --state open | grep -q .")`)
 	cmd.Flags().StringVar(&triggerStr, "trigger", "", `event triggers for immediate wakeup, comma-separated: "message", "task", or "message,task" (empty = disable triggers)`)
+	cmd.Flags().StringVar(&triggerDebounce, "trigger-debounce", "", `delay before poller fires trigger after detecting unread messages, e.g. "5m", "10m" (default: 5m). Only affects CLI/agent-to-agent messages; web API messages fire immediately.`)
 	return cmd
 }
 

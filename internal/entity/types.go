@@ -732,6 +732,15 @@ type HeartbeatConfig struct {
 	// trigger-only with no periodic heartbeat.
 	Triggers []TriggerType `yaml:"triggers,omitempty" json:"triggers,omitempty"`
 
+	// TriggerDebounce is the delay before the background message poller fires a
+	// trigger after first detecting unread messages. Go duration string, e.g.
+	// "5m", "10m". This allows multiple messages (typically agent-to-agent) to
+	// accumulate and be processed in a single wakeup cycle.
+	// Only affects poller-detected messages (CLI sends); web API messages
+	// (human→agent) still fire immediately.
+	// Default: 5m.
+	TriggerDebounce string `yaml:"trigger_debounce,omitempty" json:"trigger_debounce,omitempty"`
+
 	// Runtime state (mutated by scheduler / runner).
 	PID              int        `yaml:"pid,omitempty"`
 	LastWakeup       *time.Time `yaml:"last_wakeup,omitempty"`
