@@ -173,6 +173,8 @@ agencycli task list   --project P --agent A [--status pending] [--archived]
 agencycli task show   <task-id>
 agencycli task set    <task-id> [--title T] [--status S] [--priority N] [--due-date D] \
                       [--estimate-duration 30m] [--parent ID] [--label L]...
+agencycli task stats  [--since today] [--project P] [--agent A] [--assignee X] [--label L] \
+                      [--by agent|assignee|label|label:value|label:category] [--detail] [--format json]
 agencycli task cancel <task-id>
 agencycli task retry  <task-id>
 

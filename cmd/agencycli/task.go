@@ -29,6 +29,7 @@ func newTaskCmd() *cobra.Command {
 		newTaskShowCmd(),
 		newTaskFindCmd(),
 		newTaskSetCmd(),
+		newTaskStatsCmd(),
 		newTaskDoneCmd(),
 		newTaskConfirmRequestCmd(),
 		newTaskRetryCmd(),

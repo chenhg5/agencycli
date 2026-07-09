@@ -119,6 +119,8 @@ agencycli task show   <task-id>
 agencycli task set    <task-id> [--title T] [--status S] [--priority N] [--type T] \
   [--description D] [--summary S] [--label L]... [--parent ID] [--due-date YYYY-MM-DD] \
   [--estimate-duration 30m] [--assignee A] [--prompt P | --prompt-file PATH] [--position N]
+agencycli task stats  [--since today] [--project P] [--agent A] [--assignee X] [--label L] \
+  [--by agent|assignee|label|label:value|label:category] [--detail] [--format json]
 agencycli task cancel <task-id>
 agencycli task retry  <task-id>
 

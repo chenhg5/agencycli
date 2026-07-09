@@ -58,6 +58,8 @@ agencycli --dir $AGENCY_DIR task list --project <project> --agent <agent> --stat
 ```bash
 agencycli --dir $AGENCY_DIR task set <task-id> [--title T] [--status S] [--priority N] \
   [--due-date YYYY-MM-DD] [--estimate-duration 30m] [--parent ID] [--label L]...
+agencycli --dir $AGENCY_DIR task stats [--since today] [--project P] [--agent A] [--assignee X] \
+  [--label L] [--by agent|assignee|label|label:value|label:category] [--detail] [--format json]
 agencycli --dir $AGENCY_DIR task cancel <task-id>
 agencycli --dir $AGENCY_DIR task retry  <task-id>
 

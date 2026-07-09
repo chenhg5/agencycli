@@ -146,6 +146,9 @@ type Store interface {
 	// or ("", "", nil, error) when not found.
 	FindTaskByID(id string) (project, agent string, task *entity.Task, err error)
 
+	// ListAllTaskRecords returns active + archived tasks (optional project filter).
+	ListAllTaskRecords(projectFilter string) ([]TaskRecord, error)
+
 	// ── Task Comments ────────────────────────────────────────────────────────
 
 	// AddComment persists a comment for a task.

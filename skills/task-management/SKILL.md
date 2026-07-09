@@ -134,7 +134,36 @@ agencycli --dir $AGENCY_DIR task list --project <project> --agent <agent> --stat
 
 ---
 
-## Mark tasks done (called by the executing agent, or manually)
+## Task stats (throughput & efficiency)
+
+```bash
+# Today by executor queue (default: all agents, grouped)
+agencycli --dir $AGENCY_DIR task stats --since today
+
+# One agent's queue
+agencycli --dir $AGENCY_DIR task stats --since today --project <project> --agent <agent>
+
+# By assignee field
+agencycli --dir $AGENCY_DIR task stats --since today --assignee <project>/<agent>
+agencycli --dir $AGENCY_DIR task stats --since 7d --by assignee
+
+# By label (evening summary: value / category buckets)
+agencycli --dir $AGENCY_DIR task stats --since today --by label:value
+agencycli --dir $AGENCY_DIR task stats --since today --by label:category
+agencycli --dir $AGENCY_DIR task stats --since today --label value:owner
+
+# List each finished task
+agencycli --dir $AGENCY_DIR task stats --since today --detail
+
+# JSON export (includes elapsedHuman, estimateHuman, etc.)
+agencycli --dir $AGENCY_DIR task stats --since today --format json
+```
+
+Metrics: success/failed/cancelled counts, sum of actual elapsed time (`started_at`→`finished_at`),
+sum of `estimate_duration`, coverage (tasks with estimates), and actual/estimate ratio.
+JSON uses human-readable durations (`elapsedHuman`: `14m32s`) instead of nanosecond integers.
+
+---
 
 ```bash
 # Success
@@ -284,4 +313,6 @@ agencycli --dir $AGENCY_DIR task tokens \
 | Repeated recurring work | `cron add` with a schedule |
 | Human must approve before agent proceeds | Agent calls `task confirm-request` |
 | Need to change title/priority/due date/parent mid-flight | `task set <id> --<field> ...` |
+| Review throughput / efficiency for a person or agent | `task stats --since today [--assignee A]` |
+| Evening summary by value/category labels | `task stats --since today --by label:value` or `--by label:category` |
 | Need to know which agent owns a task ID | `task find --id <id>` |

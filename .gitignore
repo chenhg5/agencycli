@@ -42,6 +42,6 @@ Thumbs.db
 
 .npmrc
 
-agencycli
+/agencycli
 
 .codex
