@@ -8,6 +8,7 @@ import { apiDelete, apiPost, apiPut } from '../../lib/api'
 import { useFormatDateTime } from '../../lib/format-datetime'
 import { useApiJson } from '../../lib/use-api'
 import { useAuth } from '../../lib/auth'
+import { formatGoDuration, taskElapsedLabel } from '../../lib/task-duration'
 
 export type TaskRow = {
   id: string
@@ -29,8 +30,13 @@ export type TaskRow = {
   createdBy?: string
   createdAt: string
   updatedAt: string
+  startedAt?: string
+  finishedAt?: string
   dueDate?: string
+  estimateDuration?: string
 }
+
+export type TaskOption = { id: string; title: string; project?: string }
 
 type RunRow = {
   project: string; agent: string; kind: string; status: string
@@ -79,7 +85,7 @@ const fieldCls =
 
 /* ── Edit modal ─── */
 
-export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClose: () => void; onSaved: () => void }) {
+export function EditTaskModal({ task, taskOptions = [], onClose, onSaved }: { task: TaskRow; taskOptions?: TaskOption[]; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation()
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description ?? '')
@@ -89,14 +95,19 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
   const [summary, setSummary] = useState(task.summary ?? '')
   const [labelsStr, setLabelsStr] = useState((task.labels ?? []).join(', '))
   const [dueDate, setDueDate] = useState(task.dueDate ?? '')
+  const [parentId, setParentId] = useState(task.parentId ?? '')
+  const [estimateDuration, setEstimateDuration] = useState(task.estimateDuration ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const parentChoices = taskOptions.filter((o) => o.id !== task.id)
 
   const showSummary = isTerminal(status)
   const changed = title !== task.title || description !== (task.description ?? '') ||
     status !== task.status || priority !== task.priority || taskType !== (task.type ?? '') ||
     summary !== (task.summary ?? '') || labelsStr !== (task.labels ?? []).join(', ') ||
-    dueDate !== (task.dueDate ?? '')
+    dueDate !== (task.dueDate ?? '') || parentId !== (task.parentId ?? '') ||
+    estimateDuration !== (task.estimateDuration ?? '')
 
   async function onSave() {
     setErr(null)
@@ -113,6 +124,8 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
         body.labels = labelsStr.split(',').map(l => l.trim()).filter(Boolean)
       }
       if (dueDate !== (task.dueDate ?? '')) body.dueDate = dueDate || ''
+      if (parentId !== (task.parentId ?? '')) body.parentId = parentId || ''
+      if (estimateDuration !== (task.estimateDuration ?? '')) body.estimateDuration = estimateDuration || ''
       await apiPut('/api/v1/tasks/update', body)
       onSaved()
       onClose()
@@ -164,6 +177,26 @@ export function EditTaskModal({ task, onClose, onSaved }: { task: TaskRow; onClo
             <label className="block text-sm">
               <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.dueDate')}</span>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={cn(fieldCls, 'mt-1')} />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.estimateDuration')}</span>
+              <input value={estimateDuration} onChange={(e) => setEstimateDuration(e.target.value)} placeholder="30m" className={cn(fieldCls, 'mt-1')} />
+              <p className="mt-0.5 text-xs text-neutral-400 dark:text-zinc-500">{t('tasks.estimateDurationHint')}</p>
+            </label>
+            <label className="block text-sm">
+              <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.parentTask')}</span>
+              {parentChoices.length > 0 ? (
+                <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={cn(fieldCls, 'mt-1')}>
+                  <option value="">{t('tasks.parentTaskNone')}</option>
+                  {parentChoices.map((o) => (
+                    <option key={o.id} value={o.id}>{o.title} ({o.id})</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={parentId} onChange={(e) => setParentId(e.target.value)} placeholder="t-..." className={cn(fieldCls, 'mt-1 font-mono text-xs')} />
+              )}
             </label>
           </div>
           <label className="block text-sm">
@@ -238,6 +271,18 @@ export function TaskDetailModal({ task, onClose, onEdit }: { task: TaskRow; onCl
           <InfoCell label={t('tasks.colAssignee')}>{task.assignee === 'human' ? <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">human</span> : <span className="font-mono">{task.agent}</span>}</InfoCell>
           <InfoCell label={t('forms.type')}>{task.type ? t(`forms.taskType.${task.type}`, { defaultValue: task.type }) : '—'}</InfoCell>
           <InfoCell label={t('api.taskColUpdated')}>{fmt(task.updatedAt)}</InfoCell>
+          {task.estimateDuration && (
+            <InfoCell label={t('tasks.estimateDuration')}>
+              <span className="tabular-nums">{formatGoDuration(task.estimateDuration)}</span>
+            </InfoCell>
+          )}
+          {task.startedAt && <InfoCell label={t('tasks.startedAt')}>{fmt(task.startedAt)}</InfoCell>}
+          {task.finishedAt && <InfoCell label={t('tasks.finishedAt')}>{fmt(task.finishedAt)}</InfoCell>}
+          {taskElapsedLabel(task) && (
+            <InfoCell label={t('tasks.elapsed')}>
+              <span className="tabular-nums">{taskElapsedLabel(task)}</span>
+            </InfoCell>
+          )}
           {task.dueDate && <InfoCell label={t('tasks.dueDate')}><span className="tabular-nums">{task.dueDate}</span></InfoCell>}
           {task.createdBy && <InfoCell label={t('tasks.createdBy')}><span className="font-mono">{task.createdBy}</span></InfoCell>}
           {task.parentId && <InfoCell label={t('tasks.parentTask')}><span className="font-mono text-xs">{task.parentId}</span></InfoCell>}

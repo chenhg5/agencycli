@@ -56,6 +56,8 @@ agencycli --dir $AGENCY_DIR task list --project <project> --agent <agent> --stat
 ### Control tasks
 
 ```bash
+agencycli --dir $AGENCY_DIR task set <task-id> [--title T] [--status S] [--priority N] \
+  [--due-date YYYY-MM-DD] [--estimate-duration 30m] [--parent ID] [--label L]...
 agencycli --dir $AGENCY_DIR task cancel <task-id>
 agencycli --dir $AGENCY_DIR task retry  <task-id>
 

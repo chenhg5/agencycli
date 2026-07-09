@@ -504,6 +504,8 @@ type Task struct {
 	StartedAt  *time.Time `yaml:"started_at,omitempty"`
 	FinishedAt *time.Time `yaml:"finished_at,omitempty"`
 	DueDate    *time.Time `yaml:"due_date,omitempty"`
+	// EstimateDuration is expected wall-clock effort (Go duration string, e.g. "30m", "2h").
+	EstimateDuration string `yaml:"estimate_duration,omitempty"`
 
 	DependsOn []string `yaml:"depends_on,omitempty"`
 

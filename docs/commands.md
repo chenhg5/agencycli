@@ -116,6 +116,9 @@ agencycli task add    --project P --agent A --title "T" --prompt "..." \
                       [--type feature|bug|chore] [--priority 0-3]
 agencycli task list   --project P --agent A [--status pending] [--archived]
 agencycli task show   <task-id>
+agencycli task set    <task-id> [--title T] [--status S] [--priority N] [--type T] \
+  [--description D] [--summary S] [--label L]... [--parent ID] [--due-date YYYY-MM-DD] \
+  [--estimate-duration 30m] [--assignee A] [--prompt P | --prompt-file PATH] [--position N]
 agencycli task cancel <task-id>
 agencycli task retry  <task-id>
 

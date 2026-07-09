@@ -28,6 +28,7 @@ func newTaskCmd() *cobra.Command {
 		newTaskListCmd(),
 		newTaskShowCmd(),
 		newTaskFindCmd(),
+		newTaskSetCmd(),
 		newTaskDoneCmd(),
 		newTaskConfirmRequestCmd(),
 		newTaskRetryCmd(),
@@ -57,6 +58,7 @@ func newTaskAddCmd() *cobra.Command {
 		labels         []string
 		parentID       string
 		dueDate        string
+		estimateDur    string
 		idempotencyKey string
 	)
 
@@ -158,6 +160,11 @@ func newTaskAddCmd() *cobra.Command {
 					return fmt.Errorf("invalid --due-date format, use YYYY-MM-DD")
 				}
 			}
+			if est, err := entity.NormalizeEstimateDuration(estimateDur); err != nil {
+				return err
+			} else {
+				t.EstimateDuration = est
+			}
 
 			ts := taskstore.New(root)
 
@@ -216,6 +223,7 @@ func newTaskAddCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&labels, "label", nil, "labels/tags for the task (repeatable)")
 	cmd.Flags().StringVar(&parentID, "parent", "", "parent task ID for sub-task")
 	cmd.Flags().StringVar(&dueDate, "due-date", "", "due date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&estimateDur, "estimate-duration", "", "expected effort (Go duration, e.g. 30m, 2h)")
 	return cmd
 }
 
@@ -363,6 +371,9 @@ func newTaskShowCmd() *cobra.Command {
 			if t.DueDate != nil {
 				fmt.Printf("Due Date : %s\n", t.DueDate.Format("2006-01-02"))
 			}
+			if t.EstimateDuration != "" {
+				fmt.Printf("Estimate : %s\n", t.EstimateDuration)
+			}
 			if t.Description != "" {
 				fmt.Printf("Desc     : %s\n", t.Description)
 			}
@@ -372,6 +383,9 @@ func newTaskShowCmd() *cobra.Command {
 			}
 			if t.FinishedAt != nil {
 				fmt.Printf("Finished : %s\n", t.FinishedAt.Format(time.RFC3339))
+			}
+			if elapsed := entity.TaskElapsed(t, time.Now().UTC()); elapsed > 0 {
+				fmt.Printf("Elapsed  : %s\n", elapsed.Round(time.Second))
 			}
 			if len(t.DependsOn) > 0 {
 				fmt.Printf("Depends  : %s\n", strings.Join(t.DependsOn, ", "))
@@ -448,6 +462,9 @@ Example:
 			if t.FinishedAt != nil {
 				fmt.Printf("Finished : %s\n", t.FinishedAt.Format(time.RFC3339))
 			}
+			if elapsed := entity.TaskElapsed(t, time.Now().UTC()); elapsed > 0 {
+				fmt.Printf("Elapsed  : %s\n", elapsed.Round(time.Second))
+			}
 			if len(t.DependsOn) > 0 {
 				fmt.Printf("Depends  : %s\n", strings.Join(t.DependsOn, ", "))
 			}
@@ -472,6 +489,174 @@ Example:
 	cmd.Flags().StringVar(&taskID, "id", "", "task ID to find (required)")
 	_ = cmd.MarkFlagRequired("id")
 	return cmd
+}
+
+// ── task set ──────────────────────────────────────────────────────────────────
+
+func newTaskSetCmd() *cobra.Command {
+	var (
+		project     string
+		agentName   string
+		title       string
+		description string
+		status      string
+		priority    int
+		taskType    string
+		summary     string
+		labels      []string
+		parentID    string
+		dueDate     string
+		estimateDur string
+		position    float64
+		assignee    string
+		prompt      string
+		promptFile  string
+		format      string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "set <task-id>",
+		Short: "Update task fields",
+		Long: `Update one or more fields on an existing task.
+
+Only flags you pass are changed. Omit --project/--agent to auto-locate the task
+across the workspace (same as task done).
+
+Clear optional fields with an empty value:
+  --due-date ""
+  --parent ""
+  --estimate-duration ""`,
+		Example: `  agencycli task set t-20260709-abc --priority 1
+  agencycli task set t-20260709-abc --status in_progress
+  agencycli task set t-20260709-abc --due-date 2026-07-15 --estimate-duration 2h
+  agencycli task set t-20260709-abc --parent t-parent-id --label bug --label urgent
+  agencycli task set t-20260709-abc --assignee human
+  agencycli task set t-20260709-abc --prompt-file ./updated-prompt.md`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveRoot()
+			if err != nil {
+				return err
+			}
+			taskID := args[0]
+
+			if !taskSetAnyChanged(cmd) {
+				return fmt.Errorf("at least one field flag is required (e.g. --title, --status, --priority)")
+			}
+
+			proj := strings.TrimSpace(project)
+			ag := strings.TrimSpace(agentName)
+			if proj == "" || ag == "" {
+				proj, ag, err = resolveTaskOwner(root, taskID)
+				if err != nil {
+					return err
+				}
+			}
+
+			ts := taskstore.New(root)
+			t, err := ts.GetTask(proj, ag, taskID)
+			if err != nil {
+				return err
+			}
+
+			patch := taskstore.TaskPatch{}
+			if cmd.Flags().Changed("title") {
+				patch.Title = &title
+			}
+			if cmd.Flags().Changed("description") {
+				patch.Description = &description
+			}
+			if cmd.Flags().Changed("status") {
+				st := entity.TaskStatus(strings.TrimSpace(status))
+				patch.Status = &st
+			}
+			if cmd.Flags().Changed("priority") {
+				patch.Priority = &priority
+			}
+			if cmd.Flags().Changed("type") {
+				typ := entity.TaskType(strings.TrimSpace(taskType))
+				patch.Type = &typ
+			}
+			if cmd.Flags().Changed("summary") {
+				patch.Summary = &summary
+			}
+			if cmd.Flags().Changed("label") {
+				patch.Labels = &labels
+			}
+			if cmd.Flags().Changed("parent") {
+				patch.ParentID = &parentID
+			}
+			if cmd.Flags().Changed("due-date") {
+				patch.DueDate = &dueDate
+			}
+			if cmd.Flags().Changed("estimate-duration") {
+				patch.EstimateDuration = &estimateDur
+			}
+			if cmd.Flags().Changed("position") {
+				patch.Position = &position
+			}
+			if cmd.Flags().Changed("assignee") {
+				patch.Assignee = &assignee
+			}
+			if cmd.Flags().Changed("prompt") || cmd.Flags().Changed("prompt-file") {
+				var promptText string
+				if cmd.Flags().Changed("prompt-file") {
+					data, err := os.ReadFile(promptFile)
+					if err != nil {
+						return fmt.Errorf("read prompt file: %w", err)
+					}
+					promptText = string(data)
+				} else {
+					promptText = prompt
+				}
+				patch.Prompt = &promptText
+			}
+
+			if _, err := taskstore.ApplyTaskPatch(t, patch, time.Now().UTC()); err != nil {
+				return err
+			}
+			if err := ts.PersistTask(proj, ag, t); err != nil {
+				return err
+			}
+
+			if resolveFormat(format) == "json" {
+				return printJSON(t)
+			}
+			fmt.Printf("✓ Task %s updated  [%s / %s]\n", taskID, proj, ag)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&project, "project", "", "project name (auto-detected if omitted)")
+	cmd.Flags().StringVar(&agentName, "agent", "", "agent name (auto-detected if omitted)")
+	cmd.Flags().StringVar(&title, "title", "", "new title")
+	cmd.Flags().StringVar(&description, "description", "", "new description")
+	cmd.Flags().StringVar(&status, "status", "", "new status (pending|in_progress|awaiting_confirmation|blocked|done_success|done_failed|cancelled)")
+	cmd.Flags().IntVar(&priority, "priority", 2, "new priority (0–3)")
+	cmd.Flags().StringVar(&taskType, "type", "", "new type (feature|bug|review|triage|test|research|chore)")
+	cmd.Flags().StringVar(&summary, "summary", "", "completion summary")
+	cmd.Flags().StringArrayVar(&labels, "label", nil, "replace labels (repeatable)")
+	cmd.Flags().StringVar(&parentID, "parent", "", "parent task ID (empty to clear)")
+	cmd.Flags().StringVar(&dueDate, "due-date", "", "due date YYYY-MM-DD (empty to clear)")
+	cmd.Flags().StringVar(&estimateDur, "estimate-duration", "", "expected effort e.g. 30m, 2h (empty to clear)")
+	cmd.Flags().Float64Var(&position, "position", 0, "kanban sort position")
+	cmd.Flags().StringVar(&assignee, "assignee", "", "assignee (project/agent or human)")
+	cmd.Flags().StringVar(&prompt, "prompt", "", "new agent prompt text")
+	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "read new prompt from file")
+	cmd.Flags().StringVar(&format, "format", "", "output format: json")
+	return cmd
+}
+
+func taskSetAnyChanged(cmd *cobra.Command) bool {
+	for _, name := range []string{
+		"title", "description", "status", "priority", "type", "summary", "label",
+		"parent", "due-date", "estimate-duration", "position", "assignee", "prompt", "prompt-file",
+	} {
+		if cmd.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // ── task done ─────────────────────────────────────────────────────────────────
@@ -525,9 +710,10 @@ The --summary value is passed to the next step via workflow routing ({{task.summ
 			}
 
 			now := time.Now().UTC()
+			prev := t.Status
 			t.Status = finalStatus
-			t.FinishedAt = &now
 			t.UpdatedAt = now
+			entity.ApplyStatusTimestamps(t, prev, now)
 			if summary != "" {
 				t.Summary = summary
 			}
@@ -698,12 +884,12 @@ func newTaskRetryCmd() *cobra.Command {
 			}
 
 			now := time.Now().UTC()
+			prev := found.Status
 			found.Status = entity.TaskStatusPending
 			found.RetryCount++
 			found.LastError = ""
-			found.StartedAt = nil
-			found.FinishedAt = nil
 			found.UpdatedAt = now
+			entity.ApplyStatusTimestamps(found, prev, now)
 
 			// Re-add to active queue.
 			if err := ts.AddTask(project, agentName, found); err != nil {
@@ -752,9 +938,10 @@ func newTaskCancelCmd() *cobra.Command {
 			}
 
 			now := time.Now().UTC()
+			prev := t.Status
 			t.Status = entity.TaskStatusCancelled
-			t.FinishedAt = &now
 			t.UpdatedAt = now
+			entity.ApplyStatusTimestamps(t, prev, now)
 			if reason != "" {
 				t.LastError = reason
 			}

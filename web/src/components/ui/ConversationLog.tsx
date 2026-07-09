@@ -471,7 +471,7 @@ function parseLog(content: string): ConversationItem[] {
         const toolUseBlocks = blocks.filter((b) => b.type === 'tool_use') as ContentBlock[]
         const toolResultBlocks = blocks.filter((b) => b.type === 'tool_result') as ContentBlock[]
         // thinking blocks (extended thinking) — show as collapsible
-        const thinkingBlocks = blocks.filter((b) => b.type === 'thinking' && b.thinking)
+        const thinkingBlocks = blocks.filter((b) => (b as { type: string }).type === 'thinking' && (b as { thinking?: string }).thinking) as Array<{ type: 'thinking'; thinking: string }>
 
         for (const tb of thinkingBlocks) {
           if (tb.thinking) items.push({ kind: 'thinking', text: tb.thinking })

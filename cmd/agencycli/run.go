@@ -93,9 +93,10 @@ This is a one-shot manual trigger. For recurring automated runs, use
 
 			// Transition to in_progress.
 			now := time.Now().UTC()
+			prev := task.Status
 			task.Status = entity.TaskStatusInProgress
-			task.StartedAt = &now
 			task.UpdatedAt = now
+			entity.ApplyStatusTimestamps(task, prev, now)
 			if err := ts.UpdateTask(project, agentName, task); err != nil {
 				return err
 			}
@@ -122,7 +123,9 @@ This is a one-shot manual trigger. For recurring automated runs, use
 
 			task.RunLogPath = result.LogPath
 			finished := time.Now().UTC()
+			prevStatus := task.Status
 			task.FinishedAt = &finished
+			entity.ApplyStatusTimestamps(task, prevStatus, finished)
 
 			// If the agent used `task confirm-request` internally it already
 			// set the task to awaiting_confirmation in the store; don't

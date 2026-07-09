@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chenhg5/agencycli/internal/entity"
+	"github.com/chenhg5/agencycli/internal/taskstore"
 )
 
 const maxJSONBody = 1 << 20 // 1 MiB
@@ -21,23 +22,11 @@ func (s *Server) readJSON(w http.ResponseWriter, r *http.Request, dst any) error
 }
 
 func validTaskType(s string) bool {
-	switch entity.TaskType(s) {
-	case entity.TaskTypeFeature, entity.TaskTypeBug, entity.TaskTypeReview,
-		entity.TaskTypeTriage, entity.TaskTypeTest, entity.TaskTypeResearch, entity.TaskTypeChore:
-		return true
-	default:
-		return false
-	}
+	return entity.ValidTaskType(s)
 }
 
 func validTaskStatus(s string) bool {
-	switch entity.TaskStatus(s) {
-	case entity.TaskStatusPending, entity.TaskStatusInProgress, entity.TaskStatusAwaitingConfirmation,
-		entity.TaskStatusBlocked, entity.TaskStatusDoneSuccess, entity.TaskStatusDoneFailed, entity.TaskStatusCancelled:
-		return true
-	default:
-		return false
-	}
+	return entity.ValidTaskStatus(s)
 }
 
 type postTaskBody struct {
@@ -52,6 +41,7 @@ type postTaskBody struct {
 	Labels      []string `json:"labels"`
 	ParentID    string   `json:"parentId"`
 	DueDate     string   `json:"dueDate"` // YYYY-MM-DD
+	EstimateDuration string `json:"estimateDuration"` // Go duration, e.g. "30m", "2h"
 }
 
 func (s *Server) handlePostProjectTask(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +112,12 @@ func (s *Server) handlePostProjectTask(w http.ResponseWriter, r *http.Request) {
 		ParentID:    strings.TrimSpace(body.ParentID),
 		CreatedAt:   now,
 		UpdatedAt:   now,
+	}
+	if est, err := entity.NormalizeEstimateDuration(body.EstimateDuration); err != nil {
+		s.jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	} else {
+		t.EstimateDuration = est
 	}
 	if body.DueDate != "" {
 		if dd, err := time.Parse("2006-01-02", body.DueDate); err == nil {
@@ -199,8 +195,11 @@ func (s *Server) handlePostCancelTask(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "task is already in terminal state")
 		return
 	}
+	prev := t.Status
+	now := time.Now().UTC()
 	t.Status = entity.TaskStatusCancelled
-	t.UpdatedAt = time.Now().UTC()
+	t.UpdatedAt = now
+	entity.ApplyStatusTimestamps(t, prev, now)
 	if err := s.ts.UpdateTask(project, agent, t); err != nil {
 		s.serverError(w, err)
 		return
@@ -250,6 +249,7 @@ type updateTaskBody struct {
 	Labels      *[]string `json:"labels,omitempty"`
 	ParentID    *string   `json:"parentId,omitempty"`
 	DueDate     *string   `json:"dueDate,omitempty"` // YYYY-MM-DD or "" to clear
+	EstimateDuration *string `json:"estimateDuration,omitempty"` // Go duration or "" to clear
 	Position    *float64  `json:"position,omitempty"`
 	Assignee    *string   `json:"assignee,omitempty"`
 	Prompt      *string   `json:"prompt,omitempty"`
@@ -270,7 +270,7 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	hasUpdate := body.Status != nil || body.Priority != nil || body.Type != nil || body.Summary != nil ||
 		body.Title != nil || body.Description != nil || body.Labels != nil || body.ParentID != nil ||
-		body.DueDate != nil || body.Position != nil || body.Assignee != nil || body.Prompt != nil
+		body.DueDate != nil || body.EstimateDuration != nil || body.Position != nil || body.Assignee != nil || body.Prompt != nil
 	if !hasUpdate {
 		s.jsonError(w, http.StatusBadRequest, "at least one field to update is required")
 		return
@@ -286,6 +286,12 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	patch := taskstore.TaskPatch{
+		Title: body.Title, Description: body.Description, Summary: body.Summary,
+		Labels: body.Labels, ParentID: body.ParentID, DueDate: body.DueDate,
+		EstimateDuration: body.EstimateDuration, Position: body.Position,
+		Assignee: body.Assignee, Prompt: body.Prompt,
+	}
 	if body.Status != nil {
 		st := strings.TrimSpace(*body.Status)
 		if st == "" {
@@ -296,7 +302,8 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.jsonError(w, http.StatusBadRequest, "invalid task status")
 			return
 		}
-		t.Status = entity.TaskStatus(st)
+		status := entity.TaskStatus(st)
+		patch.Status = &status
 	}
 	if body.Priority != nil {
 		p := *body.Priority
@@ -304,7 +311,7 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.jsonError(w, http.StatusBadRequest, "priority must be 0–3")
 			return
 		}
-		t.Priority = p
+		patch.Priority = &p
 	}
 	if body.Type != nil {
 		typ := strings.TrimSpace(*body.Type)
@@ -316,95 +323,25 @@ func (s *Server) handlePutUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.jsonError(w, http.StatusBadRequest, "invalid task type")
 			return
 		}
-		t.Type = entity.TaskType(typ)
-	}
-	if body.Summary != nil {
-		t.Summary = strings.TrimSpace(*body.Summary)
-	}
-	if body.Title != nil {
-		t.Title = strings.TrimSpace(*body.Title)
-	}
-	if body.Description != nil {
-		t.Description = strings.TrimSpace(*body.Description)
-	}
-	if body.Labels != nil {
-		t.Labels = *body.Labels
-	}
-	if body.ParentID != nil {
-		t.ParentID = strings.TrimSpace(*body.ParentID)
-	}
-	if body.DueDate != nil {
-		dd := strings.TrimSpace(*body.DueDate)
-		if dd == "" {
-			t.DueDate = nil
-		} else if parsed, err := time.Parse("2006-01-02", dd); err == nil {
-			t.DueDate = &parsed
-		}
-	}
-	if body.Position != nil {
-		t.Position = *body.Position
-	}
-	if body.Assignee != nil {
-		t.Assignee = strings.TrimSpace(*body.Assignee)
-	}
-	if body.Prompt != nil {
-		t.Prompt = strings.TrimSpace(*body.Prompt)
+		taskType := entity.TaskType(typ)
+		patch.Type = &taskType
 	}
 
-	now := time.Now().UTC()
-	t.UpdatedAt = now
-	if t.Status.IsTerminal() && t.FinishedAt == nil {
-		t.FinishedAt = &now
-	}
-
-	activeTasks, err := s.ts.ListTasks(project, agent)
-	if err != nil {
-		s.serverError(w, err)
+	if _, err := taskstore.ApplyTaskPatch(t, patch, time.Now().UTC()); err != nil {
+		s.jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	inActive := false
-	for _, at := range activeTasks {
-		if at.ID == id {
-			inActive = true
-			break
-		}
-	}
-	if inActive {
-		if err := s.ts.UpdateTask(project, agent, t); err != nil {
-			s.serverError(w, err)
-			return
-		}
-		if t.Status.IsTerminal() {
-			if err := s.ts.ArchiveTask(project, agent, t); err != nil {
-				s.serverError(w, err)
-				return
-			}
-		}
-	} else {
-		archived, err := s.ts.ListArchivedTasks(project, agent)
-		if err != nil {
-			s.serverError(w, err)
-			return
-		}
-		found := false
-		for i, at := range archived {
-			if at.ID == t.ID {
-				archived[i] = t
-				found = true
-				break
-			}
-		}
-		if !found {
+
+	if err := s.ts.PersistTask(project, agent, t); err != nil {
+		if strings.Contains(err.Error(), "not found") {
 			s.jsonError(w, http.StatusNotFound, "task not found")
 			return
 		}
-		if err := s.ts.OverwriteArchive(project, agent, archived); err != nil {
-			s.serverError(w, err)
-			return
-		}
+		s.serverError(w, err)
+		return
 	}
 
-	if body.Status != nil && t.Status.IsTerminal() && t.CreatedBy != "" {
+	if patch.Status != nil && t.Status.IsTerminal() && t.CreatedBy != "" {
 		s.notifyTaskDone(t, project, agent)
 	}
 

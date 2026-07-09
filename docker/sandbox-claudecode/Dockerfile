@@ -12,7 +12,7 @@
 # What's inside:
 #   - Claude Code CLI  (claude)
 #   - GitHub CLI       (gh)
-#   - Go 1.25          (go, gofmt, go test, go build …)
+#   - Go 1.26          (go, gofmt, go test, go build …)
 #   - Git, curl, jq, ripgrep, make, unzip
 #   - Node.js 22 LTS (required by claude)
 #   - Pre-configured ~/.claude/settings.json to bypass permission prompts
@@ -29,7 +29,7 @@
 FROM ubuntu:24.04
 
 ARG CN_MIRROR=0
-ARG GO_VERSION=1.25.7
+ARG GO_VERSION=1.26.4
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_VERSION=22 \

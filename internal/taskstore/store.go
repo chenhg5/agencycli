@@ -25,6 +25,9 @@ type Store interface {
 	// The task must already exist in the active (non-archived) set.
 	UpdateTask(project, agent string, t *entity.Task) error
 
+	// PersistTask saves a task in the active queue or archive (auto-archives terminal active tasks).
+	PersistTask(project, agent string, t *entity.Task) error
+
 	// ListTasks returns active (non-terminal) tasks for the agent.
 	// Pass one or more statuses to filter; empty filter returns all active tasks.
 	ListTasks(project, agent string, filter ...entity.TaskStatus) ([]*entity.Task, error)

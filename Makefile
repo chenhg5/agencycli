@@ -4,6 +4,10 @@ MAIN       := ./cmd/agencycli
 NPM_DIR    := npm
 WEB_DIR    := web
 
+# Prefer goenv-managed Go over /usr/bin/go (avoids auto-download with GOSUMDB=off).
+GO         ?= $(shell command -v goenv >/dev/null 2>&1 && goenv which go 2>/dev/null || command -v go)
+export GOTOOLCHAIN := local
+
 # ── Version info (injected at link time) ──────────────────────────────────────
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT     ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
@@ -47,7 +51,7 @@ web-dev: web-install
 
 build-go:
 	@mkdir -p $(BUILD_DIR)
-	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(MAIN)
+	$(GO) build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(MAIN)
 	@echo "  ✓ $(BUILD_DIR)/$(BINARY)  ($(VERSION))"
 
 build: web build-go
@@ -56,7 +60,7 @@ build: web build-go
 	@echo "  Web console embedded. Run: ./$(BUILD_DIR)/$(BINARY) start"
 
 install: web
-	go install -ldflags "$(LDFLAGS)" $(MAIN)
+	$(GO) install -ldflags "$(LDFLAGS)" $(MAIN)
 	@echo "Installed $(BINARY) $(VERSION) (with web console)"
 
 # ── One-step local deploy (build → install → restart supervisor) ──────────────
@@ -82,7 +86,7 @@ $(PLATFORMS): web
 	$(eval EXT  := $(if $(filter windows,$(OS)),.exe,))
 	$(eval NAME := $(BINARY)-$(VERSION)-$(OS)-$(ARCH)$(EXT))
 	@mkdir -p $(BUILD_DIR)
-	GOOS=$(OS) GOARCH=$(ARCH) go build \
+	GOOS=$(OS) GOARCH=$(ARCH) $(GO) build \
 		-ldflags "$(LDFLAGS)" \
 		-o $(BUILD_DIR)/$(NAME) \
 		$(MAIN)
@@ -106,7 +110,7 @@ release: $(PLATFORMS)
 # ── Dev helpers ────────────────────────────────────────────────────────────────
 
 test:
-	go test ./...
+	$(GO) test ./...
 
 lint:
 	golangci-lint run ./...

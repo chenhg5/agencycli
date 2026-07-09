@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiPost } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import type { TaskOption } from '../task/TaskModals'
 
 const TASK_TYPES = ['chore', 'feature', 'bug', 'review', 'triage', 'test', 'research'] as const
 
@@ -13,13 +14,14 @@ type Props = {
   projectId: string
   agents: AgentOpt[]
   allProjectsAgents?: ProjectAgentsOpt[]
+  taskOptions?: TaskOption[]
   onCreated: () => void
 }
 
 const fieldCls =
   'mt-1 w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none transition-colors focus:border-sky-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100'
 
-export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultAgents, allProjectsAgents, onCreated }: Props) {
+export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultAgents, allProjectsAgents, taskOptions = [], onCreated }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState(defaultProjectId)
@@ -32,6 +34,8 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
   const [assignee, setAssignee] = useState('')
   const [labelsStr, setLabelsStr] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [parentId, setParentId] = useState('')
+  const [estimateDuration, setEstimateDuration] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -58,6 +62,8 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
     setAssignee('')
     setLabelsStr('')
     setDueDate('')
+    setParentId('')
+    setEstimateDuration('')
     setErr(null)
   }
 
@@ -77,6 +83,10 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
     const projAgents = allProjectsAgents?.find((p) => p.projectId === proj)?.agents ?? []
     setAgent(projAgents[0]?.name ?? '')
   }
+
+  const parentChoices = useMemo(() => {
+    return taskOptions.filter((o) => !o.project || o.project === selectedProject)
+  }, [taskOptions, selectedProject])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -100,6 +110,8 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
           ...(assignee ? { assignee } : {}),
           ...(labels.length > 0 ? { labels } : {}),
           ...(dueDate ? { dueDate } : {}),
+          ...(parentId ? { parentId } : {}),
+          ...(estimateDuration.trim() ? { estimateDuration: estimateDuration.trim() } : {}),
         },
       )
       setOpen(false)
@@ -206,6 +218,26 @@ export function CreateTaskDialog({ projectId: defaultProjectId, agents: defaultA
                 <label className="block text-sm">
                   <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.dueDate')}</span>
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={fieldCls} />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.estimateDuration')}</span>
+                  <input value={estimateDuration} onChange={(e) => setEstimateDuration(e.target.value)} placeholder="30m" className={fieldCls} />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.parentTask')}</span>
+                  {parentChoices.length > 0 ? (
+                    <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={fieldCls}>
+                      <option value="">{t('tasks.parentTaskNone')}</option>
+                      {parentChoices.map((o) => (
+                        <option key={o.id} value={o.id}>{o.title}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={parentId} onChange={(e) => setParentId(e.target.value)} placeholder="t-..." className={cn(fieldCls, 'font-mono text-xs')} />
+                  )}
                 </label>
                 <label className="block text-sm">
                   <span className="text-neutral-600 dark:text-zinc-400">{t('tasks.labels')}</span>

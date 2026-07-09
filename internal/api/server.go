@@ -712,7 +712,10 @@ type taskRow struct {
 	CreatedBy   string    `json:"createdBy,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+	StartedAt   string    `json:"startedAt,omitempty"`
+	FinishedAt  string    `json:"finishedAt,omitempty"`
 	DueDate     string    `json:"dueDate,omitempty"`
+	EstimateDuration string `json:"estimateDuration,omitempty"`
 }
 
 func taskToRow(t *entity.Task, project, agent string, archived bool) taskRow {
@@ -730,6 +733,13 @@ func taskToRow(t *entity.Task, project, agent string, archived bool) taskRow {
 		Labels: labels, ParentID: t.ParentID, Position: t.Position,
 		CreatedBy: t.CreatedBy,
 		CreatedAt: t.CreatedAt.UTC(), UpdatedAt: t.UpdatedAt.UTC(),
+		EstimateDuration: t.EstimateDuration,
+	}
+	if t.StartedAt != nil {
+		r.StartedAt = t.StartedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if t.FinishedAt != nil {
+		r.FinishedAt = t.FinishedAt.UTC().Format(time.RFC3339Nano)
 	}
 	if t.DueDate != nil {
 		r.DueDate = t.DueDate.UTC().Format("2006-01-02")

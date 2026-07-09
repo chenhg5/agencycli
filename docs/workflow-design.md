@@ -764,7 +764,7 @@ session_scope: cycle   # cycle | task
 Deliverables:
 - `internal/taskstore/` — read/write `tasks.yaml`, `tasks_archive.yaml`, `heartbeat.yaml`
 - `internal/runner/` — shell exec wrapper, output parser, sentinel + session ID detection
-- `cmd/agencycli/task.go` — `task add/list/show/done/confirm-request/retry/cancel`
+- `cmd/agencycli/task.go` — `task add/list/show/set/done/confirm-request/retry/cancel`
 - `cmd/agencycli/run.go` — `run` command (manual trigger)
 - `cmd/agencycli/inbox.go` — `inbox list/show/confirm/reject/comment`
 - `cmd/agencycli/session.go` — `session set/reset/show`

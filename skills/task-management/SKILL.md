@@ -43,7 +43,27 @@ agencycli --dir $AGENCY_DIR task add \
   --title "Deploy to staging" \
   --prompt "Run: make deploy-staging" \
   --depends-on <task-id-1> --depends-on <task-id-2>
+
+# With scheduling / nesting metadata
+agencycli --dir $AGENCY_DIR task add \
+  --project <project> --agent <agent> \
+  --title "Implement sub-feature" \
+  --prompt "..." \
+  --parent <parent-task-id> \
+  --due-date 2026-07-15 \
+  --estimate-duration 2h
 ```
+
+### Task metadata fields
+
+| Field | CLI flag | Notes |
+|-------|----------|-------|
+| Due date | `--due-date YYYY-MM-DD` | Deadline |
+| Estimate | `--estimate-duration 30m` | Go duration (`30m`, `2h`) |
+| Parent | `--parent <task-id>` | Sub-task nesting |
+| Labels | `--label` (repeatable) | Tags |
+| Started / finished | *(auto)* | Set when status → `in_progress` / terminal |
+
 
 ### Task types
 
@@ -70,6 +90,26 @@ agencycli --dir $AGENCY_DIR task show <task-id> --project <project> --agent <age
 # Find a task anywhere by ID (no project/agent needed)
 agencycli --dir $AGENCY_DIR task find --id <task-id>
 ```
+
+---
+
+## Update task fields
+
+```bash
+# Only flags you pass are changed; project/agent auto-detected if omitted
+agencycli --dir $AGENCY_DIR task set <task-id> --priority 1
+agencycli --dir $AGENCY_DIR task set <task-id> --status in_progress
+agencycli --dir $AGENCY_DIR task set <task-id> \
+  --due-date 2026-07-15 --estimate-duration 2h --parent <parent-task-id>
+agencycli --dir $AGENCY_DIR task set <task-id> --label bug --label urgent
+agencycli --dir $AGENCY_DIR task set <task-id> --due-date ""   # clear due date
+agencycli --dir $AGENCY_DIR task set <task-id> --format json   # print updated task
+```
+
+Updatable: `title`, `description`, `status`, `priority`, `type`, `summary`, `label`,
+`parent`, `due-date`, `estimate-duration`, `assignee`, `prompt` / `prompt-file`, `position`.
+
+Status changes auto-maintain `started_at` / `finished_at`.
 
 ---
 
@@ -243,4 +283,5 @@ agencycli --dir $AGENCY_DIR task tokens \
 | Wrong agent received the task | Cancel + re-create for correct agent |
 | Repeated recurring work | `cron add` with a schedule |
 | Human must approve before agent proceeds | Agent calls `task confirm-request` |
+| Need to change title/priority/due date/parent mid-flight | `task set <id> --<field> ...` |
 | Need to know which agent owns a task ID | `task find --id <id>` |
